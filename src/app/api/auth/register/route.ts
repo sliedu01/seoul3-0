@@ -6,8 +6,8 @@ export async function POST(req: Request) {
   try {
     const { email, password, name, phone, company } = await req.json();
 
-    if (!email || !password || !name || !phone || !company) {
-      return NextResponse.json({ error: '모든 필드를 입력해 주세요.' }, { status: 400 });
+    if (!email || !password || !name) {
+      return NextResponse.json({ error: '필수 필드(이메일, 비밀번호, 성함)를 모두 입력해 주세요.' }, { status: 400 });
     }
 
     // 이메일 중복 확인
@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     });
 
     if (existingUser) {
-      return NextResponse.json({ error: 'User already exists' }, { status: 409 });
+      return NextResponse.json({ error: '이미 존재하는 이메일입니다. 로그인 창을 이용해 주세요!' }, { status: 409 });
     }
 
     // 비밀번호 해싱

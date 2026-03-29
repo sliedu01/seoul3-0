@@ -9,7 +9,9 @@ export default function RegisterPage() {
     email: "",
     password: "",
     name: "",
-    role: "MEMBER"
+    role: "MEMBER",
+    phone: "",
+    company: ""
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -86,8 +88,8 @@ export default function RegisterPage() {
                   <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-500 group-focus-within:text-blue-400 transition-colors" />
                   <input
                     type="tel"
-                    value={(formData as any).phone || ""}
-                    onChange={(e) => setFormData({...formData, phone: e.target.value} as any)}
+                    value={formData.phone}
+                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
                     className="w-full pl-12 pr-4 py-3.5 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-blue-500/50 focus:bg-white/10 focus:ring-4 focus:ring-blue-500/5 transition-all font-bold text-white placeholder:text-slate-600 text-sm"
                     placeholder="010-0000-0000"
                     required
@@ -102,8 +104,8 @@ export default function RegisterPage() {
                   <Building className="absolute left-4 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-500 group-focus-within:text-blue-400 transition-colors" />
                   <input
                     type="text"
-                    value={(formData as any).company || ""}
-                    onChange={(e) => setFormData({...formData, company: e.target.value} as any)}
+                    value={formData.company}
+                    onChange={(e) => setFormData({...formData, company: e.target.value})}
                     className="w-full pl-12 pr-4 py-3.5 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-blue-500/50 focus:bg-white/10 focus:ring-4 focus:ring-blue-500/5 transition-all font-bold text-white placeholder:text-slate-600 text-sm"
                     placeholder="소속 기관명 입력"
                     required
