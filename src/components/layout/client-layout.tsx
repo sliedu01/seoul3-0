@@ -9,16 +9,16 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
   const isAuthPage = pathname === "/login" || pathname === "/register" || pathname === "/forgot-password";
 
   return (
-    <div className="flex min-h-screen bg-slate-50/50">
+    <div className="flex min-h-screen bg-slate-50/50 relative overflow-x-hidden">
       {!isAuthPage && <Sidebar />}
       <main 
         className={cn(
-          "flex-1 transition-all duration-300",
+          "flex-1 transition-all duration-300 min-h-screen",
           !isAuthPage ? "lg:pl-64 pt-16 lg:pt-0" : "w-full"
         )}
       >
         <div className={cn(
-          "mx-auto p-4 md:p-8",
+          "w-full mx-auto p-4 md:p-8 transition-opacity duration-500",
           !isAuthPage ? "max-w-7xl" : "max-w-full p-0 md:p-0"
         )}>
           {children}
