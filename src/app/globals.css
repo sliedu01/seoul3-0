@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+body {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  body {
+    background: white !important;
+    padding: 0 !important;
+  }
+  main {
+    padding-left: 0 !important;
+  }
+  .mx-auto {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+  .card {
+    border: 1px solid #eee !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    break-inside: avoid;
+  }
+  table {
+    min-width: 0 !important;
+    table-layout: auto !important;
+  }
+  th, td {
+    border: 1px solid #ddd !important;
+    font-size: 8px !important;
+  }
+  .sticky {
+    position: static !important;
+  }
+}
