@@ -12,12 +12,21 @@ export default function CalendarPage() {
   const [programs, setPrograms] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [showEventModal, setShowEventModal] = useState(false)
+  const [selectedEvent, setSelectedEvent] = useState<any>(null)
+  const [newTitle, setNewTitle] = useState("")
+  const [newStartDate, setNewStartDate] = useState("")
+  const [newEndDate, setNewEndDate] = useState("")
+  const [isAdding, setIsAdding] = useState(false)
+
   useEffect(() => {
     Promise.all([
       fetch("/api/meetings").then(res => res.json()),
       fetch("/api/sessions").then(res => res.json()),
-      fetch("/api/programs").then(res => res.json())
-    ]).then(([meetingsData, sessionsData, programsData]) => {
+      fetch("/api/programs").then(res => res.json()),
+      fetch("/api/schedules").then(res => res.json().catch(() => []))
+    ]).then(([meetingsData, sessionsData, programsData, schedulesData]) => {
       if (Array.isArray(programsData)) setPrograms(programsData)
       
       let allEvents: any[] = []
@@ -55,6 +64,23 @@ export default function CalendarPage() {
         allEvents = [...allEvents, ...parsedMeetings]
       }
 
+      if (Array.isArray(schedulesData)) {
+        const parsedSchedules = schedulesData.map((s: any) => {
+          const sStart = new Date(s.startDate)
+          const sEnd = s.endDate ? new Date(s.endDate) : sStart
+          return {
+            id: `other-${s.id}`,
+            program: "기타일정",
+            partner: s.title,
+            session: 1,
+            startDate: sStart,
+            endDate: sEnd,
+            type: 'other'
+          }
+        })
+        allEvents = [...allEvents, ...parsedSchedules]
+      }
+
       setEvents(allEvents)
       setLoading(false)
     }).catch(err => {
@@ -64,6 +90,7 @@ export default function CalendarPage() {
   }, [])
 
   const programColors: Record<string, string> = {
+    "기타일정": "bg-slate-700/90 text-white border-slate-800 shadow-sm",
     "회의": "bg-yellow-200/90 text-yellow-900 border-yellow-400 shadow-[inset_0_1px_1px_rgba(255,255,255,0.7)]",
     "진로캠퍼스": "bg-blue-100/90 text-blue-900 border-blue-300 shadow-sm",
     "STEM프리스쿨": "bg-emerald-100/90 text-emerald-900 border-emerald-300 shadow-sm",
@@ -210,6 +237,10 @@ export default function CalendarPage() {
                        width: `${widthPercent}%`,
                        top: `${e.weekTrackIndex * 26}px`,
                      }}
+                     onClick={() => {
+                        setSelectedEvent(e)
+                        setShowEventModal(true)
+                     }}
                    >
                      <div className={cn(
                         "h-[22px] px-2 flex items-center border font-bold text-[11px] pointer-events-auto cursor-pointer hover:brightness-95 hover:scale-[1.01] transition-all",
@@ -220,7 +251,7 @@ export default function CalendarPage() {
                         <div className="truncate w-full flex items-center justify-between gap-1.5">
                           <div className="flex items-center gap-1.5 truncate">
                             {!isContinuedFromPast && <div className="w-1.5 h-1.5 rounded-full bg-current opacity-60 shrink-0"></div>}
-                            <span className="truncate drop-shadow-sm tracking-tight">{e.type === 'meeting' ? `[회의] ${e.partner}` : e.program}</span>
+                            <span className="truncate drop-shadow-sm tracking-tight">{e.type === 'meeting' ? `[회의] ${e.partner}` : e.type === 'other' ? e.partner : e.program}</span>
                           </div>
                           {e.type === 'session' && (
                              <span className="opacity-80 text-[10px] shrink-0 font-medium tracking-tight">
@@ -253,6 +284,9 @@ export default function CalendarPage() {
           <p className="text-slate-400 mt-2 font-bold text-xl italic drop-shadow-sm">서울런 3.0 전체 사업 및 교육 세션 일정 통합 관리 시스템</p>
         </div>
         <div className="flex gap-3">
+          <Button onClick={() => setShowAddModal(true)} className="rounded-2xl shadow-sm font-bold flex items-center gap-2">
+             <Plus className="w-4 h-4" /> 기타일정 추가
+          </Button>
           <div className="text-xs font-black text-blue-600 bg-blue-50 px-5 py-2.5 rounded-2xl border border-blue-100 flex items-center gap-2 shadow-sm">
             <div className="w-2 h-2 rounded-full bg-blue-600 animate-ping"></div>
             실시간 일정 동기화 활성
@@ -296,6 +330,79 @@ export default function CalendarPage() {
           </Card>
         </div>
       </div>
+
+      {showAddModal && (
+        <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full animate-in zoom-in-95">
+            <h2 className="text-2xl font-black text-slate-900 mb-6">기타 일정 추가</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-bold text-slate-700 mb-2 block">일정 제목 (내용)</label>
+                <input type="text" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} className="w-full h-12 px-4 rounded-xl border border-slate-200 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" placeholder="일정 이름을 입력하세요" />
+              </div>
+              <div>
+                <label className="text-sm font-bold text-slate-700 mb-2 block">시작 일자</label>
+                <input type="date" value={newStartDate} onChange={(e) => setNewStartDate(e.target.value)} className="w-full h-12 px-4 rounded-xl border border-slate-200 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+              </div>
+              <div>
+                <label className="text-sm font-bold text-slate-700 mb-2 block">종료 일자 (선택)</label>
+                <input type="date" value={newEndDate} onChange={(e) => setNewEndDate(e.target.value)} className="w-full h-12 px-4 rounded-xl border border-slate-200 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+              </div>
+            </div>
+            <div className="mt-8 flex justify-end gap-3">
+              <Button variant="ghost" className="rounded-xl px-6" onClick={() => setShowAddModal(false)}>취소</Button>
+              <Button disabled={isAdding} className="rounded-xl px-6 bg-blue-600 hover:bg-blue-700" onClick={async () => {
+                if (!newTitle || !newStartDate) return alert("제목과 시작일자를 입력해주세요.");
+                setIsAdding(true);
+                try {
+                  const res = await fetch("/api/schedules", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ title: newTitle, startDate: newStartDate, endDate: newEndDate || newStartDate })
+                  });
+                  if (res.ok) window.location.reload();
+                  else alert("등록 실패");
+                } catch { alert("오류 발생"); }
+                setIsAdding(false);
+              }}>{isAdding ? "등록 중..." : "일정 등록"}</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEventModal && selectedEvent && (
+        <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in" onClick={() => setShowEventModal(false)}>
+          <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full animate-in zoom-in-95 text-center" onClick={(e) => e.stopPropagation()}>
+            <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CalendarIcon className="w-8 h-8 text-blue-600" />
+            </div>
+            <h2 className="text-xl font-black text-slate-900 mb-2">
+              {selectedEvent.type === 'other' ? selectedEvent.partner : (selectedEvent.type === 'meeting' ? `[회의] ${selectedEvent.partner}` : `${selectedEvent.program} - ${selectedEvent.partner}`)}
+            </h2>
+            <p className="text-slate-500 font-medium text-sm mb-6">
+              {format(selectedEvent.startDate, "yyyy년 MM월 dd일")} 
+              {format(selectedEvent.startDate, "yyyy-MM-dd") !== format(selectedEvent.endDate, "yyyy-MM-dd") && ` ~ ${format(selectedEvent.endDate, "yyyy년 MM월 dd일")}`}
+            </p>
+            
+            <div className="flex flex-col gap-3">
+              <Button className="w-full rounded-xl bg-[#4285F4] hover:bg-[#3367D6] text-white font-bold h-12" onClick={() => {
+                const titleText = selectedEvent.type === 'other' ? selectedEvent.partner : (selectedEvent.type === 'meeting' ? `[회의] ${selectedEvent.partner}` : `${selectedEvent.program} - ${selectedEvent.partner}`);
+                const title = encodeURIComponent(`[2026서울런] ${titleText}`);
+                const details = encodeURIComponent(`서울런 교육 일정: ${titleText}`);
+                const startDate = format(new Date(selectedEvent.startDate), "yyyyMMdd");
+                const endDateStr = format(addDays(new Date(selectedEvent.endDate), 1), "yyyyMMdd");
+                const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startDate}/${endDateStr}&details=${details}`;
+                window.open(url, '_blank');
+              }}>
+                구글 캘린더에 일정 공유
+              </Button>
+              <Button variant="ghost" className="w-full rounded-xl h-12 font-bold text-slate-500" onClick={() => setShowEventModal(false)}>
+                닫기
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
