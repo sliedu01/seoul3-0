@@ -23,6 +23,10 @@ export function Sidebar() {
   const [isOpen, setIsOpen] = useState(false)
   const { user } = useAuth()
 
+  // Do not show sidebar on auth pages
+  const isAuthPage = pathname === "/login" || pathname === "/register" || pathname === "/forgot-password"
+  if (isAuthPage) return null
+
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     window.location.href = "/login";
@@ -88,12 +92,16 @@ export function Sidebar() {
         {/* User Info & Logout */}
         {user && (
           <div className="p-4 border-t border-slate-100 bg-slate-50/50">
-            <div className="flex items-center gap-3 px-2 mb-3">
-              <div className="w-9 h-9 bg-white rounded-full flex items-center justify-center border border-slate-200 shadow-sm">
+            <Link 
+              href="/settings/profile"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center gap-3 px-2 mb-3 hover:bg-white rounded-xl py-2 transition-colors group/user"
+            >
+              <div className="w-9 h-9 bg-white rounded-full flex items-center justify-center border border-slate-200 shadow-sm group-hover/user:border-blue-200 transition-colors">
                 <User className="h-4 w-4 text-blue-600" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-black text-slate-800 truncate">{user.name || "사용자"}</p>
+                <p className="text-sm font-black text-slate-800 truncate group-hover/user:text-blue-700 transition-colors">{user.name || "사용자"}</p>
                 <div className="flex items-center gap-1">
                     <span className={cn(
                         "text-[10px] px-1.5 py-0.5 rounded-md font-bold",
@@ -104,7 +112,7 @@ export function Sidebar() {
                     </span>
                 </div>
               </div>
-            </div>
+            </Link>
             <button 
               onClick={handleLogout}
               className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-600 font-bold text-sm hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-all shadow-sm"

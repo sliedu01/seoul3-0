@@ -1,8 +1,18 @@
 @import "tailwindcss";
 
+@theme {
+  --color-brand-blue: #3b82f6;
+  --color-brand-indigo: #6366f1;
+}
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+}
+
 body {
-  background-color: #f8fafc;
-  color: #0f172a;
+  background-color: var(--background);
+  color: var(--foreground);
 }
 
 @media print {
