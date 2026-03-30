@@ -129,6 +129,8 @@ model MeetingMinute {
   id             String   @id @default(cuid())
   title          String
   date           DateTime
+  time           String?                 // 회의 시간
+  location       String?                 // 회의 장소
   sequenceNumber Int      @default(1)    // 회차
   managedOrg     String?                 // 담당기관
   attendees      String?                 // 참석자
@@ -138,8 +140,6 @@ model MeetingMinute {
   nextSchedule   String?                 // 차기일정
   meetingContent String?  @default("")   // 회의내용
   others         String?                 // 기타사항
-  time           String?                 // 회의 시간
-  location       String?                 // 회의 장소
   pdfFilePath    String   
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
