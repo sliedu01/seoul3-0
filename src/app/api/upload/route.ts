@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
+import { prisma } from "@/lib/prisma";
 
 export async function POST(req: Request) {
   try {
@@ -13,16 +12,21 @@ export async function POST(req: Request) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Save to the root 'uploads' directory
-    const uploadDir = path.join(process.cwd(), "uploads");
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir);
-    }
+    // Save to PostgreSQL via Prisma
+    const savedFile = await prisma.fileStorage.upsert({
+      where: { fileName: file.name },
+      update: {
+        data: buffer,
+        mimeType: file.type || "application/pdf"
+      },
+      create: {
+        fileName: file.name,
+        data: buffer,
+        mimeType: file.type || "application/pdf"
+      }
+    });
 
-    const filePath = path.join(uploadDir, file.name);
-    fs.writeFileSync(filePath, buffer);
-
-    return NextResponse.json({ success: true, fileName: file.name });
+    return NextResponse.json({ success: true, fileName: savedFile.fileName });
   } catch (error: any) {
     console.error("Upload Error:", error);
     return NextResponse.json({ error: "Failed to upload file", details: error.message }, { status: 500 });

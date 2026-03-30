@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
+import { prisma } from "@/lib/prisma";
 
 export async function GET(req: Request) {
   try {
@@ -11,18 +10,19 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Filename is required" }, { status: 400 });
     }
 
-    const filePath = path.join(process.cwd(), "uploads", fileName);
+    // Retrieve file from PostgreSQL via Prisma
+    const fileRecord = await prisma.fileStorage.findUnique({
+      where: { fileName }
+    });
 
-    if (!fs.existsSync(filePath)) {
-      return NextResponse.json({ error: "File not found" }, { status: 404 });
+    if (!fileRecord) {
+      return NextResponse.json({ error: "File not found in database" }, { status: 404 });
     }
 
-    const fileBuffer = fs.readFileSync(filePath);
-
-    return new Response(fileBuffer, {
+    return new Response(fileRecord.data, {
       headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${encodeURIComponent(fileName)}"`,
+        "Content-Type": fileRecord.mimeType || "application/pdf",
+        "Content-Disposition": `attachment; filename="${encodeURIComponent(fileName)}"; filename*=UTF-8''${encodeURIComponent(fileName)}`,
       },
     });
   } catch (error: any) {
