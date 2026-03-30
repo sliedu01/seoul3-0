@@ -11,6 +11,7 @@ export default function MeetingsPage() {
   const [loading, setLoading] = useState(true)
   const [isUploading, setIsUploading] = useState(false)
   const [showModal, setShowModal] = useState(false)
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
   const [formData, setFormData] = useState({
     title: "",
     date: new Date().toISOString().split('T')[0],
@@ -51,7 +52,9 @@ export default function MeetingsPage() {
     fetch("/api/meetings")
       .then(res => res.json())
       .then(data => {
-        if (Array.isArray(data)) setMeetings(data)
+        if (Array.isArray(data)) {
+          setMeetings(data)
+        }
         setLoading(false)
       })
       .catch(err => {
@@ -59,6 +62,16 @@ export default function MeetingsPage() {
         setLoading(false)
       })
   }
+
+  // Derived state: sorted meetings
+  const sortedMeetings = [...meetings].sort((a, b) => {
+    const timeA = a.time || "00:00"
+    const timeB = b.time || "00:00"
+    const dateA = new Date(`${a.date.split('T')[0]}T${timeA.length === 5 ? timeA : "00:00"}:00`).getTime()
+    const dateB = new Date(`${b.date.split('T')[0]}T${timeB.length === 5 ? timeB : "00:00"}:00`).getTime()
+    return sortOrder === 'desc' ? dateB - dateA : dateA - dateB
+  })
+
 
   const handleFileUpload = async (file: File) => {
     setIsUploading(true)
@@ -220,14 +233,23 @@ export default function MeetingsPage() {
           <h1 className="text-4xl font-black tracking-tight text-slate-900">회의록 관리</h1>
           <p className="text-slate-500 mt-1 font-semibold text-lg italic">서울런 3.0 운영 및 진도 관리 회의 기록</p>
         </div>
-        {canEdit && (
+        <div className="flex items-center gap-3">
           <Button 
-            onClick={() => setShowModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-black px-6 py-6 rounded-2xl shadow-lg shadow-blue-200 flex items-center gap-2"
+            variant="outline"
+            onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+            className="h-[52px] rounded-2xl font-bold px-6 border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-blue-600"
           >
-            <Plus className="w-5 h-5" /> 신규 회의 추가
+            {sortOrder === 'desc' ? '최신순 (새로운 것부터)' : '과거순 (오래된 것부터)'}
           </Button>
-        )}
+          {canEdit && (
+            <Button 
+              onClick={() => setShowModal(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-black px-6 py-6 rounded-2xl shadow-lg shadow-blue-200 flex items-center gap-2"
+            >
+              <Plus className="w-5 h-5" /> 신규 회의 추가
+            </Button>
+          )}
+        </div>
       </div>
 
       {isMember && (
@@ -247,13 +269,20 @@ export default function MeetingsPage() {
             <p className="text-slate-400 font-bold">등록된 회의록이 없습니다.</p>
           </div>
         ) : (
-          meetings.map(m => (
+          sortedMeetings.map(m => (
             <div key={m.id} className="grid grid-cols-1 md:grid-cols-12 bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-all overflow-hidden group">
               {/* Column 1: Info (Date, Seq, Org) */}
               <div className="md:col-span-3 bg-slate-50/50 p-6 border-r border-slate-50 flex flex-col justify-center">
-                <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">{new Date(m.date).toLocaleDateString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit' })}</div>
+                <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">
+                  {new Date(m.date).toLocaleDateString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit' })}
+                  {m.time && <span className="ml-1.5 text-slate-500 font-bold">{m.time}</span>}
+                </div>
                 <div className="text-xl font-black text-slate-900 mb-2">{m.sequenceNumber}회차 회의</div>
                 <div className="flex flex-col gap-1 text-xs font-bold text-slate-500">
+                  <div className="flex items-center">
+                     <span className="bg-slate-200 px-2 py-0.5 rounded text-[8px] mr-2 shrink-0">장소</span>
+                     <span className="truncate">{m.location || "-"}</span>
+                  </div>
                   <div className="flex items-center">
                     <span className="bg-slate-200 px-2 py-0.5 rounded text-[8px] mr-2 shrink-0">담당</span>
                     <span className="truncate">{m.managedOrg || "미지정"}</span>
