@@ -17,7 +17,8 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { 
       date, title, pdfFilePath, sequenceNumber, managedOrg, 
-      attendees, purpose, agenda, preparation, nextSchedule, meetingContent, others 
+      attendees, purpose, agenda, preparation, nextSchedule, meetingContent, others,
+      time, location
     } = body;
     const meeting = await prisma.meetingMinute.create({
       data: {
@@ -32,7 +33,9 @@ export async function POST(req: Request) {
         preparation,
         nextSchedule,
         meetingContent: meetingContent || "",
-        others
+        others,
+        time,
+        location
       }
     });
     return NextResponse.json(meeting);

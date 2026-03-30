@@ -62,7 +62,8 @@ export async function POST(req: Request) {
       
       const metadata: any = {
         title: "", attendees: "", purpose: "", agenda: "", 
-        preparation: "", nextSchedule: "", meetingContent: "", others: ""
+        preparation: "", nextSchedule: "", meetingContent: "", others: "",
+        time: "", location: ""
       };
 
       // Step B: Smart Line Re-joining (Sentence Reconstruction)
@@ -108,6 +109,16 @@ export async function POST(req: Request) {
         // Priority 2: Keyword based matching
         if (cleanLine.includes("회의명") || cleanLine.includes("회의제목")) {
           metadata.title = line.split(/[:：]/)[1]?.trim() || line;
+        } else if (cleanLine.match(/일\s*시[:：]?/)) {
+          currentKey = "time";
+          const fullTime = line.replace(/^.*?일\s*시[:：]?\s*/i, "");
+          // Try to extract time (HH:mm) from the full string if it exists
+          const timeMatch = fullTime.match(/([01]?\d|2[0-3]):[0-5]\d/);
+          if (timeMatch) metadata.time = timeMatch[0];
+          else metadata.time = fullTime;
+        } else if (cleanLine.match(/장\s*소[:：]?/)) {
+          currentKey = "location";
+          metadata.location = line.replace(/^.*?장\s*소[:：]?\s*/i, "");
         } else if (cleanLine.match(/참\s*석\s*자[:：]?/)) {
           currentKey = "attendees";
           metadata.attendees = line.replace(/^.*?참\s*석\s*자[:：]?\s*/i, "");

@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react"
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, addDays, eachDayOfInterval, differenceInDays, startOfDay } from "date-fns"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight, UploadCloud, FileText, Plus, Calendar as CalendarIcon } from "lucide-react"
+import { ChevronLeft, ChevronRight, UploadCloud, FileText, Plus, Calendar as CalendarIcon, Edit, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export default function CalendarPage() {
@@ -19,6 +19,36 @@ export default function CalendarPage() {
   const [newStartDate, setNewStartDate] = useState("")
   const [newEndDate, setNewEndDate] = useState("")
   const [isAdding, setIsAdding] = useState(false)
+  
+  const [isEditingSchedule, setIsEditingSchedule] = useState(false)
+  const [editTitle, setEditTitle] = useState("")
+  const [editStartDate, setEditStartDate] = useState("")
+  const [editEndDate, setEditEndDate] = useState("")
+  const [isUpdating, setIsUpdating] = useState(false)
+
+  const handleDeleteSchedule = async (id: string) => {
+    if (!confirm("이 일정을 삭제하시겠습니까?")) return;
+    try {
+      const res = await fetch(`/api/schedules/${id.replace('other-', '')}`, { method: "DELETE" });
+      if (res.ok) window.location.reload();
+      else alert("삭제 실패");
+    } catch { alert("오류 발생"); }
+  };
+
+  const handleUpdateSchedule = async (id: string) => {
+    if (!editTitle || !editStartDate) return alert("제목과 시작일자를 입력해주세요.");
+    setIsUpdating(true);
+    try {
+      const res = await fetch(`/api/schedules/${id.replace('other-', '')}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: editTitle, startDate: editStartDate, endDate: editEndDate || editStartDate })
+      });
+      if (res.ok) window.location.reload();
+      else alert("수정 실패");
+    } catch { alert("오류 발생"); }
+    setIsUpdating(false);
+  };
 
   useEffect(() => {
     Promise.all([
@@ -371,35 +401,85 @@ export default function CalendarPage() {
       )}
 
       {showEventModal && selectedEvent && (
-        <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in" onClick={() => setShowEventModal(false)}>
+        <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in" onClick={() => {
+          setShowEventModal(false);
+          setIsEditingSchedule(false);
+        }}>
           <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full animate-in zoom-in-95 text-center" onClick={(e) => e.stopPropagation()}>
-            <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CalendarIcon className="w-8 h-8 text-blue-600" />
-            </div>
-            <h2 className="text-xl font-black text-slate-900 mb-2">
-              {selectedEvent.type === 'other' ? selectedEvent.partner : (selectedEvent.type === 'meeting' ? `[회의] ${selectedEvent.partner}` : `${selectedEvent.program} - ${selectedEvent.partner}`)}
-            </h2>
-            <p className="text-slate-500 font-medium text-sm mb-6">
-              {format(selectedEvent.startDate, "yyyy년 MM월 dd일")} 
-              {format(selectedEvent.startDate, "yyyy-MM-dd") !== format(selectedEvent.endDate, "yyyy-MM-dd") && ` ~ ${format(selectedEvent.endDate, "yyyy년 MM월 dd일")}`}
-            </p>
-            
-            <div className="flex flex-col gap-3">
-              <Button className="w-full rounded-xl bg-[#4285F4] hover:bg-[#3367D6] text-white font-bold h-12" onClick={() => {
-                const titleText = selectedEvent.type === 'other' ? selectedEvent.partner : (selectedEvent.type === 'meeting' ? `[회의] ${selectedEvent.partner}` : `${selectedEvent.program} - ${selectedEvent.partner}`);
-                const title = encodeURIComponent(`[2026서울런] ${titleText}`);
-                const details = encodeURIComponent(`서울런 교육 일정: ${titleText}`);
-                const startDate = format(new Date(selectedEvent.startDate), "yyyyMMdd");
-                const endDateStr = format(addDays(new Date(selectedEvent.endDate), 1), "yyyyMMdd");
-                const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startDate}/${endDateStr}&details=${details}`;
-                window.open(url, '_blank');
-              }}>
-                구글 캘린더에 일정 공유
-              </Button>
-              <Button variant="ghost" className="w-full rounded-xl h-12 font-bold text-slate-500" onClick={() => setShowEventModal(false)}>
-                닫기
-              </Button>
-            </div>
+            {isEditingSchedule ? (
+              <div className="text-left">
+                <h2 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-2">
+                  <Edit className="w-5 h-5 text-blue-600" /> 일정 수정
+                </h2>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 mb-1 block uppercase">일정 제목</label>
+                    <input type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="w-full h-11 px-4 rounded-xl border border-slate-200 text-sm font-bold outline-none focus:border-blue-500" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 mb-1 block uppercase">시작 일자</label>
+                    <input type="date" value={editStartDate} onChange={(e) => setEditStartDate(e.target.value)} className="w-full h-11 px-4 rounded-xl border border-slate-200 text-sm font-bold outline-none focus:border-blue-500" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 mb-1 block uppercase">종료 일자</label>
+                    <input type="date" value={editEndDate} onChange={(e) => setEditEndDate(e.target.value)} className="w-full h-11 px-4 rounded-xl border border-slate-200 text-sm font-bold outline-none focus:border-blue-500" />
+                  </div>
+                </div>
+                <div className="mt-8 flex gap-2">
+                  <Button variant="ghost" className="flex-1 rounded-xl font-bold h-11" onClick={() => setIsEditingSchedule(false)}>취소</Button>
+                  <Button disabled={isUpdating} className="flex-1 rounded-xl bg-blue-600 hover:bg-blue-700 font-bold h-11" onClick={() => handleUpdateSchedule(selectedEvent.id)}>
+                    {isUpdating ? "저장 중..." : "사항 저장"}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CalendarIcon className="w-8 h-8 text-blue-600" />
+                </div>
+                <h2 className="text-xl font-black text-slate-900 mb-2">
+                  {selectedEvent.type === 'other' ? selectedEvent.partner : (selectedEvent.type === 'meeting' ? `[회의] ${selectedEvent.partner}` : `${selectedEvent.program} - ${selectedEvent.partner}`)}
+                </h2>
+                <p className="text-slate-500 font-medium text-sm mb-6">
+                  {format(new Date(selectedEvent.startDate), "yyyy년 MM월 dd일")} 
+                  {format(new Date(selectedEvent.startDate), "yyyy-MM-dd") !== format(new Date(selectedEvent.endDate), "yyyy-MM-dd") && ` ~ ${format(new Date(selectedEvent.endDate), "yyyy년 MM월 dd일")}`}
+                </p>
+                
+                <div className="flex flex-col gap-2">
+                  <Button className="w-full rounded-xl bg-[#4285F4] hover:bg-[#3367D6] text-white font-bold h-11" onClick={() => {
+                    const titleText = selectedEvent.type === 'other' ? selectedEvent.partner : (selectedEvent.type === 'meeting' ? `[회의] ${selectedEvent.partner}` : `${selectedEvent.program} - ${selectedEvent.partner}`);
+                    const title = encodeURIComponent(`[2026서울런] ${titleText}`);
+                    const details = encodeURIComponent(`서울런 교육 일정: ${titleText}`);
+                    const startDate = format(new Date(selectedEvent.startDate), "yyyyMMdd");
+                    const endDateStr = format(addDays(new Date(selectedEvent.endDate), 1), "yyyyMMdd");
+                    const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startDate}/${endDateStr}&details=${details}`;
+                    window.open(url, '_blank');
+                  }}>
+                    구글 캘린더에 일정 공유
+                  </Button>
+
+                  {selectedEvent.type === 'other' && (
+                    <div className="flex gap-2">
+                      <Button variant="outline" className="flex-1 rounded-xl font-bold h-11 border-slate-200 hover:bg-slate-50" onClick={() => {
+                        setEditTitle(selectedEvent.partner);
+                        setEditStartDate(format(new Date(selectedEvent.startDate), "yyyy-MM-dd"));
+                        setEditEndDate(format(new Date(selectedEvent.endDate), "yyyy-MM-dd"));
+                        setIsEditingSchedule(true);
+                      }}>
+                        <Edit className="w-4 h-4 mr-2" /> 수정
+                      </Button>
+                      <Button variant="outline" className="flex-1 rounded-xl font-bold h-11 border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-100" onClick={() => handleDeleteSchedule(selectedEvent.id)}>
+                        <Trash2 className="w-4 h-4 mr-2" /> 삭제
+                      </Button>
+                    </div>
+                  )}
+
+                  <Button variant="ghost" className="w-full rounded-xl h-11 font-bold text-slate-500" onClick={() => setShowEventModal(false)}>
+                    닫기
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

@@ -22,7 +22,9 @@ export default function MeetingsPage() {
     preparation: "",
     nextSchedule: "",
     meetingContent: "",
-    others: ""
+    others: "",
+    time: "",
+    location: ""
   })
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [selectedMeeting, setSelectedMeeting] = useState<any>(null)
@@ -36,7 +38,7 @@ export default function MeetingsPage() {
     setFormData({ 
       title: "", date: new Date().toISOString().split('T')[0], sequenceNumber: 1, 
       managedOrg: "", attendees: "", purpose: "", agenda: "", preparation: "", 
-      nextSchedule: "", meetingContent: "", others: "" 
+      nextSchedule: "", meetingContent: "", others: "", time: "", location: ""
     })
     setSelectedFile(null)
   }
@@ -101,7 +103,9 @@ export default function MeetingsPage() {
       preparation: m.preparation || "",
       nextSchedule: m.nextSchedule || "",
       meetingContent: m.meetingContent || "",
-      others: m.others || ""
+      others: m.others || "",
+      time: m.time || "",
+      location: m.location || ""
     })
     setEditingId(m.id)
     setIsEditing(true)
@@ -178,7 +182,8 @@ export default function MeetingsPage() {
           
           <div class="section">
             <div class="section-title">1. 회의 기본 정보</div>
-            <div class="grid"><div class="label">일시</div><div class="value">${new Date(meeting.date).toLocaleDateString()}</div></div>
+            <div class="grid"><div class="label">일시</div><div class="value">${new Date(meeting.date).toLocaleDateString()} ${meeting.time || ''}</div></div>
+            <div class="grid"><div class="label">장소</div><div class="value">${meeting.location || '-'}</div></div>
             <div class="grid"><div class="label">참석자</div><div class="value">${meeting.attendees || '-'}</div></div>
             <div class="grid"><div class="label">회차</div><div class="value">${meeting.sequenceNumber}회차</div></div>
             <div class="grid"><div class="label">담당기관</div><div class="value">${meeting.managedOrg || '-'}</div></div>
@@ -354,12 +359,20 @@ export default function MeetingsPage() {
                     <input type="date" value={formData.date} onChange={e => setFormData(prev => ({...prev, date: e.target.value}))} className="flex-1 bg-slate-50 border-none rounded-xl p-3 text-sm font-bold focus:ring-2 focus:ring-blue-500" />
                   </div>
                   <div className="flex items-center gap-4">
-                    <label className="w-24 text-[11px] font-black text-slate-400 shrink-0">참석자</label>
-                    <input type="text" placeholder="참석 인원 및 명단" value={formData.attendees} onChange={e => setFormData(prev => ({...prev, attendees: e.target.value}))} className="flex-1 bg-slate-50 border-none rounded-xl p-3 text-sm font-bold focus:ring-2 focus:ring-blue-500" />
+                    <label className="w-24 text-[11px] font-black text-slate-400 shrink-0">회의 시간</label>
+                    <input type="text" placeholder="예: 14:00" value={formData.time} onChange={e => setFormData(prev => ({...prev, time: e.target.value}))} className="flex-1 bg-slate-50 border-none rounded-xl p-3 text-sm font-bold focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <label className="w-24 text-[11px] font-black text-slate-400 shrink-0">회의 장소</label>
+                    <input type="text" placeholder="회의 장소 입력" value={formData.location} onChange={e => setFormData(prev => ({...prev, location: e.target.value}))} className="flex-1 bg-slate-50 border-none rounded-xl p-3 text-sm font-bold focus:ring-2 focus:ring-blue-500" />
                   </div>
                   <div className="flex items-center gap-4">
                     <label className="w-24 text-[11px] font-black text-slate-400 shrink-0">회의 회차</label>
                     <input type="number" value={formData.sequenceNumber} onChange={e => setFormData(prev => ({...prev, sequenceNumber: parseInt(e.target.value)}))} className="flex-1 bg-slate-50 border-none rounded-xl p-3 text-sm font-bold focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <label className="w-24 text-[11px] font-black text-slate-400 shrink-0">참석자</label>
+                    <input type="text" placeholder="참석 인원 및 명단" value={formData.attendees} onChange={e => setFormData(prev => ({...prev, attendees: e.target.value}))} className="flex-1 bg-slate-50 border-none rounded-xl p-3 text-sm font-bold focus:ring-2 focus:ring-blue-500" />
                   </div>
                   <div className="flex items-center gap-4">
                     <label className="w-24 text-[11px] font-black text-slate-400 shrink-0">담당기관</label>
@@ -437,9 +450,10 @@ export default function MeetingsPage() {
               <div>
                 <h2 className="text-2xl font-black text-slate-900 pr-12">{selectedMeeting.title}</h2>
                 <div className="flex flex-wrap gap-2 text-slate-500 font-bold mt-3">
-                  <span className="bg-slate-100 px-3 py-1.5 rounded-lg text-xs">{new Date(selectedMeeting.date).toLocaleDateString()}</span>
+                  <span className="bg-slate-100 px-3 py-1.5 rounded-lg text-xs">{new Date(selectedMeeting.date).toLocaleDateString()} {selectedMeeting.time || ''}</span>
                   <span className="bg-slate-100 px-3 py-1.5 rounded-lg text-xs tracking-widest">{selectedMeeting.sequenceNumber}회차</span>
-                  <span className="bg-slate-100 px-3 py-1.5 rounded-lg text-xs text-blue-600">{selectedMeeting.managedOrg || '담당기관 없음'}</span>
+                  <span className="bg-slate-100 px-3 py-1.5 rounded-lg text-xs text-blue-600 truncate max-w-[150px]">{selectedMeeting.location || '장소 미지정'}</span>
+                  <span className="bg-slate-100 px-3 py-1.5 rounded-lg text-xs text-indigo-600">{selectedMeeting.managedOrg || '담당기관 없음'}</span>
                 </div>
               </div>
               <button onClick={() => setSelectedMeeting(null)} className="p-3 hover:bg-slate-100 rounded-2xl transition-colors shrink-0">

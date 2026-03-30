@@ -18,7 +18,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const { 
       title, date, sequenceNumber, managedOrg, attendees, 
       purpose, agenda, preparation, nextSchedule, meetingContent, others,
-      pdfFilePath 
+      pdfFilePath, time, location
     } = body;
     
     const meeting = await prisma.meetingMinute.update({
@@ -35,7 +35,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         nextSchedule,
         meetingContent,
         others,
-        pdfFilePath
+        pdfFilePath,
+        time,
+        location
       },
     });
     return NextResponse.json(meeting);
