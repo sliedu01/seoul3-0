@@ -19,10 +19,10 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "파일을 데이터베이스에서 찾을 수 없습니다." }, { status: 404 });
     }
 
-    return new Response(fileRecord.data, {
+    return new Response(new Uint8Array(fileRecord.data), {
       headers: {
         "Content-Type": fileRecord.mimeType || "application/pdf",
-        "Content-Disposition": `attachment; filename="${encodeURIComponent(fileName)}"; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+        "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`,
       },
     });
   } catch (error: any) {

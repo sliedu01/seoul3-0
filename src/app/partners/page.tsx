@@ -170,7 +170,12 @@ export default function PartnersPage() {
 
   const handleDownload = (fileName: string) => {
     if (!fileName) return;
-    window.open(`/api/download?file=${encodeURIComponent(fileName)}`, "_blank");
+    const link = document.createElement("a");
+    link.href = `/api/download?file=${encodeURIComponent(fileName)}`;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
     setPdfModal(null);
   }
 
