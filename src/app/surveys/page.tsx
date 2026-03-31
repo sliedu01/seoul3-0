@@ -24,6 +24,8 @@ export default function SurveysPage() {
   const [surveyTypeFilter, setSurveyTypeFilter] = useState("ALL") // ALL, PRE, POST, SATISFACTION
   const [researchTargetFilter, setResearchTargetFilter] = useState("")
   
+  const [isInitialized, setIsInitialized] = useState(false)
+  
   const [sortBy, setSortBy] = useState("createdAt")
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
 
@@ -70,15 +72,60 @@ export default function SurveysPage() {
   }, [page, search, startDate, endDate, selectedProgramIds, selectedPartnerIds, selectedInstructor, surveyTypeFilter, sortBy, sortOrder])
 
   useEffect(() => {
-    fetch("/api/programs").then(res => res.json()).then(setPrograms)
-    fetch("/api/partners").then(res => res.json()).then(setPartners)
-    // Fetch unique instructors (this could be a dedicated API, or we extract from sessions)
-    fetch("/api/sessions").then(res => res.json()).then(data => {
-      if (Array.isArray(data)) {
-        const uniqueInstructors = Array.from(new Set(data.map((s: any) => s.instructorName).filter(Boolean))) as string[]
-        setInstructors(uniqueInstructors)
+    const initFilters = async () => {
+      try {
+        const [programsRes, partnersRes, sessionsRes] = await Promise.all([
+          fetch("/api/programs").then(res => res.json()),
+          fetch("/api/partners").then(res => res.json()),
+          fetch("/api/sessions").then(res => res.json())
+        ]);
+
+        if (Array.isArray(programsRes)) setPrograms(programsRes);
+        if (Array.isArray(partnersRes)) setPartners(partnersRes);
+        
+        // Find earliest date from programs/sessions
+        let minDate: Date | null = null;
+        if (Array.isArray(programsRes)) {
+          programsRes.forEach(p => {
+            (p.sessions || []).forEach((s: any) => {
+              const d = new Date(s.date);
+              if (!minDate || d < minDate) minDate = d;
+            });
+          });
+        }
+
+        // Set default dates
+        const today = new Date();
+        const endDateStr = today.toISOString().split('T')[0];
+        setEndDate(endDateStr);
+
+        if (minDate) {
+          const startDateStr = (minDate as Date).toISOString().split('T')[0];
+          setStartDate(startDateStr);
+        } else {
+          // Fallback if no data
+          setStartDate(endDateStr);
+        }
+
+        if (Array.isArray(sessionsRes)) {
+          console.log("Sessions fetched:", sessionsRes.length);
+          const uniqueInstructors = Array.from(new Set(sessionsRes.map((s: any) => s.instructorName).filter(Boolean))) as string[];
+          setInstructors(uniqueInstructors);
+        }
+        
+        setIsInitialized(true);
+        console.log("Filters initialized with:", { minDate, endDate: endDateStr });
+      } catch (err) {
+        console.error("Filter initialization error:", err);
+        // Ensure at least today's date if fetch fails
+        const today = new Date().toISOString().split('T')[0];
+        setStartDate(today);
+        setEndDate(today);
+        setIsInitialized(true);
       }
-    })
+    };
+
+    initFilters();
   }, [])
 
   const handleDelete = async (id: string) => {
@@ -144,6 +191,46 @@ export default function SurveysPage() {
       console.error("Inline update failed:", err);
     }
   };
+
+  // Dynamic filter lists
+  const filteredPrograms = React.useMemo(() => {
+    if (!startDate || !endDate) return programs;
+    const sDate = new Date(startDate);
+    const eDate = new Date(endDate);
+    eDate.setHours(23, 59, 59, 999);
+    
+    return programs.filter(p => {
+      const sessions = p.sessions || [];
+      if (sessions.length === 0) return false;
+      return sessions.some((s: any) => {
+        const d = new Date(s.date);
+        return d >= sDate && d <= eDate;
+      });
+    });
+  }, [programs, startDate, endDate]);
+
+  const filteredPartners = React.useMemo(() => {
+    return partners.filter(pt => {
+      // Filter by Programs
+      const matchesProgram = selectedProgramIds.length === 0 || (pt.programIds || []).some((id: string) => selectedProgramIds.includes(id));
+      if (!matchesProgram) return false;
+      
+      // Filter by Dates
+      if (!startDate || !endDate) return true;
+      const sDate = new Date(startDate);
+      const eDate = new Date(endDate);
+      eDate.setHours(23, 59, 59, 999);
+      
+      const dates = pt.sessionDates || [];
+      // If partner has no sessions, it should probably not show up if date range is set
+      if (dates.length === 0) return false;
+
+      return dates.some((dStr: string) => {
+        const d = new Date(dStr);
+        return d >= sDate && d <= eDate;
+      });
+    });
+  }, [partners, selectedProgramIds, startDate, endDate]);
 
   const handleUpdate = async () => {
     setLoading(true)
@@ -359,14 +446,14 @@ export default function SurveysPage() {
                 <Filter className="w-3 h-3 text-indigo-500"/> 사업 선택
               </label>
               <button 
-                onClick={() => selectedProgramIds.length === programs.length && programs.length > 0 ? setSelectedProgramIds([]) : setSelectedProgramIds(programs.map(p => p.id))}
+                onClick={() => selectedProgramIds.length === filteredPrograms.length && filteredPrograms.length > 0 ? setSelectedProgramIds([]) : setSelectedProgramIds(filteredPrograms.map(p => p.id))}
                 className="text-[10px] font-black text-indigo-600 hover:text-indigo-700 transition-colors uppercase tracking-tighter"
               >
-                {selectedProgramIds.length === programs.length && programs.length > 0 ? "DESELECT ALL" : "SELECT ALL"}
+                {selectedProgramIds.length === filteredPrograms.length && filteredPrograms.length > 0 ? "DESELECT ALL" : "SELECT ALL"}
               </button>
             </div>
             <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-1 scrollbar-hide">
-              {programs.length > 0 ? programs.map(p => (
+              {filteredPrograms.length > 0 ? filteredPrograms.map(p => (
                 <label 
                   key={p.id} 
                   className={cn(
@@ -385,7 +472,7 @@ export default function SurveysPage() {
                   {p.order}. {p.name}
                 </label>
               )) : (
-                <div className="text-[10px] font-bold text-slate-300 italic p-2">등록된 사업이 없습니다.</div>
+                <div className="text-[10px] font-bold text-slate-300 italic p-2">조회 기간 내 운영된 사업이 없습니다.</div>
               )}
             </div>
           </div>
@@ -396,14 +483,14 @@ export default function SurveysPage() {
                 <Filter className="w-3 h-3 text-emerald-500"/> 협력업체 선택
               </label>
               <button 
-                onClick={() => selectedPartnerIds.length === partners.length && partners.length > 0 ? setSelectedPartnerIds([]) : setSelectedPartnerIds(partners.map(p => p.id))}
+                onClick={() => selectedPartnerIds.length === filteredPartners.length && filteredPartners.length > 0 ? setSelectedPartnerIds([]) : setSelectedPartnerIds(filteredPartners.map(p => p.id))}
                 className="text-[10px] font-black text-emerald-600 hover:text-emerald-700 transition-colors uppercase tracking-tighter"
               >
-                {selectedPartnerIds.length === partners.length && partners.length > 0 ? "DESELECT ALL" : "SELECT ALL"}
+                {selectedPartnerIds.length === filteredPartners.length && filteredPartners.length > 0 ? "DESELECT ALL" : "SELECT ALL"}
               </button>
             </div>
             <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-1 scrollbar-hide">
-              {partners.length > 0 ? partners.map(p => (
+              {filteredPartners.length > 0 ? filteredPartners.map(p => (
                 <label 
                   key={p.id} 
                   className={cn(
@@ -422,7 +509,7 @@ export default function SurveysPage() {
                   {p.name}
                 </label>
               )) : (
-                <div className="text-[10px] font-bold text-slate-300 italic p-2">등록된 협력업체가 없습니다.</div>
+                <div className="text-[10px] font-bold text-slate-300 italic p-2">해당 조건의 협력업체가 없습니다.</div>
               )}
             </div>
           </div>

@@ -23,10 +23,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   try {
     const { id } = await params;
     const body = await req.json();
-    const { name, contactName, contactPhone, contactEmail, address, businessRegistration, contractFile, insuranceFile, bankbookFile } = body;
+    const { name, contactName, contactPhone, contactEmail, address, businessRegistration, contractFile, insuranceFile, bankbookFile, preInspectionFile } = body;
     const partner = await prisma.partner.update({
       where: { id },
-      data: { name, contactName, contactPhone, contactEmail, address, businessRegistration, contractFile, insuranceFile, bankbookFile },
+      data: { name, contactName, contactPhone, contactEmail, address, businessRegistration, contractFile, insuranceFile, bankbookFile, preInspectionFile },
     });
     return NextResponse.json(partner);
   } catch (error) {

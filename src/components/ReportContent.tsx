@@ -22,8 +22,8 @@ export default function ReportsPage() {
   const [partners, setPartners] = useState<any[]>([])
   const [selectedProgramIds, setSelectedProgramIds] = useState<string[]>([])
   const [selectedPartnerIds, setSelectedPartnerIds] = useState<string[]>([])
-  const [startDate, setStartDate] = useState("2026-03-01")
-  const [endDate, setEndDate] = useState("2026-03-31")
+  const [startDate, setStartDate] = useState("")
+  const [endDate, setEndDate] = useState("")
   const [reportData, setReportData] = useState<any>(null)
   
   const [aiAnalysisResult, setAiAnalysisResult] = useState<string | null>(null)
@@ -35,36 +35,72 @@ export default function ReportsPage() {
       fetch("/api/programs").then(res => res.json()),
       fetch("/api/partners").then(res => res.json())
     ]).then(([pData, ptData]) => {
-      if (Array.isArray(pData)) setPrograms(pData)
-      if (Array.isArray(ptData)) setPartners(ptData)
+      if (Array.isArray(pData)) {
+        setPrograms(pData);
+        
+        // Find earliest date
+        let minDate: Date | null = null;
+        pData.forEach(p => {
+          (p.sessions || []).forEach((s: any) => {
+            const d = new Date(s.date);
+            if (!minDate || d < minDate) minDate = d;
+          });
+        });
+
+        const today = new Date();
+        const endDateStr = today.toISOString().split('T')[0];
+        setEndDate(endDateStr);
+
+        if (minDate) {
+          setStartDate((minDate as Date).toISOString().split('T')[0]);
+        } else {
+          setStartDate(endDateStr);
+        }
+        console.log("Report filters initialized with:", { minDate, endDate: endDateStr });
+      }
+      if (Array.isArray(ptData)) {
+        console.log("Partners fetched:", ptData.length);
+        setPartners(ptData);
+      }
+    }).catch(err => {
+      console.error("Report filter initialization error:", err);
     })
   }, [])
 
-  // Dynamic filtered lists - Keep them simple to avoid nested effect issues
+  // Dynamic filtered lists
   const filteredPrograms = programs.filter(p => {
     if (!startDate || !endDate) return true;
     const sDate = new Date(startDate);
     const eDate = new Date(endDate);
     eDate.setHours(23, 59, 59, 999);
-    return (p.sessions || []).some((s: any) => {
+    
+    const sessions = p.sessions || [];
+    if (sessions.length === 0) return false;
+    
+    return sessions.some((s: any) => {
         const d = new Date(s.date);
         return d >= sDate && d <= eDate;
-    }) || true;
+    });
   });
 
   const filteredPartners = partners.filter(pt => {
+    // 1. Program Filter
     const matchesProgram = selectedProgramIds.length === 0 || (pt.programIds || []).some((id: string) => selectedProgramIds.includes(id));
     if (!matchesProgram) return false;
     
+    // 2. Date Filter
     if (!startDate || !endDate) return true;
     const sDate = new Date(startDate);
     const eDate = new Date(endDate);
     eDate.setHours(23, 59, 59, 999);
     
-    return (pt.sessionDates || []).some((dStr: string) => {
+    const sessionDates = pt.sessionDates || [];
+    if (sessionDates.length === 0) return false;
+
+    return sessionDates.some((dStr: string) => {
       const d = new Date(dStr);
       return d >= sDate && d <= eDate;
-    }) || true;
+    });
   });
 
   const fetchReportData = React.useCallback(async () => {

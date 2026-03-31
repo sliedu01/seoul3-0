@@ -30,9 +30,9 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { name, contactName, contactPhone, contactEmail, address, businessRegistration, contractFile, insuranceFile, bankbookFile } = body;
+    const { name, contactName, contactPhone, contactEmail, address, businessRegistration, contractFile, insuranceFile, bankbookFile, preInspectionFile } = body;
     const partner = await prisma.partner.create({
-      data: { name, contactName, contactPhone, contactEmail, address, businessRegistration, contractFile, insuranceFile, bankbookFile },
+      data: { name, contactName, contactPhone, contactEmail, address, businessRegistration, contractFile, insuranceFile, bankbookFile, preInspectionFile },
     });
     return NextResponse.json(partner);
   } catch (error) {

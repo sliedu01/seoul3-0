@@ -16,6 +16,7 @@ type Partner = {
   contractFile: string; 
   insuranceFile: string;
   bankbookFile: string;
+  preInspectionFile: string;
   stats?: {
     sessionCount: number;
     avgSatisfaction: number;
@@ -64,7 +65,7 @@ export default function PartnersPage() {
   
   const initialFormState = { 
     name: "", contactName: "", contactPhone: "", contactEmail: "", address: "", 
-    businessRegistration: "", contractFile: "", insuranceFile: "", bankbookFile: "" 
+    businessRegistration: "", contractFile: "", insuranceFile: "", bankbookFile: "", preInspectionFile: ""
   }
   const [formData, setFormData] = useState(initialFormState)
   const [isUploading, setIsUploading] = useState<string | null>(null);
@@ -148,7 +149,8 @@ export default function PartnersPage() {
       businessRegistration: partner.businessRegistration || "",
       contractFile: partner.contractFile || "",
       insuranceFile: partner.insuranceFile || "",
-      bankbookFile: partner.bankbookFile || ""
+      bankbookFile: partner.bankbookFile || "",
+      preInspectionFile: partner.preInspectionFile || ""
     })
     setIsModalOpen(true)
   }
@@ -204,6 +206,7 @@ export default function PartnersPage() {
                   <th className="px-6 py-4 font-semibold text-slate-700">사업자등록증</th>
                   <th className="px-6 py-4 font-semibold text-slate-700">계약서</th>
                   <th className="px-6 py-4 font-semibold text-slate-700">보험증권</th>
+                  <th className="px-6 py-4 font-semibold text-slate-700">사전점검</th>
                   <th className="px-6 py-4 font-semibold text-slate-700">통장사본</th>
                   <th className="px-6 py-4 font-semibold text-slate-700 text-right">관리</th>
                 </tr>
@@ -244,6 +247,13 @@ export default function PartnersPage() {
                       {p.insuranceFile ? (
                         <button onClick={() => setPdfModal({ isOpen: true, field: 'insuranceFile', partnerId: p.id, fileName: p.insuranceFile })} className="inline-flex items-center text-blue-600 hover:text-blue-800 hover:underline font-medium text-xs">
                           <FileDown className="w-3 h-3 mr-1"/>{p.insuranceFile}
+                        </button>
+                      ) : <span className="text-slate-400">-</span>}
+                    </td>
+                    <td className="px-6 py-4">
+                      {p.preInspectionFile ? (
+                        <button onClick={() => setPdfModal({ isOpen: true, field: 'preInspectionFile', partnerId: p.id, fileName: p.preInspectionFile })} className="inline-flex items-center text-orange-600 hover:text-orange-800 hover:underline font-medium text-xs">
+                          <FileDown className="w-3 h-3 mr-1"/>{p.preInspectionFile}
                         </button>
                       ) : <span className="text-slate-400">-</span>}
                     </td>
@@ -313,6 +323,7 @@ export default function PartnersPage() {
                 <FileField label="사업자등록증 (PDF)" field="businessRegistration" value={formData.businessRegistration} isUploading={isUploading === 'businessRegistration'} onUpload={handleFileUpload} />
                 <FileField label="계약서 원본 (PDF)" field="contractFile" value={formData.contractFile} isUploading={isUploading === 'contractFile'} onUpload={handleFileUpload} />
                 <FileField label="보험증권 (PDF)" field="insuranceFile" value={formData.insuranceFile} isUploading={isUploading === 'insuranceFile'} onUpload={handleFileUpload} />
+                <FileField label="사전점검체크리스트 (PDF)" field="preInspectionFile" value={formData.preInspectionFile} isUploading={isUploading === 'preInspectionFile'} onUpload={handleFileUpload} />
                 <FileField label="통장사본 (PDF)" field="bankbookFile" value={formData.bankbookFile} isUploading={isUploading === 'bankbookFile'} onUpload={handleFileUpload} />
               </div>
 

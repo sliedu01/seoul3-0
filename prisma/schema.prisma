@@ -31,6 +31,7 @@ model Partner {
   contractFile         String?  
   insuranceFile        String?  
   bankbookFile         String?  
+  preInspectionFile    String?  // 사전점검체크리스트
   sessions             ProgramSession[]
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
