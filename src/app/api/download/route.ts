@@ -4,10 +4,10 @@ import { prisma } from "@/lib/prisma";
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const fileName = searchParams.get("file");
+    const fileName = searchParams.get("file") || searchParams.get("filename");
 
     if (!fileName) {
-      return NextResponse.json({ error: "Filename is required" }, { status: 400 });
+      return NextResponse.json({ error: "파일 이름이 필요합니다." }, { status: 400 });
     }
 
     // Retrieve file from PostgreSQL via Prisma
@@ -16,7 +16,7 @@ export async function GET(req: Request) {
     });
 
     if (!fileRecord) {
-      return NextResponse.json({ error: "File not found in database" }, { status: 404 });
+      return NextResponse.json({ error: "파일을 데이터베이스에서 찾을 수 없습니다." }, { status: 404 });
     }
 
     return new Response(fileRecord.data, {
