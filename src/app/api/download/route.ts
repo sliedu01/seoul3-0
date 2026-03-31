@@ -37,6 +37,7 @@ export async function GET(req: Request) {
       headers: {
         "Content-Type": fileRecord.mimeType || "application/pdf",
         "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(nfcName)}`,
+        "Content-Length": fileRecord.data.length.toString(),
       },
     });
   } catch (error: any) {
