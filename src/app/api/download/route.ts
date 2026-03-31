@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const fileName = searchParams.get("file") || searchParams.get("filename");
+    const fileName = searchParams.get("file") || searchParams.get("filename") || searchParams.get("fileName");
 
     if (!fileName) {
       return NextResponse.json({ error: "파일 이름이 필요합니다." }, { status: 400 });
