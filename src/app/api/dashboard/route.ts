@@ -61,21 +61,21 @@ export async function GET() {
     });
 
     if (responses.length > 0) {
-      // 1. Perceived Growth (Respondents with at least one improved maturity question)
-      const improvedCount = responses.filter(resp => {
-        const matAns = resp.answers.filter(a => a.question && isMat(a.question));
-        return matAns.some(a => (a.postChange || 0) > 0);
-      }).length;
-      perceivedGrowth = (improvedCount / responses.length) * 100;
-
-      // 2. Net Growth (Based on all maturity answers)
       const allMatAnswers = responses.flatMap(r => r.answers).filter(a => a.question && isMat(a.question) && a.preScore !== null);
-      
-      const preSum = allMatAnswers.reduce((acc, curr) => acc + (curr.preScore || 0), 0);
-      const postSum = allMatAnswers.reduce((acc, curr) => acc + (curr.preScore || 0) + (curr.postChange || 0), 0);
-      
-      if (preSum > 0) {
-        netGrowth = ((postSum - preSum) / preSum) * 100;
+      const totalMatCount = allMatAnswers.length;
+
+      if (totalMatCount > 0) {
+        const preSum = allMatAnswers.reduce((acc, curr) => acc + (curr.preScore || 0), 0);
+        const postSum = allMatAnswers.reduce((acc, curr) => {
+          let post = (curr.question?.growthType === 'CHANGE') ? ((curr.preScore || 0) + (curr.postChange || 0)) : (curr.score || 0);
+          return acc + Math.min(5, Math.max(1, post));
+        }, 0);
+        
+        // 1. 학습 인지 변화도: (사후 - 사전) / 전체 척도(5점) * 100
+        perceivedGrowth = ((postSum - preSum) / (totalMatCount * 5)) * 100;
+        
+        // 2. 역량 도달률: 사후 / 전체 척도(5점) * 100
+        netGrowth = (postSum / (totalMatCount * 5)) * 100;
       }
     }
 

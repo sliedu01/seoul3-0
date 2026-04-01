@@ -78,7 +78,15 @@ export async function GET(req: Request) {
     });
 
     // Categorization: Keyword "만족" means Satisfaction, otherwise Maturity/Competency
-    const isSatCat = (cat: string) => cat?.includes("만족") || cat?.includes("satisfaction") || cat?.toLowerCase().includes("sat");
+    const isSatCat = (cat: string, content: string) => {
+        const text = content || "";
+        const c = cat || "";
+        return c.includes("만족") || c.includes("satisfaction") || c.toLowerCase().includes("sat") ||
+               text.includes("만족도") || text.includes("접근성") || text.includes("장소") || 
+               text.includes("교통") || text.includes("환경") || text.includes("공간") ||
+               text.includes("유익") || text.includes("구성") || text.includes("강사") || 
+               text.includes("멘토") || text.includes("친절");
+    };
 
     // 3. Process Each Program Individually
     const programReports = Array.from(programMap.entries()).map(([pid, pResponses]) => {
@@ -86,7 +94,7 @@ export async function GET(req: Request) {
 
       // Group competency answers by respondent to calculate PER-PERSON growth
       const respondentGrowthStats = pResponses.map((r: any) => {
-        const compAns = r.answers.filter((a: any) => !isSatCat(a.question?.category || ""));
+        const compAns = r.answers.filter((a: any) => !isSatCat(a.question?.category || "", a.question?.content || ""));
         if (compAns.length === 0) return null;
 
         let rPreSum = 0, rPostSum = 0, rCount = 0;
@@ -112,16 +120,16 @@ export async function GET(req: Request) {
         const rPreAvg = rPreSum / rCount;
         const rPostAvg = rPostSum / rCount;
         
-        // 1. 체감향상률: (사후 점수가 사전 점수보다 큰 문항 수 / 전체 문항 수) * 100
-        const perceivedRate = (rImprovedCount / rCount) * 100;
+        // 1. 학습 인지 변화도: (사후 평균 - 사전 평균) / 전체 척도(5점) * 100
+        const perceivedRate = ((rPostAvg - rPreAvg) / 5) * 100;
         
-        // 2. 순수성장률: ((사후 점수 - 사전 점수) / 사전 점수) * 100
-        const netGrowthRate = rPreAvg > 0 ? ((rPostAvg - rPreAvg) / rPreAvg) * 100 : 0;
+        // 2. 역량 도달률: 사후 평균 / 전체 척도(5점) * 100
+        const netGrowthRate = (rPostAvg / 5) * 100;
 
-        // 3. 잠재적 성장 달성률: User-defined complex logic
+        // 3. 학습 목표 근접도: (사후 - 사전) / (5 - 사전) * 100
         let potentialGrowthRate = 0;
         if (rPreAvg >= 5) {
-          potentialGrowthRate = rPostAvg >= 5 ? 100 : -100;
+          potentialGrowthRate = rPostAvg >= 5 ? 100 : 0;
         } else {
           potentialGrowthRate = ((rPostAvg - rPreAvg) / (5 - rPreAvg)) * 100;
         }
@@ -163,14 +171,15 @@ export async function GET(req: Request) {
         if (text.includes("유연하게") || text.includes("책임감") || text.includes("태도")) return "직업태도";
         
         // 4. Default Fallback
-        if (isSatCat(cat)) return "종합만족"; 
+        // 4. Default Fallback
+        if (isSatCat(cat, text)) return "종합만족"; 
         
         const finalCat = cat.includes('|') ? cat.split('|').pop() : cat;
         return finalCat || "역량";
       };
 
       // Radar Data (Grouped by Category)
-      const pCompAnswers = pResponses.flatMap(r => r.answers).filter(a => !isSatCat(a.question?.category || ""));
+      const pCompAnswers = pResponses.flatMap(r => r.answers).filter(a => !isSatCat(a.question?.category || "", a.question?.content || ""));
       const mappedCompAnswers = pCompAnswers.map(a => ({ ...a, mappedCat: getCategoryMatches(a.question?.category, a.question?.content) }));
       const pCompCategories = Array.from(new Set(mappedCompAnswers.map(a => a.mappedCat))).filter(Boolean);
       
@@ -195,13 +204,13 @@ export async function GET(req: Request) {
           subject: cat,
           A: parseFloat(catPre.toFixed(2)),
           B: parseFloat(catPost.toFixed(2)),
-          growth: catPre > 0 ? ((catPost - catPre) / catPre) * 100 : 0,
+          growth: ((catPost - catPre) / 5) * 100, // 카테고리별 역량 도달률 산식 적용
           potentialGrowth: parseFloat(potential.toFixed(1))
         };
       });
 
       // Satisfaction & Subjective 
-      const pSatAnswers = pResponses.flatMap(r => r.answers).filter(a => isSatCat(a.question?.category || ""));
+      const pSatAnswers = pResponses.flatMap(r => r.answers).filter(a => isSatCat(a.question?.category || "", a.question?.content || ""));
       const mappedSatAnswers = pSatAnswers.map(a => ({ ...a, mappedCat: getCategoryMatches(a.question?.category, a.question?.content) }));
       const pSatCategories = Array.from(new Set(mappedSatAnswers.map(a => a.mappedCat))).filter(cat => cat && cat !== "주관식");
       const pSatisfactionData = pSatCategories.map(cat => {

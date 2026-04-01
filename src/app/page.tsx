@@ -108,7 +108,7 @@ export default function Dashboard() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-0">
-                  <p className="text-[10px] font-black text-slate-400 tracking-tighter">평균체감향상률</p>
+                  <p className="text-[10px] font-black text-slate-400 tracking-tighter">학습 인지 변화도</p>
                   <div className="flex items-baseline gap-0.5">
                     <h3 className="text-3xl font-black tracking-tighter text-indigo-600">
                       {stats.perceivedGrowth}
@@ -117,7 +117,7 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="space-y-0">
-                  <p className="text-[10px] font-black text-slate-400 tracking-tighter text-right">평균순수성장률</p>
+                  <p className="text-[10px] font-black text-slate-400 tracking-tighter text-right">역량 도달률</p>
                   <div className="flex items-baseline gap-0.5 justify-end">
                     <h3 className="text-3xl font-black tracking-tighter text-indigo-600">
                       {stats.netGrowth}
@@ -127,7 +127,7 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="pt-2 border-t border-indigo-100/50 flex justify-between items-center">
-                <p className="text-xs text-slate-400 font-black tracking-widest opacity-60">평균성장도</p>
+                <p className="text-xs text-slate-400 font-black tracking-widest opacity-60">평균 도달 수준</p>
                 <div className="flex items-baseline gap-0.5 text-indigo-600 font-black">
                   <span className="text-lg">{stats.avgGrowth}</span>
                   <span className="text-[10px]">%</span>

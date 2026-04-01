@@ -5,8 +5,11 @@ import { Search, Filter, FileText, ChevronLeft, ChevronRight, User, Calendar as 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
+import { useRouter } from "next/navigation"
+import * as XLSX from 'xlsx';
 
 export default function SurveysPage() {
+  const router = useRouter()
   const { canEdit, canDelete, isMember } = useAuth()
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -277,7 +280,7 @@ export default function SurveysPage() {
     headers.push("사전_평균");
     matQs.forEach((q: any) => headers.push(`사후_${getCat(q)}`));
     headers.push("사후_평균");
-    headers.push("체감향상률(%)", "순수성장률(%)", "잠재성장달성(%)");
+    headers.push("학습인지변화도(%)", "역량도달률(%)", "학습목표근접도(%)");
     satQs.forEach((q: any) => headers.push(`만족도_${getCat(q)}`));
     headers.push("전체만족도");
     essayQs.forEach((q: any) => headers.push(`주관식_${getCat(q) || "의견"}`));
@@ -315,9 +318,9 @@ export default function SurveysPage() {
         row["사후_평균"] = postAvg ? parseFloat(postAvg.toFixed(2)) : "";
         
         // Growth Metrics
-        row["체감향상률(%)"] = improvedCount > 0 ? 100 : 0;
-        row["순수성장률(%)"] = preAvg > 0 ? parseFloat(((postAvg - preAvg) / preAvg * 100).toFixed(1)) : 0;
-        row["잠재성장달성(%)"] = (5 - preAvg) > 0 ? parseFloat(((postAvg - preAvg) / (5 - preAvg) * 100).toFixed(1)) : (postAvg >= preAvg ? 100 : 0);
+        row["학습인지변화도(%)"] = parseFloat((((postAvg - preAvg) / 5) * 100).toFixed(1));
+        row["역량도달률(%)"] = parseFloat(((postAvg / 5) * 100).toFixed(1));
+        row["학습목표근접도(%)"] = (5 - preAvg) > 0 ? parseFloat(((postAvg - preAvg) / (5 - preAvg) * 100).toFixed(1)) : (postAvg >= preAvg ? 100 : 0);
 
         let satSum = 0, satCount = 0;
         satQs.forEach((q: any) => {
@@ -372,7 +375,9 @@ export default function SurveysPage() {
       acc[key] = {
         info: {
           program: `${pOrder}. ${pName}`,
+          programId: survey.session?.programId,
           partner: survey.session?.partner?.name,
+          partnerId: survey.session?.partnerId,
           session: survey.session?.sessionNumber,
           instructor: survey.session?.instructorName || "미지정",
           startDate
@@ -395,11 +400,11 @@ export default function SurveysPage() {
     return numA - numB;
   });
 
-  // Calculation Formulas
-  const calcExperienceImprovement = (pre: number, post: number) => (post > pre ? 100 : 0);
-  const calcPureGrowth = (pre: number, post: number) => pre > 0 ? ((post - pre) / pre) * 100 : 0;
+  // Calculation Formulas - 사용 제안 산식 반영
+  const calcExperienceImprovement = (pre: number, post: number) => ((post - pre) / 5) * 100;
+  const calcPureGrowth = (pre: number, post: number) => (post / 5) * 100;
   const calcPotentialGrowth = (pre: number, post: number) => {
-    if (pre === 5) return post === 5 ? 100 : -100;
+    if (pre >= 5) return post >= 5 ? 100 : -100;
     return ((post - pre) / (5 - pre)) * 100;
   };
 
@@ -577,8 +582,9 @@ export default function SurveysPage() {
                         const post = q.growthType === 'CHANGE' ? (ans.preScore || 0) + (ans.postChange || 0) : (ans.score || 0);
                         if (post > 0) {
                             distMaturity[Math.min(5, Math.max(1, Math.round(post)))]++;
-                            sExpImp += post > pre ? 100 : 0;
-                            sGrowth += pre > 0 ? ((post - pre) / pre) * 100 : 0;
+                            // 산식 개정 반영: 인지변화도((post-pre)/5), 도달률(post/5)
+                            sExpImp += ((post - pre) / 5) * 100;
+                            sGrowth += (post / 5) * 100;
                             sPotGrowth += calcPotentialGrowth(pre, post);
                             sMCount++;
                         }
@@ -600,8 +606,8 @@ export default function SurveysPage() {
             });
 
             const avgExpImp = countImp > 0 ? (totalExpImp / countImp).toFixed(1) : "0.0";
-            const avgGrowth = countImp > 0 ? (totalGrowth / countImp).toFixed(1) : "0.0";
-            const avgPotGrowth = countImp > 0 ? (totalPotGrowth / countImp).toFixed(1) : "0.0";
+            const avgAttainment = countImp > 0 ? (totalGrowth / countImp).toFixed(1) : "0.0";
+            const avgGoalProximity = countImp > 0 ? (totalPotGrowth / countImp).toFixed(1) : "0.0";
             const avgSat = countSat > 0 ? (totalSat / countSat).toFixed(1) : "0.0";
             
             const isExpanded = expandedGroups.includes(key);
@@ -650,15 +656,25 @@ export default function SurveysPage() {
                              >
                                 <FileText className="w-3 h-3" /> 엑셀(다운로드)
                              </Button>
+                             <Button 
+                                onClick={(e) => { 
+                                  e.stopPropagation(); 
+                                  router.push(`/reports?programId=${group.info.programId}&partnerId=${group.info.partnerId}`);
+                                }} 
+                                size="sm" 
+                                className="h-7 gap-1 rounded-lg text-[10px] font-black bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-sm"
+                             >
+                                <Globe className="w-3 h-3" /> AI 분석 보고서
+                             </Button>
                         </div>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full md:w-auto">
                     {[
-                        { label: "체감향상률", val: `${avgExpImp}%`, color: "text-blue-600", bg: "bg-blue-50" },
-                        { label: "순수성장률", val: `${avgGrowth}%`, color: "text-indigo-600", bg: "bg-indigo-50" },
-                        { label: "잠재성장달성", val: `${avgPotGrowth}%`, color: "text-emerald-600", bg: "bg-emerald-50" },
+                        { label: "학습인지변화도", val: `${avgExpImp}%`, color: "text-blue-600", bg: "bg-blue-50" },
+                        { label: "역량도달률", val: `${avgAttainment}%`, color: "text-indigo-600", bg: "bg-indigo-50" },
+                        { label: "학습목표근접도", val: `${avgGoalProximity}%`, color: "text-emerald-600", bg: "bg-emerald-50" },
                         { label: "전체 만족도", val: `${avgSat}점`, color: "text-amber-600", bg: "bg-amber-50" }
                     ].map(stat => (
                         <div key={stat.label} className={cn("p-4 rounded-3xl text-center min-w-[100px]", stat.bg)}>
@@ -708,7 +724,7 @@ export default function SurveysPage() {
                                 {/* Row 0: Tier 1 Group Headers */}
                                 <tr className="bg-slate-950 text-white font-black uppercase tracking-widest divide-x divide-slate-800 border-b border-slate-700">
                                     <th colSpan={3} className="px-4 py-3 text-center bg-slate-900 sticky left-0 z-30">응답자 정보</th>
-                                    <th colSpan={maturityQs.length * 5 + 5} className="px-4 py-3 text-center bg-blue-950/80">성숙도 (사전/사후/향상률/성장률/달성률)</th>
+                                    <th colSpan={maturityQs.length * 5 + 5} className="px-4 py-3 text-center bg-blue-950/80">성숙도 (사전/사후/인지변화/도달률/근접도)</th>
                                     <th colSpan={satQs.length + 1} className="px-4 py-3 text-center bg-amber-950/80">만족도</th>
                                     <th colSpan={essayQs.length} className="px-4 py-3 text-center bg-slate-900">주관식 (상세의견)</th>
                                     <th colSpan={1} className="px-4 py-3 text-center bg-slate-900 sticky right-0 z-30">관리</th>
@@ -738,9 +754,9 @@ export default function SurveysPage() {
                                     <th rowSpan={2} className="w-24 px-2 py-4 border-b border-slate-700">대상</th>
                                     <th colSpan={maturityQs.length + 1} className="px-3 py-2 text-center bg-blue-900/50">사전조사 (Pre-Score)</th>
                                     <th colSpan={maturityQs.length + 1} className="px-3 py-2 text-center bg-indigo-900/50">사후조사 (Post = Pre + Change)</th>
-                                    <th colSpan={maturityQs.length + 1} className="px-3 py-2 text-center bg-emerald-900/50">체감향상률 (%)</th>
-                                    <th colSpan={maturityQs.length + 1} className="px-3 py-2 text-center bg-emerald-800/50">순수성장률 (%)</th>
-                                    <th colSpan={maturityQs.length + 1} className="px-3 py-2 text-center bg-teal-900/50 border-r border-slate-700">잠재적 성장 달성률 (%)</th>
+                                    <th colSpan={maturityQs.length + 1} className="px-3 py-2 text-center bg-emerald-900/50">학습 인지 변화도 (%)</th>
+                                    <th colSpan={maturityQs.length + 1} className="px-3 py-2 text-center bg-emerald-800/50">역량 도달률 (%)</th>
+                                    <th colSpan={maturityQs.length + 1} className="px-3 py-2 text-center bg-teal-900/50 border-r border-slate-700">학습 목표 근접도 (%)</th>
                                     <th colSpan={satQs.length + 1} className="px-3 py-2 text-center bg-amber-900/50">만족도 (사후)</th>
                                     {essayQs.map((q:any) => <th key={`ess-h-${q.id}`} rowSpan={2} className="w-96 px-4 py-2 border-b border-slate-700 bg-slate-900">{getShortCat(q.category) || "상세의견"}</th>)}
                                     <th rowSpan={2} className="w-24 px-4 py-2 sticky right-0 z-20 bg-slate-900 border-b border-slate-700">

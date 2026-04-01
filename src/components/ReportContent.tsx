@@ -7,12 +7,14 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 import { AlertCircle } from "lucide-react"
+import { useSearchParams } from "next/navigation"
 // @ts-ignore
 import { jStat } from "jstat"
 
 import * as XLSX from 'xlsx'
 
 export default function ReportsPage() {
+  const searchParams = useSearchParams()
   const { isMember } = useAuth()
   const reportRef = useRef<HTMLDivElement>(null)
   const [isGenerating, setIsGenerating] = useState(false)
@@ -30,7 +32,21 @@ export default function ReportsPage() {
   const [lastAnalysisParams, setLastAnalysisParams] = useState<any>(null)
 
   useEffect(() => {
-    // Fetch programs and partners for filter
+    // URL 파라미터에서 필터 값 추출 및 설정 (프로그램, 파트너 ID)
+    const pId = searchParams.get('programId');
+    const ptId = searchParams.get('partnerId');
+    if (pId) {
+      const ids = pId.split(',');
+      setSelectedProgramIds(ids);
+    }
+    if (ptId) {
+      const ids = ptId.split(',');
+      setSelectedPartnerIds(ids);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    // 최초 로드 시 프로그램 및 파트너 목록 페칭
     Promise.all([
       fetch("/api/programs").then(res => res.json()),
       fetch("/api/partners").then(res => res.json())
@@ -196,12 +212,8 @@ export default function ReportsPage() {
   }
 
   const handleExportPDF = async () => {
-    setIsGenerating(true)
-    // Simulation of PDF export
-    setTimeout(() => {
-      setIsGenerating(false)
-      alert("PDF 보고서가 생성되었습니다.")
-    }, 1500)
+    // 실제 브라우저의 PDF 저장(인쇄) 기능을 활용합니다.
+    window.print();
   }
 
   return (
@@ -225,7 +237,7 @@ export default function ReportsPage() {
         </div>
       )}
 
-      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 space-y-6">
+      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 space-y-6 no-print">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="space-y-3">
             <label className="text-xs font-black text-slate-400 uppercase ml-1 flex items-center gap-2">
@@ -370,23 +382,37 @@ export default function ReportsPage() {
           <div className="space-y-20">
             {/* Global Summary Stats */}
             <div className="grid grid-cols-2 gap-6">
-                <Card className="border-none bg-blue-50/50 p-6 rounded-3xl">
-                    <h4 className="text-sm font-black text-blue-600 mb-2">전체 체감 향상률 (%)</h4>
+                <Card className="border-none bg-blue-50/50 p-6 rounded-3xl relative group">
+                    <h4 className="text-sm font-black text-blue-600 mb-2">전체 학습 인지 변화도 (%)</h4>
                     <div className="flex items-baseline gap-2">
                         <span className="text-4xl font-black text-slate-900">{reportData.overallStats.perceivedGrowth}%</span>
                     </div>
                     <p className="mt-3 text-xs font-bold text-slate-500 leading-relaxed">
-                        서울런3.0 전체 참여 학생 중 <span className="text-blue-600 font-black">{reportData.overallStats.perceivedGrowth}%</span>가 자신의 진로 역량이 향상되었다고 응답했습니다.
+                        서울런3.0 전체 참여 학생들의 사전 대비 사후 <span className="text-blue-600 font-black">인지적 변화 정도</span>를 나타냅니다.
                     </p>
+                    {/* Tooltip */}
+                    <div className="absolute inset-0 bg-blue-600/95 rounded-3xl opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-center px-6 text-white pointer-events-none z-10">
+                        <p className="text-[10px] font-black uppercase tracking-widest opacity-70 mb-1">Calculation Logic</p>
+                        <p className="text-xs font-bold leading-relaxed mb-3">{"( 사후 평균 - 사전 평균 ) / 5 * 100"}</p>
+                        <hr className="border-white/20 mb-3" />
+                        <p className="text-[10px] font-medium leading-normal italic opacity-90">교육을 통해 학습자가 스스로 느낀 성장의 폭을 100점 만점으로 환산한 지표입니다.</p>
+                    </div>
                 </Card>
-                <Card className="border-none bg-indigo-50/50 p-6 rounded-3xl">
-                    <h4 className="text-sm font-black text-indigo-600 mb-2">전체 순수 성장률 (%)</h4>
+                <Card className="border-none bg-indigo-50/50 p-6 rounded-3xl relative group">
+                    <h4 className="text-sm font-black text-indigo-600 mb-2">전체 역량 도달률 (%)</h4>
                     <div className="flex items-baseline gap-2">
                         <span className="text-4xl font-black text-slate-900">{reportData.overallStats.netGrowth}%</span>
                     </div>
                     <p className="mt-3 text-xs font-bold text-slate-500 leading-relaxed">
-                        핵심 역량 전체 평균에서 사전 대비 사후 <span className="text-indigo-600 font-black">{reportData.overallStats.netGrowth}%</span>의 성장을 기록했습니다.
+                         핵심 역량 전체 평균에서 목표하는 역량 수준에 <span className="text-indigo-600 font-black">도달한 정도</span>를 기록했습니다.
                     </p>
+                    {/* Tooltip */}
+                    <div className="absolute inset-0 bg-indigo-600/95 rounded-3xl opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-center px-6 text-white pointer-events-none z-10">
+                        <p className="text-[10px] font-black uppercase tracking-widest opacity-70 mb-1">Calculation Logic</p>
+                        <p className="text-xs font-bold leading-relaxed mb-3">{"사후 평균 / 5 * 100"}</p>
+                        <hr className="border-white/20 mb-3" />
+                        <p className="text-[10px] font-medium leading-normal italic opacity-90">교육 종료 시점에서 학습자가 목표(5점) 대비 현재 도달한 수준을 나타내는 절대 성취 지표입니다.</p>
+                    </div>
                 </Card>
             </div>
 
@@ -396,22 +422,46 @@ export default function ReportsPage() {
                     <BarChart3 className="w-4 h-4 text-blue-500"/> 핵심 성과 통계 요약 (Key Performance Indicators)
                 </h3>
                 <div className="grid grid-cols-4 gap-4">
-                    <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                        <div className="text-[10px] font-black text-blue-600 uppercase mb-2">체감향상률</div>
+                    <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative group cursor-help">
+                        <div className="text-[10px] font-black text-blue-600 uppercase mb-2">학습 인지 변화도</div>
                         <div className="text-3xl font-black text-slate-900">{reportData.overallStats.perceivedGrowth}%</div>
+                        {/* Hover Tooltip Overlay */}
+                        <div className="absolute inset-0 bg-blue-600/95 rounded-2xl opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-center px-4 text-white pointer-events-none z-10 overflow-hidden">
+                            <p className="text-[9px] font-black uppercase opacity-70 mb-1">Formula</p>
+                            <p className="text-xs font-bold mb-2">{"( 사후 - 사전 ) / 5 * 100"}</p>
+                            <p className="text-[9px] leading-tight opacity-90 line-clamp-3">교육을 통해 학습자가 체감한 성숙도 변화의 폭을 백분율로 환산한 수치입니다.</p>
+                        </div>
                     </div>
-                    <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                        <div className="text-[10px] font-black text-indigo-600 uppercase mb-2">순수성장률</div>
+                    <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative group cursor-help">
+                        <div className="text-[10px] font-black text-indigo-600 uppercase mb-2">역량 도달률</div>
                         <div className="text-3xl font-black text-slate-900">{reportData.overallStats.netGrowth}%</div>
+                        {/* Hover Tooltip Overlay */}
+                        <div className="absolute inset-0 bg-indigo-600/95 rounded-2xl opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-center px-4 text-white pointer-events-none z-10 overflow-hidden">
+                            <p className="text-[9px] font-black uppercase opacity-70 mb-1">Formula</p>
+                            <p className="text-xs font-bold mb-2">{"사후 / 5 * 100"}</p>
+                            <p className="text-[9px] leading-tight opacity-90 line-clamp-3">최종 교육 시점의 역량이 목표치(5점) 대비 평점에 도달한 수준을 나타내는 지표입니다.</p>
+                        </div>
                     </div>
-                    <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                        <div className="text-[10px] font-black text-emerald-600 uppercase mb-2">잠재성장달성률</div>
+                    <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative group cursor-help">
+                        <div className="text-[10px] font-black text-emerald-600 uppercase mb-2">학습 목표 근접도</div>
                         <div className="text-3xl font-black text-slate-900">{reportData.overallStats.potentialGrowth}%</div>
+                        {/* Hover Tooltip Overlay */}
+                        <div className="absolute inset-0 bg-emerald-600/95 rounded-2xl opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-center px-4 text-white pointer-events-none z-10 overflow-hidden">
+                            <p className="text-[9px] font-black uppercase opacity-70 mb-1">Formula</p>
+                            <p className="text-xs font-bold mb-2">{"( 사후 - 사전 ) / ( 5 - 사전 ) * 100"}</p>
+                            <p className="text-[9px] leading-tight opacity-90 line-clamp-3">학습자가 성장 가능한 범위 내에서 실제 목표 지점에 얼마나 근접했는지 보여줍니다.</p>
+                        </div>
                     </div>
-                    <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                    <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative group cursor-help">
                         <div className="text-[10px] font-black text-amber-500 uppercase mb-2">전체 만족도</div>
                         <div className="text-3xl font-black text-slate-900">
                             {(reportData.programReports.reduce((acc: any, p: any) => acc + p.stats.overallSatisfaction, 0) / (reportData.programReports.length || 1)).toFixed(2)}
+                        </div>
+                        {/* Hover Tooltip Overlay */}
+                        <div className="absolute inset-0 bg-amber-500/95 rounded-2xl opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-center px-4 text-white pointer-events-none z-10 overflow-hidden">
+                            <p className="text-[9px] font-black uppercase opacity-70 mb-1">Average Satisfaction</p>
+                            <p className="text-xs font-bold mb-2">5.0 만점 기준</p>
+                            <p className="text-[9px] leading-tight opacity-90 line-clamp-3">운영지원, 교육환경, 내용, 강사 등 모든 설문의 전반적 만족도 평균 수치입니다.</p>
                         </div>
                     </div>
                 </div>
@@ -453,24 +503,24 @@ export default function ReportsPage() {
 
                         <div className="grid grid-cols-3 gap-6">
                             <Card className="border-none bg-slate-50/80 p-5 rounded-2xl">
-                                <h5 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">체감 상승률</h5>
+                                <h5 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">학습 인지 변화도</h5>
                                 <div className="text-2xl font-black text-blue-600">{Number(p.stats.perceivedGrowth).toFixed(1)}%</div>
                             </Card>
                             <Card className="border-none bg-slate-50/80 p-5 rounded-2xl">
-                                <h5 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">순수 성장률</h5>
+                                <h5 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">역량 도달률</h5>
                                 <div className="text-2xl font-black text-indigo-600">{Number(p.stats.netGrowth).toFixed(1)}%</div>
                             </Card>
                             <Card className="border-none bg-emerald-50/80 p-5 rounded-2xl">
-                                <h5 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">잠재성장달성률</h5>
+                                <h5 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">학습 목표 근접도</h5>
                                 <div className="text-2xl font-black text-emerald-600">{Number(p.stats.potentialGrowth).toFixed(1)}%</div>
                             </Card>
                         </div>
 
                         <div className="grid gap-6 md:grid-cols-2 mt-6">
                             <Card className="border-slate-100 shadow-sm rounded-3xl p-6">
-                                <CardTitle className="text-[11px] font-black text-indigo-600 mb-4 uppercase tracking-widest text-center">순수 성장률 상세 (%)</CardTitle>
+                                <CardTitle className="text-[11px] font-black text-indigo-600 mb-4 uppercase tracking-widest text-center">역량 도달률 상세 (%)</CardTitle>
                                 <div className="h-[250px]">
-                                    <ResponsiveContainer width="100%" height="100%">
+                                            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                                         <BarChart data={p.radarData} layout="vertical" margin={{ top: 5, right: 60, left: 40, bottom: 5 }}>
                                             <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f1f5f9" />
                                             <XAxis type="number" domain={[0, 5.5]} hide />
@@ -491,9 +541,9 @@ export default function ReportsPage() {
                                 </div>
                             </Card>
                             <Card className="border-slate-100 shadow-sm rounded-3xl p-6">
-                                <CardTitle className="text-[11px] font-black text-slate-400 mb-4 uppercase tracking-widest text-center">순수 성장률 (방사형)</CardTitle>
+                                <CardTitle className="text-[11px] font-black text-slate-400 mb-4 uppercase tracking-widest text-center">역량 도달 수준 (방사형)</CardTitle>
                                 <div className="h-[250px]">
-                                    <ResponsiveContainer width="100%" height="100%">
+                                            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                                         <RadarChart cx="50%" cy="50%" outerRadius={60} data={p.radarData}>
                                             <PolarGrid stroke="#f1f5f9" />
                                             <PolarAngleAxis dataKey="subject" tick={{fontSize: 9, fill: '#64748b', fontWeight: 800}} />
@@ -509,9 +559,9 @@ export default function ReportsPage() {
                         </div>
                         <div className="grid gap-6 md:grid-cols-2 mt-6">
                             <Card className="border-slate-100 shadow-sm rounded-3xl p-6">
-                                <CardTitle className="text-[11px] font-black text-emerald-600 mb-4 uppercase tracking-widest text-center">잠재성장달성률 상세 (%)</CardTitle>
+                                <CardTitle className="text-[11px] font-black text-emerald-600 mb-4 uppercase tracking-widest text-center">학습 목표 근접도 상세 (%)</CardTitle>
                                 <div className="h-[250px]">
-                                    <ResponsiveContainer width="100%" height="100%">
+                                            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                                         <BarChart data={p.radarData} layout="vertical" margin={{ top: 5, right: 60, left: 40, bottom: 5 }}>
                                             <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f1f5f9" />
                                             <XAxis type="number" domain={[0, 100]} hide />
@@ -530,9 +580,9 @@ export default function ReportsPage() {
                                 </div>
                             </Card>
                             <Card className="border-slate-100 shadow-sm rounded-3xl p-6">
-                                <CardTitle className="text-[11px] font-black text-slate-400 mb-4 uppercase tracking-widest text-center">잠재성장달성률 (방사형)</CardTitle>
+                                <CardTitle className="text-[11px] font-black text-slate-400 mb-4 uppercase tracking-widest text-center">학습 목표 근접 수준 (방사형)</CardTitle>
                                 <div className="h-[250px]">
-                                    <ResponsiveContainer width="100%" height="100%">
+                                            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                                         <RadarChart cx="50%" cy="50%" outerRadius={60} data={p.radarData}>
                                             <PolarGrid stroke="#f1f5f9" />
                                             <PolarAngleAxis dataKey="subject" tick={{fontSize: 9, fill: '#64748b', fontWeight: 800}} />
@@ -575,7 +625,7 @@ export default function ReportsPage() {
                                     </CardHeader>
                                     <CardContent className="p-8">
                                         <div className="h-[250px]">
-                                            <ResponsiveContainer width="100%" height="100%">
+                                                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                                                 <BarChart data={p.satisfactionData} layout="vertical" margin={{ top: 5, right: 40, left: 40, bottom: 5 }}>
                                                     <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f8fafc" />
                                                     <XAxis type="number" domain={[0, 5]} hide />
@@ -668,6 +718,12 @@ export default function ReportsPage() {
             </section>
           </div>
         )}
+      </div>
+      {/* 필수 한계 명시 문구 추가 */}
+      <div className="px-10 pb-20 text-center">
+         <p className="text-[11px] font-bold text-slate-400 bg-slate-50 py-4 rounded-2xl border border-slate-100 italic">
+            👉 "본 조사는 학습자 자가 진단에 기반한 주관적 데이터이며, 단기 과정의 특성상 상황 의존적일 수 있음"
+         </p>
       </div>
     </div>
   )

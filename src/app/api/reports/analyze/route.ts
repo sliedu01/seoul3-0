@@ -76,7 +76,7 @@ export async function POST(req: Request) {
     
     const targetMeta: Record<string, { label: string, tone: string, indicator: string }> = {
       ELEMENTARY: { label: "\uCD08\uB4F1\uD559\uC0DD", tone: "\uCE5C\uC808\uD558\uACE0 \uC26C\uC6B4 \uC120\uC0DD\uB2D8\uC758 \uC5B4\uC870", indicator: "\uD559\uC2B5 \uD765\uBBF8\uB3C4 \uBC0F \uAE30\uCD08 \uC5ED\uB7C9" },
-      MIDDLE: { label: "\uC911\uD559\uC0DD", tone: "\uBA85\uD655\uD558\uACE0 \uACA9\uB824\uD558\uB294 \uC131\uC7A5 \uC911\uC2EC \uC5B4\uC870", indicator: "\uC9C4\uB85C \uD0D0\uC0C9 \uBC0F \uC790\uC544 \uD6A8\uB2A5\uAC10" },
+      MIDDLE: { label: "\uC911\uD559\uC0DD", tone: "\uBA85\uD655\uD558\uACE0 \uACA9\uB824\uD558\uB294 \uB2E4\uCC28\uC6D0\uC801 \uC131\uCDE8 \uC5B4\uC870", indicator: "\uC9C4\uB85C \uD0D0\uC0C9 \uBC0F \uC790\uC544 \uD6A8\uB2A5\uAC10" },
       HIGH: { label: "\uACE0\uB4F1\uD559\uC0DD", tone: "\uC9C4\uC9C0\uD558\uACE0 \uAD6C\uCCB4\uC801\uC778 \uC9C4\uD559 \uCEE8\uC124\uD305 \uC5B4\uC870", indicator: "\uC9C4\uB85C \uACB0\uC815 \uBC0F \uAD6C\uCCB4\uC801 \uACC4\uD68D\uC218\uB9BD" },
       UNIVERSITY: { label: "\uB300\uD559\uC0DD", tone: "\uC804\uBB38\uC801\uC774\uACE0 \uB370\uC774\uD130 \uC911\uC2EC\uC758 \uC218\uC11D \uCEE8\uC124\uD134\uD2B8 \uC5B4\uC870", indicator: "\uC9C1\uBB34 \uC5ED\uB7C9 \uBC0F \uC0B0\uC5C5 \uC815\uD569\uC131 \uC9C0\uD45C" },
       OTHER: { label: "\uAE30\uD0C0", tone: "\uAC1D\uAD00\uC801\uC774\uACE0 \uC815\uC911\uD55C \uBD84\uC11D \uC5B4\uC870", indicator: "\uC804\uBC18\uC801 \uB9CC\uC871\uB3C4 \uBC0F \uC131\uCDE8\uB3C4" }
@@ -99,7 +99,7 @@ export async function POST(req: Request) {
       if (!programGrouped[pId]) {
         programGrouped[pId] = { 
           name: resp.session.program.name, 
-          coreGoals: resp.session.program.coreGoals || "\uC9C4\uB85C \uC5ED\uB7C9 \uAC15\uD654 \uBC0F \uC131\uC7A5 \uC9C0\uC6D0",
+          coreGoals: resp.session.program.coreGoals || "\uC9C4\uB85C \uC5ED\uB7C9 \uAC15\uD654 \uBC0F \uC131\uCDE8 \uC9C0\uC6D0",
           responses: [],
           partnerName: resp.session.partner?.name || "\uB0B4\uBD80 \uC6B4\uC601"
         };
@@ -207,20 +207,51 @@ export async function POST(req: Request) {
       });
 
       const compResults = Object.entries(topicStats)
-        .filter(([cat]) => !isSatCat(cat) && cat !== "\uC8FC\uAD00\uC2DD")
+        .filter(([cat]) => !isSatCat(cat) && cat !== "주관식")
         .map(([cat, s]) => {
           const pre = s.preCount > 0 ? s.preSum / s.preCount : 0;
           const post = s.postCount > 0 ? s.postSum / s.postCount : 0;
           return {
             cat,
-            growth: pre > 0 ? ((post - pre) / pre) * 100 : 0,
+            attainment: (post / 5) * 100,
+            perceived: ((post - pre) / 5) * 100,
+            potential: pre < 5 ? ((post - pre) / (5 - pre)) * 100 : (post >= 5 ? 100 : 0),
             pre,
             post
           };
-        }).sort((a, b) => b.growth - a.growth);
+        }).sort((a, b) => b.attainment - a.attainment);
+
+      // 3. 인별 지표(Grand Average) 산출: 카테고리 가중치 왜곡 방지
+      const respondentStats = groupResponses.map((r: any) => {
+        const compAns = r.answers.filter((a: any) => !isSatCat(getCategoryMatches(a.question?.category || "", a.question?.content || "")));
+        if (compAns.length === 0) return null;
+
+        let rPreSum = 0, rPostSum = 0, rCount = 0;
+        compAns.forEach((a: any) => {
+          const pre = a.preScore || 0;
+          let post = (a.question?.growthType === 'CHANGE') ? (pre + (a.postChange || 0)) : (a.score || 0);
+          post = Math.min(5, Math.max(1, post));
+          rPreSum += pre;
+          rPostSum += post;
+          rCount++;
+        });
+
+        const rPreAvg = rPreSum / rCount;
+        const rPostAvg = rPostSum / rCount;
+
+        return {
+          perceived: ((rPostAvg - rPreAvg) / 5) * 100,
+          attainment: (rPostAvg / 5) * 100,
+          potential: rPreAvg < 5 ? ((rPostAvg - rPreAvg) / (5 - rPreAvg)) * 100 : (rPostAvg >= 5 ? 100 : 0)
+        };
+      }).filter(Boolean);
+
+      const avgPerceived = respondentStats.length > 0 ? respondentStats.reduce((acc, s) => acc + s!.perceived, 0) / respondentStats.length : 0;
+      const avgAttainment = respondentStats.length > 0 ? respondentStats.reduce((acc, s) => acc + s!.attainment, 0) / respondentStats.length : 0;
+      const avgPotential = respondentStats.length > 0 ? respondentStats.reduce((acc, s) => acc + s!.potential, 0) / respondentStats.length : 0;
 
       const satResults = Object.entries(topicStats)
-        .filter(([cat]) => isSatCat(cat) && cat !== "\uC8FC\uAD00\uC2DD")
+        .filter(([cat]) => isSatCat(cat) && cat !== "주관식")
         .map(([cat, s]) => ({
           cat,
           score: s.satCount > 0 ? s.satSum / s.satCount : 0
@@ -230,10 +261,9 @@ export async function POST(req: Request) {
       const subjectiveQuestions = Array.from(subjectiveByQuestion.values());
       const allSubjTexts = subjectiveQuestions.flatMap(q => q.answers);
       
-      // Advanced keyword extraction
       const keywords: Record<string, string[]> = {
-        positive: ["\uAC15\uC0AC", "\uC7AC\uBBF8", "\uB3C4\uC6C0", "\uC2E4\uC2B5", "\uC124\uBA85", "\uCE5C\uC808", "\uCD5C\uACE0", "\uB85C\uBD07", "\uB4DC\uB860", "\uCCB4\uD5D8", "\uD65C\uB3D9", "\uADF8\uB9BC", "\uBBF8\uC220"],
-        negative: ["\uC5B4\uB835", "\uBD80\uC871", "\uC2DC\uAC04", "\uC2DC\uB044\uB7EC", "\uC881\uB2E4", "\uAE38\uB2E4", "\uC9E7\uB2E4", "\uBCF5\uC7A1", "\uBAA8\uB974\uACA0"]
+        positive: ["강사", "재미", "도움", "실습", "설명", "친절", "최고", "로봇", "드론", "체험", "활동", "그림", "미술"],
+        negative: ["어렵", "부족", "시간", "시끄러", "좁다", "길다", "짧다", "복잡", "모르겠"]
       };
       
       const analysisKeywords = {
@@ -241,7 +271,7 @@ export async function POST(req: Request) {
         neg: keywords.negative.filter(k => allSubjTexts.some(t => t && t.includes(k)))
       };
 
-      return { compResults, satResults, subjectiveQuestions, analysisKeywords };
+      return { compResults, satResults, subjectiveQuestions, analysisKeywords, avgPerceived, avgAttainment, avgPotential };
     };
 
     // Comprehensive 5-Stage AI Consultant Report
@@ -268,28 +298,33 @@ export async function POST(req: Request) {
 
     // [Senior Consultant Engine] - 5 Chapter Structured Report
     const totalMaturity = (overall.compResults.reduce((acc: number, c: any) => acc + c.post, 0) / (overall.compResults.length || 1)).toFixed(2);
-    const avgGrowth = (overall.compResults.reduce((acc: number, c: any) => acc + c.growth, 0) / (overall.compResults.length || 1)).toFixed(1);
+    
+    // 신규 지표 집계 (인별 통합 평균 참조)
+    const avgAttainment = overall.avgAttainment.toFixed(1);
+    const avgPerceived = overall.avgPerceived.toFixed(1);
+    const avgPotential = overall.avgPotential.toFixed(1);
+    
     const avgSatScore = (overall.satResults.reduce((acc: number, s: any) => acc + s.score, 0) / (overall.satResults.length || 1)).toFixed(2);
     
-    const bestArea = (overall.compResults[0] as any) || { cat: "\uD575\uC2EC \uC5ED\uB7C9", growth: 0, post: 0 };
-    const worstArea = (overall.compResults[overall.compResults.length - 1] as any) || { cat: "\uAE30\uCD08 \uC18C\uC591", growth: 0, post: 0 };
+    const bestArea = (overall.compResults[0] as any) || { cat: "\uD575\uC2EC \uC5ED\uB7C9", attainment: 0, perceived: 0, post: 0 };
+    const worstArea = (overall.compResults[overall.compResults.length - 1] as any) || { cat: "\uAE30\uCD08 \uC18C\uC591", attainment: 0, perceived: 0, post: 0 };
     
     const satGap = overall.satResults.length >= 2 
         ? (overall.satResults[0].score - overall.satResults[overall.satResults.length-1].score).toFixed(2)
         : "0.00";
 
-    let fullAnalysis = `## [\uC11C\uC6B8\uB7F0 3.0 \uC131\uACFC \uBD84\uC11D \uBCF4\uACE0\uC11C: \uC2DC\uB2C8\uC5B4 \uAD50\uC721 \uCEE8\uC124\uD134\uD2B8 \uAD00\uC810]\n\n`;
+    let fullAnalysis = `## [서울런 3.0 성과 분석 보고서: AI 컨설턴트 객관적 관찰 분석]\n\n`;
 
 
     // Chapter 1. Strategic Overview
-    fullAnalysis += `### Chapter 1. \uC0AC\uC5C5 \uC131\uACFC \uCD1D\uAD04 \uBC0F \uC815\uB7C9 \uBD84\uC11D (Strategic Overview)\n`;
-    fullAnalysis += `\uBCF8 \uC0AC\uC5C5\uC758 \uD575\uC2EC \uC9C0\uD45C\uC778 **\uC5ED\uB7C9 \uC131\uC219\uB3C4(${totalMaturity}/5.0)**\uC640 **\uAD50\uC721 \uB9CC\uC871\uB3C4(${avgSatScore}/5.0)**\uC758 \uC0C1\uAD00\uAD00\uACC4\uB97C \uBD84\uC11D\uD55C \uACB0\uACFC, \uC804\uBC18\uC801\uC778 \uC815\uD569\uC131\uC774 \uC6B0\uC218\uD55C \uC218\uC900\uC73C\uB85C \uB098\uD0C0\uB0AC\uC2B5\uB2C8\uB2E4.\n\n`;
-    fullAnalysis += `\uD2B9\uD788 \uD3C9\uADE0 **${avgGrowth}%\uC758 \uC131\uC219\uB3C4 \uD5A5\uC0C1\uB960**\uC740 \uB2E8\uAE30 \uAD50\uC721 \uACFC\uC815\uC784\uC5D0\uB3C4 \uBD88\uAD6C\uD558\uACE0 \uD559\uC2B5\uC790\uC758 \uC778\uC2DD \uBCC0\uD654\uAC00 \uC720\uC758\uBBF8\uD558\uAC8C \uBC1C\uC0DD\uD588\uC74C\uC744 \uC2DC\uC0AC\uD569\uB2C8\uB2E4. '\uBAA9\uD45C-\uC131\uACFC GAP \uBD84\uC11D' \uAE30\uBC95\uC744 \uC801\uC6A9\uD588\uC744 \uB54C, \uCD08\uAE30 \uC124\uC815\uD55C \uC5ED\uB7C9 \uAC15\uD654 \uBAA9\uD45C \uB300\uBE44 \uC57D **${(Number(totalMaturity)*20).toFixed(1)}%\uC758 \uB2EC\uC131\uB3C4**\uB97C \uBCF4\uC774\uBA70 \uC548\uC815\uC801\uC778 \uADA4\uB3C4\uC5D0 \uC9C4\uC785\uD55C \uAC83\uC73C\uB85C \uD3C9\uAC00\uB429\uB2C8\uB2E4. \uC774\uB294 \uB2E8\uC21C \uAD50\uC721 \uC81C\uACF5\uC744 \uB118\uC5B4 \uB9DE\uCDA4\uD615 \uC9C4\uB85C \uC124\uACC4 \uC9C0\uC6D0\uC774\uB77C\uB294 \uD575\uC2EC \uBAA9\uD45C\uC5D0 \uBD80\uD569\uD558\uB294 \uACB0\uACFC\uC785\uB2C8\uB2E4.\n\n`;
+    fullAnalysis += `### Chapter 1. 사업 성과 총괄 및 지표 분석 (Strategic Overview)\n`;
+    fullAnalysis += `본 사업의 핵심 지표인 **사후 성숙도(${totalMaturity}/5.0)**와 **교육 만족도(${avgSatScore}/5.0)**의 상관관계를 분석한 결과, 전반적인 데이터 정합성이 우수한 수준으로 관찰됩니다.\n\n`;
+    fullAnalysis += `특히 평균 **${avgPerceived}%의 학습 인지 변화도**는 단기 교육 과정의 특성 내에서 학습자의 인지적 성취가 어느 정도 형성되었음을 시사합니다. '학습 목표 근접도 분석' 기법을 적용했을 때, 초기 설정한 강화 목표 대비 약 **${avgPotential}%의 근접도**를 보이며 안정적인 궤도에 진입한 것으로 보입니다. 이는 단순 교육 제공을 넘어 맞춤형 진로 설계 지원이라는 목표에 부합하는 결과로 풀이됩니다.\n\n`;
 
     // Chapter 2. Maturity Deep Dive
-    fullAnalysis += `### Chapter 2. \uB2E4\uCC28\uC6D0 \uC5ED\uB7C9 \uC131\uC219\uB3C4 \uC9C4\uB2E8 (Maturity Deep Dive)\n`;
-    fullAnalysis += `\uD559\uC2B5\uC790 \uC5ED\uB7C9 \uBCC0\uD654 \uCD94\uC774\uB97C \uBD84\uC11D\uD55C \uACB0\uACFC, \uAC00\uC7A5 \uBE44\uC57D\uC801\uC778 \uBC1C\uC804\uC744 \uBCF4\uC778 \uC601\uC5ED\uC740 **'${bestArea.cat}'(+${Number(bestArea.growth).toFixed(1)}%)**\uC778 \uBC18\uBA74, **'${worstArea.cat}'** \uC601\uC5ED\uC740 \uC0C1\uB300\uC801\uC73C\uB85C \uC815\uCCB4\uB41C \uC591\uC0C1\uC744 \uBCF4\uC600\uC2B5\uB2C8\uB2E4.\n\n`;
-    fullAnalysis += `\uD604\uC7AC \uB3C4\uCD9C\uB41C **\uC804\uCCB4 \uC131\uC219\uB3C4 ${(Number(totalMaturity)*20).toFixed(1)}% (100\uC810 \uD658\uC0B0)** \uC9C0\uC810\uC740 \uCC28\uB144\uB3C4 \uC2EC\uD654 \uACFC\uC815 \uC9C4\uC785\uC744 \uC704\uD55C '\uC784\uACC4\uC810(Threshold)'\uC73C\uB85C\uC11C \uB9E4\uC6B0 \uC801\uC808\uD55C \uC218\uC900\uC785\uB2C8\uB2E4. \uD2B9\uD788 '${bestArea.cat}' \uC601\uC5ED\uC758 \uB192\uC740 \uC131\uCDE8\uB3C4\uB294 \uD559\uC2B5\uC790\uB4E4\uC774 \uAE30\uCD08 \uD0D0\uC0C9 \uB2E8\uACC4\uB97C \uB118\uC5B4 \uC2E4\uBB34/\uC2E4\uD589 \uC911\uC2EC\uC758 \uC2EC\uD654 \uB2E8\uACC4\uB85C \uB098\uC544\uAC08 \uC900\uBE44\uAC00 \uB418\uC5C8\uC74C\uC744 \uC785\uC99D\uD558\uB294 \uAC15\uB825\uD55C \uC9C0\uD45C\uC785\uB2C8\uB2E4.\n\n`;
+    fullAnalysis += `### Chapter 2. 다차원 역량 도달 수준 진단 (Maturity Deep Dive)\n`;
+    fullAnalysis += `학습자 역량 변화 추이를 분석한 결과, 상대적으로 큰 인지 변화를 보인 영역은 **'${bestArea.cat}'(+${Number(bestArea.perceived).toFixed(1)}%)**인 반면, **'${worstArea.cat}'** 영역은 상대적으로 완만한 변화 양상을 나타내는 경향이 있습니다.\n\n`;
+    fullAnalysis += `현재 도출된 **해당 영역 도달률 ${Number(bestArea.attainment).toFixed(1)}% (100점 환산)** 지점은 차년도 심화 과정 진입을 위한 '임계점(Threshold)'에 근접한 수준으로 보입니다. 특히 도달 수준은 학습자들이 기초 탐색 단계를 넘어 실무/실행 중심의 심화 단계로 나아갈 수 있는 가능성을 시사하는 지표로 풀이됩니다.\n\n`;
 
     // Chapter 3. User Experience Diagnosis - Enhanced with subjective frequency
     fullAnalysis += `### Chapter 3. \uD559\uC2B5\uC790 \uB9CC\uC871\uB3C4 \uBC0F \uC815\uC131\uC801 \uACBD\uD5D8 \uBD84\uC11D (User Experience Diagnosis)\n`;
@@ -315,7 +350,7 @@ export async function POST(req: Request) {
     if (negKeywordsText) {
       fullAnalysis += ` 반면, "${negKeywordsText}" 등의 키워드는 일부 개선 여지가 있음을 시사합니다.`;
     }
-    fullAnalysis += ` 이러한 정성적 피드백은 콘텐츠 품질 대비 운영 품질의 격차를 줄이는 것이 만족도 지표를 4.0 이상으로 견인할 핵심 과제임을 시사합니다.\n\n`;
+    fullAnalysis += ` 이러한 정성적 피드백은 콘텐츠 품질 대비 운영 품질의 격차를 줄이는 것이 만족도 지표를 4.0 이상으로 견인할 핵심 과제임을 나타냅니다.\n\n`;
 
     // 질문별 심층 분석
     questionFrequencies.forEach((qf, idx) => {
@@ -336,15 +371,15 @@ export async function POST(req: Request) {
 
     // Chapter 4. Critical Success Factors
     const minuteAgenda = meetingMinutes.map(m => m.agenda).filter(Boolean).slice(0,2).join(" / ");
-    fullAnalysis += `### Chapter 4. \uC0AC\uC5C5 \uC6B4\uC601\uC758 \uBCD1\uBAA9 \uD604\uC0C1 \uBC0F \uD575\uC2EC \uC131\uACF5 \uC694\uC778 (Critical Success Factors)\n`;
-    fullAnalysis += `**[Bottle-neck]**: \uBD84\uC11D \uACB0\uACFC, \uC131\uACFC \uC131\uC7A5\uC744 \uC800\uD574\uD558\uB294 \uC8FC\uC694 \uBCD1\uBAA9 \uD604\uC0C1\uC740 '${worstArea.cat}' \uC601\uC5ED\uC758 \uC778\uC9C0\uC801 \uC9C4\uC785\uC7A5\uBCBD\uACFC \uBB3C\uB9AC\uC801 \uC6B4\uC601 \uD658\uACBD\uC758 \uC81C\uC57D\uC73C\uB85C \uB3C4\uCD9C\uB418\uC5C8\uC2B5\uB2C8\uB2E4.\n`;
-    fullAnalysis += `**[Success Factors]**: \uBC18\uBA74, \uC131\uACFC\uB97C \uACAC\uC778\uD55C \uACB0\uC815\uC801 \uC694\uC778\uC740 '${bestArea.cat}' \uC911\uC2EC\uC758 \uC2E4\uC2B5\uD615 \uCF58\uD150\uCE20\uC640 \uD68C\uC758\uB85D(${meetingMinutes.length}\uAC74)\uC5D0\uC11C \uD655\uC778\uB41C '${minuteAgenda || '\uD604\uC7A5 \uBC00\uCC29\uD615 \uC6B4\uC601'}' \uC804\uB7B5\uC758 \uC720\uD6A8\uC131\uC774\uC5C8\uC2B5\uB2C8\uB2E4. \uD604\uC7A5 \uC911\uC2EC\uC758 \uAE30\uD68D\uC774 \uC815\uB7C9\uC801 \uC131\uC219\uB3C4\uB85C \uC9C1\uACB0\uB41C \uC0AC\uB840\uB85C \uBCFC \uC218 \uC788\uC2B5\uB2C8\uB2E4.\n\n`;
+    fullAnalysis += `### Chapter 4. 사업 운영의 병목 현상 및 핵심 성공 요인 (Critical Success Factors)\n`;
+    fullAnalysis += `**[Bottle-neck]**: 분석 결과, 인지 변화를 저해하는 주요 병목 현상은 '${worstArea.cat}' 영역의 인지적 진입장벽과 물리적 운영 환경의 제약으로 도출되었습니다.\n`;
+    fullAnalysis += `**[Success Factors]**: 반면, 성과를 견인한 결정적 요인은 '${bestArea.cat}' 중심의 실습형 콘텐츠와 회의록(${meetingMinutes.length}건)에서 확인된 '${minuteAgenda || '현장 밀착형 운영'}' 전략의 유효성입니다. 현장 중심의 기획이 정량적 역량 도달 수준으로 직결된 사례로 볼 수 있습니다.\n\n`;
 
     // Chapter 5. Feedback - Enhanced with frequency-based recommendations
     fullAnalysis += `### Chapter 5. \uCC28\uB144\uB3C4 \uC0AC\uC5C5 \uACE0\uB3C4\uD654\uB97C \uC704\uD55C \uD658\uB958(Feedback) \uC81C\uC5B8\n`;
 
     // 질문 기반 제언 생성
-    fullAnalysis += `1. **커리큘럼 및 UX 재설계**: 성숙도 저조 항목인 '${worstArea.cat}' 영역의 난이도를 세분화하고, `;
+    fullAnalysis += `1. **커리큘럼 및 UX 재설계**: 역량 도달 수준이 저조한 항목인 '${worstArea.cat}' 영역의 난이도를 세분화하고, `;
     // Q1 기반 제언 (장단점 질문의 답변 활용)
     const q1Data = questionFrequencies.find(qf => qf.questionContent.includes("좋") || qf.questionContent.includes("장단점"));
     if (q1Data && q1Data.topAnswers.length > 0) {
@@ -361,13 +396,14 @@ export async function POST(req: Request) {
       const futureProgText = `학습자들이 **"${q2Data.questionContent}"**에 대해 가장 많이 응답한 '${q2Data.topAnswers[0].text}'(${q2Data.topAnswers[0].count}건) 등을 반영한 **체험 중심 브릿지 프로그램(Bridge Program)** 신설`;
       fullAnalysis += `3. **전략적 정책 제언**: 발주기관은 차기 예산 편성 시 ${futureProgText}을 반드시 검토해야 합니다. 이는 본 사업의 지속 가능성과 교육 사다리 역할을 강화하는 핵심 동인이 될 것입니다.\n\n`;
     } else {
-      fullAnalysis += `3. **전략적 정책 제언**: 발주기관은 차기 예산 편성 시 **'성숙도 임계점 도달 그룹 대상의 브릿지 프로그램(Bridge Program)'** 신설을 반드시 검토해야 합니다.\n\n`;
+      fullAnalysis += `3. **전략적 정책 제언**: 발주기관은 차기 예산 편성 시 **'도달 임계점 근접 그룹 대상의 브릿지 프로그램(Bridge Program)'** 신설을 반드시 검토해야 합니다.\n\n`;
     }
 
 
     fullAnalysis += `--- \n`;
-    fullAnalysis += `*\uBCF8 \uBCF4\uACE0\uC11C\uB294 \uB370\uC774\uD130 \uAE30\uBC18 \uC54C\uACE0\uB9AC\uC998\uC5D0 \uC758\uD574 \uC0DD\uC131\uB41C 15\uB144 \uACBD\uB825 \uC2DC\uB2C8\uC5B4 \uCEE8\uC124\uD134\uD2B8\uAE09 \uC804\uBB38 \uC758\uACAC\uC785\uB2C8\uB2E4.*\n`;
-    fullAnalysis += `**\uC218\uC11D \uCEE8\uC124\uD134\uD2B8: \uC11C\uC6B8\uB7F0 3.0 AI \uC131\uACFC\uCE21\uC815 \uC9C0\uC6D0\uD300**`;
+    fullAnalysis += `👉 **"본 조사는 학습자 자가 진단에 기반한 주관적 데이터이며, 단기 과정의 특성상 상황 의존적일 수 있음"**\n\n`;
+    fullAnalysis += `*\uBCF8 \uBCF4\uACE0\uC11C\uB294 \uB370\uC774\uD130 \uAE30\uBC18 \uC54C\uACE0\uB9AC\uC998\uC5D0 \uC758\uD574 \uC0DD\uC131\uB41C AI \uCEE8\uC124\uD134\uD2B8\uAE09 \uAD00\uCC30 \uC758\uACAC\uC785\uB2C8\uB2E4.*\n`;
+    fullAnalysis += `**\uC11C\uC6B8\uB7F0 3.0 AI \uCEE8\uC124\uD134\uD2B8**`;
 
     // 마크다운 문법 제거 함수
     const cleanMarkdown = (text: string) => {
