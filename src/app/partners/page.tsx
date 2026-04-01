@@ -357,12 +357,16 @@ export default function PartnersPage() {
               </div>
               
               <div className="grid grid-cols-1 gap-2 pt-4">
-                <Button 
-                  className="w-full h-12 bg-slate-900 text-white rounded-xl font-bold flex items-center justify-center gap-2"
-                  onClick={() => handleDownload(pdfModal.fileName)}
+                {/* v1.0.3-force: Explicit anchor tag for binary safety */}
+                <a 
+                  href={`/api/download?file=${encodeURIComponent(pdfModal.fileName)}`}
+                  download={pdfModal.fileName}
+                  data-version="v1.0.3-force"
+                  className="w-full h-12 bg-slate-900 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors"
+                  onClick={() => setPdfModal(null)}
                 >
                   <FileDown className="w-4 h-4" /> 원본 다운로드
-                </Button>
+                </a>
                 
                 <label className="w-full h-12 border-2 border-blue-600 text-blue-600 hover:bg-blue-50 cursor-pointer rounded-xl font-bold flex items-center justify-center gap-2 transition-colors">
                   <Pencil className="w-4 h-4" /> 수정 (교체)
