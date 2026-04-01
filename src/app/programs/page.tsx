@@ -6,7 +6,15 @@ import { Plus, Pencil, Trash2, FilePlus2, X, Clock, User, BookOpen, Calendar, Bu
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 
-type Partner = { id: string; name: string }
+type Partner = { 
+  id: string; 
+  name: string;
+  businessRegistration?: string | null;
+  contractFile?: string | null;
+  insuranceFile?: string | null;
+  bankbookFile?: string | null;
+  preInspectionFile?: string | null;
+}
 type Session = {
   id: string
   date: string
@@ -648,6 +656,109 @@ export default function ProgramsPage() {
                   <label className="text-xs font-black text-slate-400 ml-1 uppercase">출석 인원</label>
                   <input type="number" value={sessionFormData.participantCount} onChange={e => setSessionFormData({...sessionFormData, participantCount: e.target.value})} className="w-full h-12 px-4 bg-slate-50 border-none rounded-2xl text-sm font-black focus:ring-2 focus:ring-blue-500 text-blue-600" />
                 </div>
+
+                {/* v1.0.4: Partner Documents Management Section (Business Registration, Contract, Insurance, Bankbook, Checklist) */}
+                {sessionFormData.partnerId && (
+                  <div className="col-span-2 mt-4 space-y-4 pt-6 border-t border-slate-100 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                        <Building2 className="w-4 h-4 text-blue-600" /> 협력업체 증빙 서류 관리
+                      </h4>
+                      <p className="text-[10px] text-slate-400 font-bold">* 가공되지 않은 원본 저장 및 출력용</p>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {[
+                        { label: "사업자등록증", field: "businessRegistration" },
+                        { label: "계약서 원본", field: "contractFile" },
+                        { label: "보험증권", field: "insuranceFile" },
+                        { label: "통장사본", field: "bankbookFile" },
+                        { label: "사전점검체크리스트", field: "preInspectionFile" }
+                      ].map((item) => {
+                        const partner = partners.find(p => p.id === sessionFormData.partnerId);
+                        const value = partner ? (partner as any)[item.field] : null;
+                        
+                        return (
+                          <div key={item.field} className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-black text-slate-500">{item.label}</span>
+                              {value && (
+                                <div className="flex gap-1">
+                                  <button 
+                                    type="button"
+                                    onClick={() => {
+                                      const link = document.createElement("a");
+                                      link.href = `/api/download?file=${encodeURIComponent(value)}`;
+                                      link.download = value;
+                                      document.body.appendChild(link);
+                                      link.click();
+                                      document.body.removeChild(link);
+                                    }}
+                                    className="p-1.5 bg-white text-blue-600 border border-blue-100 rounded-lg hover:bg-blue-50 transition-colors shadow-sm"
+                                    title="원본 다운로드"
+                                  >
+                                    <Download className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button 
+                                    type="button"
+                                    onClick={() => window.open(`/api/download?file=${encodeURIComponent(value)}`, '_blank')}
+                                    className="p-1.5 bg-white text-slate-600 border border-slate-100 rounded-lg hover:bg-slate-50 transition-colors shadow-sm"
+                                    title="인쇄 전 미리보기"
+                                  >
+                                    <Link className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                            
+                            <label className={cn(
+                              "relative flex items-center justify-center h-10 border-2 border-dashed rounded-xl cursor-pointer transition-all overflow-hidden",
+                              value ? "border-emerald-200 bg-white" : "border-slate-200 bg-slate-100 hover:border-blue-300 hover:bg-white"
+                            )}>
+                              <input 
+                                type="file" 
+                                accept=".pdf" 
+                                className="hidden" 
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  
+                                  const formData = new FormData();
+                                  formData.append("file", file);
+                                  
+                                  const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
+                                  if (uploadRes.ok) {
+                                    const result = await uploadRes.json();
+                                    const partner = partners.find(p => p.id === sessionFormData.partnerId);
+                                    if (partner) {
+                                      const updatedPartner = { ...partner, [item.field]: result.fileName };
+                                      const updateRes = await fetch(`/api/partners/${partner.id}`, {
+                                        method: "PUT",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify(updatedPartner)
+                                      });
+                                      if (updateRes.ok) {
+                                        setPartners(partners.map(p => p.id === partner.id ? updatedPartner : p));
+                                        alert(`${item.label} 원본이 성공적으로 업로드되었습니다.`);
+                                      }
+                                    }
+                                  }
+                                }}
+                              />
+                              <div className="flex items-center gap-2 truncate px-2">
+                                {value ? (
+                                  <><FilePlus2 className="w-3.5 h-3.5 text-emerald-500" /><span className="text-[10px] font-bold text-emerald-600 truncate max-w-[120px]">{value}</span></>
+                                ) : (
+                                  <><UploadCloud className="w-3.5 h-3.5 text-slate-400" /><span className="text-[10px] font-bold text-slate-400 text-center leading-none">원본 PDF 업로드</span></>
+                                )}
+                              </div>
+                            </label>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
               <Button type="submit" className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl shadow-lg shadow-blue-100 transition-all active:scale-[0.98]">
                 {editingSessionId ? "교육과정 수정 저장" : "교육과정 추가 완료"}
