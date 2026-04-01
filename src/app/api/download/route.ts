@@ -33,10 +33,13 @@ export async function GET(req: Request) {
       }, { status: 404 });
     }
 
+    // Create a safe ASCII filename for fallback
+    const safeFileName = nfcName.replace(/[^\x20-\x7E]/g, "_");
+
     return new Response(new Uint8Array(fileRecord.data), {
       headers: {
         "Content-Type": fileRecord.mimeType || "application/pdf",
-        "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(nfcName)}`,
+        "Content-Disposition": `attachment; filename="${safeFileName}"; filename*=UTF-8''${encodeURIComponent(nfcName)}`,
         "Content-Length": fileRecord.data.length.toString(),
       },
     });

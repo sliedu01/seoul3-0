@@ -9,18 +9,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
     }
 
+    // Normalize fileName to NFC for consistent lookup across OS (Win/Mac)
+    const normalizedFileName = file.name.normalize("NFC");
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
     // Save to PostgreSQL via Prisma
     const savedFile = await prisma.fileStorage.upsert({
-      where: { fileName: file.name },
+      where: { fileName: normalizedFileName },
       update: {
         data: buffer,
         mimeType: file.type || "application/pdf"
       },
       create: {
-        fileName: file.name,
+        fileName: normalizedFileName,
         data: buffer,
         mimeType: file.type || "application/pdf"
       }
