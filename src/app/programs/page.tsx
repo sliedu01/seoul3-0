@@ -127,9 +127,9 @@ export default function ProgramsPage() {
     const url = editingSessionId ? `/api/sessions/${editingSessionId}` : "/api/sessions"
     const method = editingSessionId ? "PATCH" : "POST"
 
-    // Prepare date+time strings
-    const startDateTime = sessionFormData.startTime ? `${sessionFormData.startDate}T${sessionFormData.startTime}:00` : null
-    const endDateTime = sessionFormData.endTime ? `${sessionFormData.endDate || sessionFormData.startDate}T${sessionFormData.endTime}:00` : null
+    // Prepare date+time strings with KST (+09:00) offset
+    const startDateTime = sessionFormData.startTime ? `${sessionFormData.startDate}T${sessionFormData.startTime}:00+09:00` : null
+    const endDateTime = sessionFormData.endTime ? `${sessionFormData.endDate || sessionFormData.startDate}T${sessionFormData.endTime}:00+09:00` : null
 
     const res = await fetch(url, {
       method,
@@ -372,12 +372,25 @@ export default function ProgramsPage() {
     setSelectedProgramId(programId)
     if (session) {
       setEditingSessionId(session.id)
+      
+      // Helper to extract KST date and time
+      const getKST = (dateStr: string | null) => {
+        if (!dateStr) return { date: "", time: "" };
+        const d = new Date(dateStr);
+        const datePart = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Seoul' }).format(d);
+        const timePart = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Seoul' }).format(d);
+        return { date: datePart, time: timePart };
+      };
+
+      const start = getKST(session.startTime || session.date);
+      const end = getKST(session.endTime || session.date);
+
       setSessionFormData({
         partnerId: session.partnerId || "",
-        startDate: session.startTime ? session.startTime.split('T')[0] : session.date.split('T')[0],
-        startTime: session.startTime ? session.startTime.split('T')[1].substring(0, 5) : "",
-        endDate: session.endTime ? session.endTime.split('T')[0] : session.date.split('T')[0],
-        endTime: session.endTime ? session.endTime.split('T')[1].substring(0, 5) : "",
+        startDate: start.date,
+        startTime: session.startTime ? start.time : "",
+        endDate: end.date,
+        endTime: session.endTime ? end.time : "",
         courseName: session.courseName || "",
         instructorName: session.instructorName || "",
         capacity: session.capacity.toString(),
