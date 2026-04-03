@@ -7,7 +7,10 @@ export async function GET() {
       include: {
         sessions: {
           include: {
-            partner: true
+            partner: true,
+            classDays: {
+              orderBy: [{ date: "asc" }, { startTime: "asc" }, { order: "asc" }]
+            }
           },
           orderBy: [
             { date: "asc" },

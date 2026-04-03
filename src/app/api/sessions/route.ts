@@ -15,7 +15,10 @@ export async function GET(req: Request) {
       where,
       include: {
         program: true,
-        partner: true
+        partner: true,
+        classDays: {
+          orderBy: [{ date: "asc" }, { startTime: "asc" }, { order: "asc" }]
+        }
       },
       orderBy: { date: "desc" }
     });

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Plus, Pencil, Trash2, FilePlus2, X, Clock, User, BookOpen, Calendar, Building2, UploadCloud, Download, Link, AlertCircle } from "lucide-react"
+import { Plus, Pencil, Trash2, FilePlus2, X, Clock, User, BookOpen, Calendar, Building2, UploadCloud, Download, Link, AlertCircle, ChevronDown, ChevronRight, CalendarDays } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 
@@ -14,6 +14,16 @@ type Partner = {
   insuranceFile?: string | null;
   bankbookFile?: string | null;
   preInspectionFile?: string | null;
+}
+type ClassDay = {
+  id: string
+  date: string
+  startTime: string | null
+  endTime: string | null
+  title: string | null
+  capacity: number
+  participantCount: number
+  order: number
 }
 type Session = {
   id: string
@@ -30,6 +40,7 @@ type Session = {
   completerCount: number
   resultPdfPath: string | null
   resultGoogleFormUrl: string | null
+  classDays: ClassDay[]
 }
 type Program = { 
   id: string; 
@@ -83,8 +94,22 @@ export default function ProgramsPage() {
 
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
-  const [deleteType, setDeleteType] = useState<"program" | "session">("program")
+  const [deleteType, setDeleteType] = useState<"program" | "session" | "classday">("program")
   const [isDeleting, setIsDeleting] = useState(false)
+
+  // ClassDay (교육일) states
+  const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set())
+  const [isClassDayModalOpen, setIsClassDayModalOpen] = useState(false)
+  const [editingClassDayId, setEditingClassDayId] = useState<string | null>(null)
+  const [classDaySessionId, setClassDaySessionId] = useState<string | null>(null)
+  const [classDayFormData, setClassDayFormData] = useState({
+    date: "",
+    startTime: "",
+    endTime: "",
+    title: "",
+    capacity: "0",
+    participantCount: "0"
+  })
 
   const fetchData = () => {
     setLoading(true)
@@ -359,13 +384,105 @@ export default function ProgramsPage() {
   const handleDeleteConfirm = async () => {
     if (!deleteId) return
     setIsDeleting(true)
-    const url = deleteType === "program" ? `/api/programs/${deleteId}` : `/api/sessions/${deleteId}`
+    let url = ""
+    if (deleteType === "program") url = `/api/programs/${deleteId}`
+    else if (deleteType === "session") url = `/api/sessions/${deleteId}`
+    else url = `/api/classdays/${deleteId}`
     const res = await fetch(url, { method: "DELETE" })
     if (res.ok) {
       setIsDeleteConfirmOpen(false)
       fetchData()
     }
     setIsDeleting(false)
+  }
+
+  // ClassDay (교육일) handlers
+  const toggleSessionExpand = (sessionId: string) => {
+    setExpandedSessions(prev => {
+      const next = new Set(prev)
+      if (next.has(sessionId)) next.delete(sessionId)
+      else next.add(sessionId)
+      return next
+    })
+  }
+
+  const openClassDayModal = (sessionId: string, classDay?: ClassDay) => {
+    setClassDaySessionId(sessionId)
+    if (classDay) {
+      setEditingClassDayId(classDay.id)
+      const getDateTimeParts = (dateStr: string | null) => {
+        if (!dateStr) return { date: "", time: "" };
+        const d = new Date(dateStr);
+        const yyyy = d.getUTCFullYear();
+        const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+        const dd = String(d.getUTCDate()).padStart(2, '0');
+        const hh = String(d.getUTCHours()).padStart(2, '0');
+        const mi = String(d.getUTCMinutes()).padStart(2, '0');
+        return { date: `${yyyy}-${mm}-${dd}`, time: `${hh}:${mi}` };
+      };
+      const dateParts = getDateTimeParts(classDay.date);
+      const startParts = classDay.startTime ? getDateTimeParts(classDay.startTime) : { date: "", time: "" };
+      const endParts = classDay.endTime ? getDateTimeParts(classDay.endTime) : { date: "", time: "" };
+      setClassDayFormData({
+        date: dateParts.date,
+        startTime: startParts.time,
+        endTime: endParts.time,
+        title: classDay.title || "",
+        capacity: classDay.capacity.toString(),
+        participantCount: classDay.participantCount.toString()
+      })
+    } else {
+      setEditingClassDayId(null)
+      setClassDayFormData({
+        date: new Date().toISOString().split('T')[0],
+        startTime: "",
+        endTime: "",
+        title: "",
+        capacity: "0",
+        participantCount: "0"
+      })
+    }
+    setIsClassDayModalOpen(true)
+  }
+
+  const handleClassDaySubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const url = editingClassDayId ? `/api/classdays/${editingClassDayId}` : "/api/classdays"
+    const method = editingClassDayId ? "PATCH" : "POST"
+    const startDateTime = classDayFormData.startTime ? `${classDayFormData.date}T${classDayFormData.startTime}:00.000Z` : null
+    const endDateTime = classDayFormData.endTime ? `${classDayFormData.date}T${classDayFormData.endTime}:00.000Z` : null
+    const res = await fetch(url, {
+      method,
+      body: JSON.stringify({
+        programSessionId: classDaySessionId,
+        date: `${classDayFormData.date}T00:00:00.000Z`,
+        startTime: startDateTime,
+        endTime: endDateTime,
+        title: classDayFormData.title,
+        capacity: Number(classDayFormData.capacity),
+        participantCount: Number(classDayFormData.participantCount)
+      }),
+      headers: { "Content-Type": "application/json" }
+    })
+    if (res.ok) {
+      setIsClassDayModalOpen(false)
+      fetchData()
+    }
+  }
+
+  const formatClassDayDate = (iso: string) => {
+    const d = new Date(iso);
+    const month = d.getUTCMonth() + 1;
+    const day = d.getUTCDate();
+    const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
+    const wd = weekdays[d.getUTCDay()];
+    return `${month}.${String(day).padStart(2, '0')} (${wd})`;
+  }
+
+  const formatClassDayTime = (iso: string | null) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
   }
 
   const openSessionModal = (programId: string, session?: Session) => {
@@ -426,10 +543,32 @@ export default function ProgramsPage() {
       const wd = weekdays[d.getUTCDay()];
       return `${month}. ${String(day).padStart(2, '0')}. (${wd})`;
     };
+    const formatDateShort = (iso: string) => {
+      const d = new Date(iso);
+      const yyyy = d.getUTCFullYear();
+      const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(d.getUTCDate()).padStart(2, '0');
+      return `${yyyy}.${mm}.${dd}`;
+    };
     const formatTimeUTC = (iso: string) => {
       const d = new Date(iso);
       return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
     };
+
+    // classDays가 있는 경우: 교육기간 범위만 표시
+    if (s.classDays && s.classDays.length > 0) {
+      const first = s.classDays[0];
+      const last = s.classDays[s.classDays.length - 1];
+      const startStr = formatDateShort(first.date);
+      const endStr = formatDateShort(last.date);
+      return (
+        <div className="flex flex-col gap-0.5 whitespace-nowrap">
+          <span className="text-xs">{startStr}</span>
+          {startStr !== endStr && <span className="opacity-70 text-xs">~ {endStr}</span>}
+          <span className="text-[10px] text-blue-500 font-black">{s.classDays.length}일 수업</span>
+        </div>
+      )
+    }
 
     const startD = s.startTime ? formatDateUTC(s.startTime) : formatDateUTC(s.date);
     const startT = s.startTime ? formatTimeUTC(s.startTime) : "";
@@ -521,48 +660,143 @@ export default function ProgramsPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {program.sessions.length === 0 ? (
-                    <tr><td colSpan={6} className="px-8 py-10 text-center text-sm font-bold text-slate-300 italic">등록된 교육 과정이 없습니다.</td></tr>
-                  ) : program.sessions.map(session => (
-                    <tr key={session.id} className="text-sm hover:bg-slate-50/50 transition-colors group">
-                      <td className="px-8 py-5 font-bold text-slate-700 whitespace-nowrap">
-                        {formatPeriod(session)}
-                      </td>
-                      <td className="px-6 py-5 whitespace-nowrap">
-                        <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-[10px] font-black whitespace-nowrap">{session.sessionNumber}회차</span>
-                      </td>
-                      <td className="px-6 py-5 font-bold text-slate-600">
-                        {session.partner?.name || "-"}
-                      </td>
-                      <td className="px-6 py-5 font-bold text-slate-900">{session.courseName || "-"}</td>
-                      <td className="px-6 py-5 text-slate-500 font-bold whitespace-nowrap">{session.instructorName || "-"}</td>
-                      <td className="px-5 py-5 text-center font-bold text-slate-500">{session.capacity}</td>
-                      <td className="px-5 py-5 text-center font-black text-blue-600 font-mono italic text-lg">{session.participantCount}</td>
-                      <td className="px-8 py-5 whitespace-nowrap">
-                        <div className="flex items-center justify-center gap-2 min-w-[120px]">
-                          {canEdit && (
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              onClick={() => { setActiveSession(session); setSurveyFormData({ pdfPath: session.resultPdfPath || "", googleUrl: session.resultGoogleFormUrl || "", excelFile: null, templateId: "" }); setShowSurveyModal(true); }}
-                              className="h-8 md:h-9 px-2 md:px-3 text-blue-600 font-black hover:bg-blue-50 rounded-xl flex gap-1 items-center transition-all active:scale-95 border border-blue-100 whitespace-nowrap text-[10px] md:text-sm"
-                            >
-                              <FilePlus2 className="w-3 md:w-4 h-3 md:h-4 shrink-0" /> <span className="whitespace-nowrap">입력</span>
-                            </Button>
-                          )}
-                          {canEdit && (
-                            <Button variant="ghost" size="sm" onClick={() => openSessionModal(program.id, session)} className="h-8 w-8 md:h-9 md:w-9 p-0 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all">
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                          )}
-                          {canDelete && (
-                            <Button variant="ghost" size="sm" onClick={() => { setDeleteId(session.id); setDeleteType("session"); setIsDeleteConfirmOpen(true); }} className="h-8 w-8 md:h-9 md:w-9 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                    <tr><td colSpan={8} className="px-8 py-10 text-center text-sm font-bold text-slate-300 italic">등록된 교육 과정이 없습니다.</td></tr>
+                  ) : program.sessions.map(session => {
+                    const isExpanded = expandedSessions.has(session.id)
+                    const hasClassDays = session.classDays && session.classDays.length > 0
+                    return (
+                      <React.Fragment key={session.id}>
+                        <tr 
+                          className={cn(
+                            "text-sm transition-colors group",
+                            hasClassDays ? "cursor-pointer hover:bg-blue-50/30" : "hover:bg-slate-50/50",
+                            isExpanded && "bg-blue-50/20"
+                          )} 
+                          onClick={() => hasClassDays && toggleSessionExpand(session.id)}
+                        >
+                          <td className="px-8 py-5 font-bold text-slate-700 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              {hasClassDays && (
+                                <span className="text-blue-500 shrink-0">
+                                  {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                                </span>
+                              )}
+                              {formatPeriod(session)}
+                            </div>
+                          </td>
+                          <td className="px-6 py-5 whitespace-nowrap">
+                            <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-[10px] font-black whitespace-nowrap">{session.sessionNumber}회차</span>
+                          </td>
+                          <td className="px-6 py-5 font-bold text-slate-600">
+                            {session.partner?.name || "-"}
+                          </td>
+                          <td className="px-6 py-5 font-bold text-slate-900">{session.courseName || "-"}</td>
+                          <td className="px-6 py-5 text-slate-500 font-bold whitespace-nowrap">{session.instructorName || "-"}</td>
+                          <td className="px-5 py-5 text-center font-bold text-slate-500">
+                            {hasClassDays ? (
+                              <span className="text-xs text-slate-400" title="교육일 합산">{session.capacity}<span className="text-[9px] ml-0.5 opacity-60">합계</span></span>
+                            ) : session.capacity}
+                          </td>
+                          <td className="px-5 py-5 text-center font-black text-blue-600 font-mono italic text-lg">
+                            {session.participantCount}
+                          </td>
+                          <td className="px-8 py-5 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center justify-center gap-2 min-w-[120px]">
+                              {canEdit && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  onClick={() => { setActiveSession(session); setSurveyFormData({ pdfPath: session.resultPdfPath || "", googleUrl: session.resultGoogleFormUrl || "", excelFile: null, templateId: "" }); setShowSurveyModal(true); }}
+                                  className="h-8 md:h-9 px-2 md:px-3 text-blue-600 font-black hover:bg-blue-50 rounded-xl flex gap-1 items-center transition-all active:scale-95 border border-blue-100 whitespace-nowrap text-[10px] md:text-sm"
+                                >
+                                  <FilePlus2 className="w-3 md:w-4 h-3 md:h-4 shrink-0" /> <span className="whitespace-nowrap">입력</span>
+                                </Button>
+                              )}
+                              {canEdit && (
+                                <Button variant="ghost" size="sm" onClick={() => openSessionModal(program.id, session)} className="h-8 w-8 md:h-9 md:w-9 p-0 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all">
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {canDelete && (
+                                <Button variant="ghost" size="sm" onClick={() => { setDeleteId(session.id); setDeleteType("session"); setIsDeleteConfirmOpen(true); }} className="h-8 w-8 md:h-9 md:w-9 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                        {/* Expanded ClassDays */}
+                        {isExpanded && hasClassDays && (
+                          <>
+                            <tr className="bg-blue-50/10">
+                              <td colSpan={8} className="px-0 py-0">
+                                <div className="border-l-4 border-blue-400 ml-8">
+                                  <table className="w-full">
+                                    <thead>
+                                      <tr className="text-[10px] font-black text-blue-400 uppercase tracking-wider border-b border-blue-100/50">
+                                        <th className="px-6 py-2.5 whitespace-nowrap">교육일</th>
+                                        <th className="px-4 py-2.5">시간</th>
+                                        <th className="px-4 py-2.5 min-w-[160px]">수업명</th>
+                                        <th className="px-4 py-2.5 text-center whitespace-nowrap">정원</th>
+                                        <th className="px-4 py-2.5 text-center whitespace-nowrap">참여</th>
+                                        <th className="px-6 py-2.5 text-center whitespace-nowrap">관리</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-blue-50">
+                                      {session.classDays.map((cd, idx) => (
+                                        <tr key={cd.id} className="text-xs hover:bg-blue-50/40 transition-colors">
+                                          <td className="px-6 py-3 font-bold text-slate-600 whitespace-nowrap">
+                                            <div className="flex items-center gap-2">
+                                              <CalendarDays className="w-3.5 h-3.5 text-blue-400" />
+                                              {formatClassDayDate(cd.date)}
+                                            </div>
+                                          </td>
+                                          <td className="px-4 py-3 text-slate-500 font-bold whitespace-nowrap">
+                                            {formatClassDayTime(cd.startTime)}{cd.endTime ? ` ~ ${formatClassDayTime(cd.endTime)}` : ""}
+                                          </td>
+                                          <td className="px-4 py-3 font-bold text-slate-800">{cd.title || "-"}</td>
+                                          <td className="px-4 py-3 text-center font-bold text-slate-500">{cd.capacity}</td>
+                                          <td className="px-4 py-3 text-center font-black text-blue-600">{cd.participantCount}</td>
+                                          <td className="px-6 py-3 whitespace-nowrap">
+                                            <div className="flex items-center justify-center gap-1">
+                                              {canEdit && (
+                                                <Button variant="ghost" size="sm" onClick={() => openClassDayModal(session.id, cd)} className="h-7 w-7 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all">
+                                                  <Pencil className="h-3 w-3" />
+                                                </Button>
+                                              )}
+                                              {canDelete && (
+                                                <Button variant="ghost" size="sm" onClick={() => { setDeleteId(cd.id); setDeleteType("classday"); setIsDeleteConfirmOpen(true); }} className="h-7 w-7 p-0 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all">
+                                                  <Trash2 className="h-3 w-3" />
+                                                </Button>
+                                              )}
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </td>
+                            </tr>
+                          </>
+                        )}
+                        {/* Add ClassDay button - always show for expanded or non-classday sessions */}
+                        {(isExpanded || !hasClassDays) && canEdit && (
+                          <tr className="bg-slate-50/30">
+                            <td colSpan={8} className={cn("py-2", hasClassDays ? "pl-14" : "pl-8")}>
+                              <button
+                                onClick={() => openClassDayModal(session.id)}
+                                className="flex items-center gap-2 px-4 py-2 text-[11px] font-bold text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-xl transition-all"
+                              >
+                                <CalendarDays className="w-3.5 h-3.5" />
+                                세부 교육일 추가
+                              </button>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -986,7 +1220,7 @@ export default function ProgramsPage() {
             <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
               <Trash2 className="w-8 h-8" />
             </div>
-            <h3 className="text-2xl font-black text-slate-900 mb-2">{deleteType === "program" ? "사업" : "교육과정"} 삭제 확인</h3>
+            <h3 className="text-2xl font-black text-slate-900 mb-2">{deleteType === "program" ? "사업" : deleteType === "session" ? "교육과정" : "교육일"} 삭제 확인</h3>
             <p className="text-slate-500 font-bold mb-8">정말 삭제하시겠습니까? 관련 데이터가 모두 삭제되며 복구할 수 없습니다.</p>
             <div className="flex gap-3">
               <Button variant="outline" onClick={() => setIsDeleteConfirmOpen(false)} className="flex-1 h-12 rounded-xl font-black">취소</Button>
@@ -994,6 +1228,60 @@ export default function ProgramsPage() {
                 {isDeleting ? "삭제 중..." : "위험성 인지 및 삭제"}
               </Button>
             </div>
+          </Card>
+        </div>
+      )}
+
+      {/* ClassDay Modal */}
+      {isClassDayModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in zoom-in-95 duration-200">
+          <Card className="w-full max-w-lg border-none shadow-2xl rounded-[2.5rem] bg-white overflow-hidden">
+            <div className="px-8 pt-8 pb-4 flex items-center justify-between border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg">
+                  <CalendarDays className="w-5 h-5" />
+                </div>
+                <h3 className="text-xl font-black text-slate-900">{editingClassDayId ? "교육일 수정" : "세부 교육일 추가"}</h3>
+              </div>
+              <button onClick={() => setIsClassDayModalOpen(false)} className="w-10 h-10 flex items-center justify-center hover:bg-slate-100 rounded-xl transition-colors">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            <form onSubmit={handleClassDaySubmit} className="p-8 space-y-5">
+              <div>
+                <label className="text-xs font-black text-slate-400 ml-1 uppercase">교육일 *</label>
+                <input type="date" value={classDayFormData.date} onChange={e => setClassDayFormData({...classDayFormData, date: e.target.value})} required className="w-full h-12 px-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-black text-slate-400 ml-1 uppercase">시작 시간</label>
+                  <input type="time" value={classDayFormData.startTime} onChange={e => setClassDayFormData({...classDayFormData, startTime: e.target.value})} className="w-full h-12 px-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="text-xs font-black text-slate-400 ml-1 uppercase">종료 시간</label>
+                  <input type="time" value={classDayFormData.endTime} onChange={e => setClassDayFormData({...classDayFormData, endTime: e.target.value})} className="w-full h-12 px-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-black text-slate-400 ml-1 uppercase">수업명</label>
+                <input type="text" value={classDayFormData.title} onChange={e => setClassDayFormData({...classDayFormData, title: e.target.value})} className="w-full h-12 px-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500" placeholder="수업명을 입력하세요" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-black text-slate-400 ml-1 uppercase">정원</label>
+                  <input type="number" min="0" value={classDayFormData.capacity} onChange={e => setClassDayFormData({...classDayFormData, capacity: e.target.value})} className="w-full h-12 px-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="text-xs font-black text-slate-400 ml-1 uppercase">참여인원</label>
+                  <input type="number" min="0" value={classDayFormData.participantCount} onChange={e => setClassDayFormData({...classDayFormData, participantCount: e.target.value})} className="w-full h-12 px-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500" />
+                </div>
+              </div>
+              <div className="pt-2">
+                <Button type="submit" className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl transition-all active:scale-[0.98] shadow-xl shadow-blue-200">
+                  {editingClassDayId ? "교육일 수정 완료" : "교육일 등록"}
+                </Button>
+              </div>
+            </form>
           </Card>
         </div>
       )}

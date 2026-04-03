@@ -62,7 +62,8 @@ export default function CalendarPage() {
       let allEvents: any[] = []
       
       if (Array.isArray(sessionsData)) {
-        const parsedSessions = sessionsData.map((s: any) => {
+        const parsedSessions: any[] = []
+        sessionsData.forEach((s: any) => {
           // DB에 KST 값이 UTC로 저장되어 있으므로 UTC 그대로 파싱
           const getUTCDate = (isoStr: string | null) => {
             if (!isoStr) return null;
@@ -70,18 +71,35 @@ export default function CalendarPage() {
             return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
           };
 
-          const sDate = getUTCDate(s.date);
-          const sStart = getUTCDate(s.startTime) || sDate;
-          const sEnd = getUTCDate(s.endTime) || sStart;
+          // classDays가 있으면 각 교육일을 개별 이벤트로
+          if (s.classDays && s.classDays.length > 0) {
+            s.classDays.forEach((cd: any, idx: number) => {
+              const cdDate = getUTCDate(cd.date);
+              parsedSessions.push({
+                id: `classday-${cd.id}`,
+                program: s.program.name,
+                partner: cd.title || s.partner?.name || "미지정",
+                session: idx + 1,
+                startDate: cdDate,
+                endDate: cdDate,
+                type: 'session'
+              })
+            })
+          } else {
+            // classDays가 없으면 기존 방식 (교육기간)
+            const sDate = getUTCDate(s.date);
+            const sStart = getUTCDate(s.startTime) || sDate;
+            const sEnd = getUTCDate(s.endTime) || sStart;
 
-          return { 
-            id: `session-${s.id}`,
-            program: s.program.name,
-            partner: s.partner?.name || "미지정",
-            session: s.sessionNumber,
-            startDate: sStart, 
-            endDate: (sEnd && sStart && sEnd < sStart) ? sStart : sEnd,
-            type: 'session'
+            parsedSessions.push({ 
+              id: `session-${s.id}`,
+              program: s.program.name,
+              partner: s.partner?.name || "미지정",
+              session: s.sessionNumber,
+              startDate: sStart, 
+              endDate: (sEnd && sStart && sEnd < sStart) ? sStart : sEnd,
+              type: 'session'
+            })
           }
         })
         allEvents = [...allEvents, ...parsedSessions]

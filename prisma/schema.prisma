@@ -51,6 +51,7 @@ model ProgramSession {
   courseName     String?   // 강의명
   instructorName String?   // 강사명
   
+  classDays      ClassDay[]
   facilityCheck  FacilityChecklist?
   responses      SurveyResponse[]
   
@@ -63,6 +64,21 @@ model ProgramSession {
 
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+}
+
+model ClassDay {
+  id               String   @id @default(cuid())
+  programSessionId String
+  session          ProgramSession @relation(fields: [programSessionId], references: [id], onDelete: Cascade)
+  date             DateTime           // 교육일 날짜
+  startTime        DateTime?          // 시작 시간
+  endTime          DateTime?          // 종료 시간
+  title            String?            // 수업명
+  capacity         Int      @default(0)   // 정원
+  participantCount Int      @default(0)   // 참여인원
+  order            Int      @default(0)   // 순서
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }
 
 model FacilityChecklist {
