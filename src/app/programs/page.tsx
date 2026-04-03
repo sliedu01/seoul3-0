@@ -1,5 +1,6 @@
 "use client"
 import React, { useState, useEffect } from "react"
+export const dynamic = 'force-dynamic' // Vercel 배포 시 최신 데이터 및 UI 반영 강제
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Plus, Pencil, Trash2, FilePlus2, X, Clock, User, BookOpen, Calendar, Building2, UploadCloud, Download, Link, AlertCircle, ChevronDown, ChevronRight, CalendarDays } from "lucide-react"
@@ -52,10 +53,60 @@ type Program = {
 }
 
 export default function ProgramsPage() {
-  const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
+const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
   const [programs, setPrograms] = useState<Program[]>([])
   const [partners, setPartners] = useState<Partner[]>([])
   const [loading, setLoading] = useState(true)
+
+  // DB에 KST 값이 UTC로 저장되어 있으므로 UTC 그대로 읽어 표시 (가독성을 위해 외부 정의 권장되나 현재는 내부 스코프 유지하며 정렬)
+  const formatPeriod = (s: Session) => {
+    const formatDateUTC = (iso: string) => {
+      const d = new Date(iso);
+      const month = d.getUTCMonth() + 1;
+      const day = d.getUTCDate();
+      const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
+      const wd = weekdays[d.getUTCDay()];
+      return `${month}. ${String(day).padStart(2, '0')}. (${wd})`;
+    };
+    const formatDateShort = (iso: string) => {
+      const d = new Date(iso);
+      const yyyy = d.getUTCFullYear();
+      const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(d.getUTCDate()).padStart(2, '0');
+      return `${yyyy}.${mm}.${dd}`;
+    };
+    const formatTimeUTC = (iso: string) => {
+      const d = new Date(iso);
+      return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+    };
+
+    if (s.classDays && s.classDays.length > 0) {
+      const first = s.classDays[0];
+      const last = s.classDays[s.classDays.length - 1];
+      const startStr = formatDateShort(first.date);
+      const endStr = formatDateShort(last.date);
+      return (
+        <div className="flex flex-col gap-0.5 whitespace-nowrap">
+          <span className="text-xs text-slate-700">{startStr}</span>
+          {startStr !== endStr && <span className="opacity-70 text-[10px] text-slate-400 font-bold">~ {endStr}</span>}
+          <span className="text-[10px] text-blue-600 font-black">{s.classDays.length}일 수업</span>
+        </div>
+      );
+    }
+
+    const startD = s.startTime ? formatDateUTC(s.startTime) : formatDateUTC(s.date);
+    const startT = s.startTime ? formatTimeUTC(s.startTime) : "";
+    const endD = s.endTime ? formatDateUTC(s.endTime) : "";
+    const endT = s.endTime ? formatTimeUTC(s.endTime) : "";
+    if (!startT && !endT) return <span className="font-bold text-slate-700">{startD}</span>;
+
+    return (
+      <div className="flex flex-col gap-0.5 whitespace-nowrap">
+        <span className="font-bold text-slate-700">{startD} {startT}</span>
+        {endD && <span className="opacity-70 text-[10px] text-slate-400 font-bold">~ {endD} {endT}</span>}
+      </div>
+    );
+  };
 
   // Program Modal
   const [isProgramModalOpen, setIsProgramModalOpen] = useState(false)
@@ -547,60 +598,13 @@ export default function ProgramsPage() {
     setIsSessionModalOpen(true)
   }
 
-  // DB에 KST 값이 UTC로 저장되어 있으므로 UTC 그대로 읽어 표시
-  const formatPeriod = (s: Session) => {
-    const formatDateUTC = (iso: string) => {
-      const d = new Date(iso);
-      const month = d.getUTCMonth() + 1;
-      const day = d.getUTCDate();
-      const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
-      const wd = weekdays[d.getUTCDay()];
-      return `${month}. ${String(day).padStart(2, '0')}. (${wd})`;
-    };
-    const formatDateShort = (iso: string) => {
-      const d = new Date(iso);
-      const yyyy = d.getUTCFullYear();
-      const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-      const dd = String(d.getUTCDate()).padStart(2, '0');
-      return `${yyyy}.${mm}.${dd}`;
-    };
-    const formatTimeUTC = (iso: string) => {
-      const d = new Date(iso);
-      return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
-    };
-
-    // classDays가 있는 경우: 교육기간 범위만 표시
-    if (s.classDays && s.classDays.length > 0) {
-      const first = s.classDays[0];
-      const last = s.classDays[s.classDays.length - 1];
-      const startStr = formatDateShort(first.date);
-      const endStr = formatDateShort(last.date);
-      return (
-        <div className="flex flex-col gap-0.5 whitespace-nowrap">
-          <span className="text-xs">{startStr}</span>
-          {startStr !== endStr && <span className="opacity-70 text-xs">~ {endStr}</span>}
-          <span className="text-[10px] text-blue-500 font-black">{s.classDays.length}일 수업</span>
-        </div>
-      )
-    }
-
-    const startD = s.startTime ? formatDateUTC(s.startTime) : formatDateUTC(s.date);
-    const startT = s.startTime ? formatTimeUTC(s.startTime) : "";
-    const endD = s.endTime ? formatDateUTC(s.endTime) : "";
-    const endT = s.endTime ? formatTimeUTC(s.endTime) : "";
-    
-    // In case no time is provided
-    if (!startT && !endT) return startD;
-
-    return (
-      <div className="flex flex-col gap-0.5 whitespace-nowrap">
-        <span>{startD} {startT}</span>
-        {endD && <span className="opacity-70 text-sm">~ {endD} {endT}</span>}
-      </div>
-    )
-  }
-
-  if (loading && programs.length === 0) return <div className="p-10 text-center font-bold text-slate-400 animate-pulse">데이터를 불러오는 중...</div>
+  // 데이터 로딩 중 표시 (애니메이션 효과)
+  if (loading && programs.length === 0) return (
+    <div className="p-20 text-center flex flex-col items-center justify-center gap-4">
+      <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent animate-spin rounded-full"></div>
+      <p className="font-bold text-slate-400 italic">사업 데이터를 최적화하여 불러오고 있습니다...</p>
+    </div>
+  );
 
   return (
     <div className="space-y-12 animate-in fade-in duration-300 pb-20">
@@ -688,8 +692,11 @@ export default function ProgramsPage() {
                             onClick={() => toggleSessionExpand(session.id)}
                           >
                             <td className="px-8 py-5 font-bold text-slate-700 whitespace-nowrap">
-                              <div className="flex items-center gap-2">
-                                <span className={cn("shrink-0 transition-colors", isExpanded ? "text-blue-500" : "text-slate-300 group-hover:text-blue-400")}>
+                              <div className="flex items-center gap-2 group-hover:translate-x-1 transition-transform">
+                                <span className={cn(
+                                  "flex items-center justify-center w-6 h-6 rounded-lg transition-all",
+                                  isExpanded ? "bg-blue-600 text-white shadow-md shadow-blue-100" : "bg-slate-100 text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-500"
+                                )}>
                                   {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                                 </span>
                                 {formatPeriod(session)}
