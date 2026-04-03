@@ -48,15 +48,22 @@ export async function POST(req: Request) {
     if (classDays && Array.isArray(classDays) && classDays.length > 0) {
       // 사용자가 명시적으로 교육일을 지정한 경우
       classDaysCreate = {
-        create: classDays.map((cd: any, idx: number) => ({
-          date: new Date(cd.date),
-          startTime: cd.startTime ? new Date(cd.startTime) : null,
-          endTime: cd.endTime ? new Date(cd.endTime) : null,
-          title: cd.title,
-          capacity: Number(cd.capacity || 0),
-          participantCount: Number(cd.participantCount || 0),
-          order: cd.order || idx
-        }))
+        create: classDays.map((cd: any, idx: number) => {
+          const parseDate = (val: any) => {
+            if (!val) return null;
+            const d = new Date(val);
+            return isNaN(d.getTime()) ? null : d;
+          };
+          return {
+            date: parseDate(cd.date) || new Date(),
+            startTime: parseDate(cd.startTime),
+            endTime: parseDate(cd.endTime),
+            title: cd.title,
+            capacity: Number(cd.capacity || 0),
+            participantCount: Number(cd.participantCount || 0),
+            order: cd.order || idx
+          };
+        })
       };
     } else {
       // 세부 교육일이 없는 경우 → 교육과정 정보로 기본 1일차 자동 생성 보장

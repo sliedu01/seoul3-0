@@ -233,7 +233,16 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
         endTime: endDateTime,
         capacity: Number(sessionFormData.capacity),
         participantCount: Number(sessionFormData.participantCount),
-        classDays: sessionFormData.classDays // Pass the array
+        // 전처리된 classDays 배열 전송
+        classDays: (sessionFormData.classDays || []).map((cd: any) => ({
+          ...cd,
+          // 각 교육일의 날짜와 시간을 결합하여 ISO Date 문자열 생성
+          date: `${cd.date}T00:00:00.000Z`,
+          startTime: cd.startTime ? `${cd.date}T${cd.startTime}:00.000Z` : null,
+          endTime: cd.endTime ? `${cd.date}T${cd.endTime}:00.000Z` : null,
+          capacity: Number(cd.capacity || 0),
+          participantCount: Number(cd.participantCount || 0)
+        }))
       }),
       headers: { "Content-Type": "application/json" }
     })
