@@ -59,13 +59,13 @@ export async function POST(req: Request) {
         }))
       };
     } else {
-      // 세부 교육일이 없는 경우 → 교육과정 정보로 기본 1건 자동 생성
+      // 세부 교육일이 없는 경우 → 교육과정 정보로 기본 1일차 자동 생성 보장
       classDaysCreate = {
         create: [{
           date: new Date(date),
           startTime: startTime ? new Date(startTime) : null,
           endTime: endTime ? new Date(endTime) : null,
-          title: courseName || null,
+          title: courseName || "1일차 수업",
           capacity: Number(capacity || 0),
           participantCount: Number(participantCount || 0),
           order: 0

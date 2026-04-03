@@ -94,6 +94,15 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
       );
     }
 
+    // 하위 문항 평균 출석 인원 계산 함수 (소수점 둘째자리 반올림 -> 첫째자리까지 표시)
+    const calculateAvgAttendance = (days: ClassDay[]) => {
+      if (!days || days.length === 0) return s.participantCount;
+      const total = days.reduce((sum, d) => sum + d.participantCount, 0);
+      const avg = total / days.length;
+      return (Math.round(avg * 10) / 10).toFixed(1);
+    }
+    const avgAttendance = calculateAvgAttendance(s.classDays || []);
+
     const startD = s.startTime ? formatDateUTC(s.startTime) : formatDateUTC(s.date);
     const startT = s.startTime ? formatTimeUTC(s.startTime) : "";
     const endD = s.endTime ? formatDateUTC(s.endTime) : "";
@@ -163,19 +172,21 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
     participantCount: "0"
   })
 
-  const fetchData = () => {
-    setLoading(true)
-    Promise.all([
-      fetch("/api/programs").then(res => res.json()),
-      fetch("/api/partners").then(res => res.json())
-    ]).then(([progData, partData]) => {
+  const fetchData = async (silent = false) => {
+    if (!silent) setLoading(true)
+    try {
+      const timestamp = new Date().getTime();
+      const [progData, partData] = await Promise.all([
+        fetch(`/api/programs?t=${timestamp}`).then(res => res.json()),
+        fetch(`/api/partners?t=${timestamp}`).then(res => res.json())
+      ]);
       setPrograms(progData)
       setPartners(partData)
-      setLoading(false)
-    }).catch(err => {
-      console.error(err)
-      setLoading(false)
-    })
+    } catch (err) {
+      console.error("Failed to fetch data:", err)
+    } finally {
+      if (!silent) setLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -193,9 +204,13 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
       body: JSON.stringify(programFormData),
       headers: { "Content-Type": "application/json" }
     })
+    
     if (res.ok) {
       setIsProgramModalOpen(false)
-      fetchData()
+      fetchData(true) // 백그라운드 갱신
+    } else {
+      const error = await res.json()
+      alert(`저장 실패: ${error.error || "알 수 없는 오류"}`)
     }
   }
 
@@ -222,9 +237,13 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
       }),
       headers: { "Content-Type": "application/json" }
     })
+    
     if (res.ok) {
       setIsSessionModalOpen(false)
-      fetchData()
+      fetchData(true) // 백그라운드 갱신
+    } else {
+      const error = await res.json()
+      alert(`저장 실패: ${error.error || "알 수 없는 오류"}`)
     }
   }
 
@@ -436,7 +455,30 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
 
   const handleDeleteConfirm = async () => {
     if (!deleteId) return
-    setIsDeleting(true)
+    
+    // 낙관적 업데이트를 위해 이전 상태 백업
+    const previousPrograms = [...programs];
+    
+    // UI에서 즉시 제거
+    if (deleteType === "program") {
+      setPrograms(programs.filter(p => p.id !== deleteId));
+    } else if (deleteType === "session") {
+      setPrograms(programs.map(p => ({
+        ...p,
+        sessions: p.sessions.filter(s => s.id !== deleteId)
+      })));
+    } else if (deleteType === "classday") {
+      setPrograms(programs.map(p => ({
+        ...p,
+        sessions: p.sessions.map(s => ({
+          ...s,
+          classDays: s.classDays.filter(cd => cd.id !== deleteId)
+        }))
+      })));
+    }
+
+    setIsDeleteConfirmOpen(false); // 모달 즉시 닫기
+    
     try {
       let url = ""
       if (deleteType === "program") url = `/api/programs/${deleteId}`
@@ -444,18 +486,15 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
       else url = `/api/classdays/${deleteId}`
       
       const res = await fetch(url, { method: "DELETE" })
-      if (res.ok) {
-        setIsDeleteConfirmOpen(false)
-        fetchData()
-      } else {
-        const errorData = await res.json().catch(() => ({}));
-        alert(`삭제 실패: ${errorData.error || "서버 오류가 발생했습니다."}`);
+      if (!res.ok) {
+        throw new Error("서버 응답 오류")
       }
+      // 성공 시 조용히 넘김 (이미 UI에서 제거됨)
     } catch (err) {
       console.error("Delete error:", err)
-      alert("삭제 중 네트워크 오류가 발생했습니다. 서버 상태를 확인해주세요.")
-    } finally {
-      setIsDeleting(false)
+      // 실패 시 상태 복구 (Rollback)
+      setPrograms(previousPrograms);
+      alert("삭제 중 오류가 발생했습니다. 데이터를 복구합니다.");
     }
   }
 
@@ -527,9 +566,13 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
       }),
       headers: { "Content-Type": "application/json" }
     })
+    
     if (res.ok) {
       setIsClassDayModalOpen(false)
-      fetchData()
+      fetchData(true) // 백그라운드 갱신
+    } else {
+      const error = await res.json()
+      alert(`저장 실패: ${error.error || "알 수 없는 오류"}`)
     }
   }
 
@@ -672,7 +715,7 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
                     <th className="px-6 py-4 min-w-[200px]">강의명</th>
                     <th className="px-6 py-4 whitespace-nowrap">강사명</th>
                     <th className="px-5 py-4 whitespace-nowrap text-center">정원</th>
-                    <th className="px-5 py-4 whitespace-nowrap text-center">출석</th>
+                    <th className="px-5 py-4 whitespace-nowrap text-center text-blue-600">출석 평균</th>
                     <th className="px-8 py-4 text-center whitespace-nowrap w-[240px]">관리</th>
                   </tr>
                 </thead>
@@ -716,7 +759,14 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
                               ) : session.capacity}
                             </td>
                             <td className="px-5 py-5 text-center font-black text-blue-600 font-mono italic text-lg">
-                              {session.participantCount}
+                              {(() => {
+                                const days = session.classDays || [];
+                                // 모든 참여 인원을 합산하여 평균 계산
+                                const validDays = days.length > 0 ? days : [{ participantCount: session.participantCount || 0 }];
+                                const total = validDays.reduce((sum, d) => sum + (Number(d.participantCount) || 0), 0);
+                                const avg = total / validDays.length;
+                                return (Math.round(avg * 10) / 10).toFixed(1);
+                              })()}
                             </td>
                             <td className="px-8 py-5 whitespace-nowrap" onClick={e => e.stopPropagation()}>
                               <div className="flex items-center justify-center gap-2 min-w-[120px]">
@@ -762,7 +812,7 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
                                         </tr>
                                       </thead>
                                       <tbody className="divide-y divide-slate-50">
-                                        {session.classDays.map((cd) => (
+                                        {session.classDays.map((cd, idx) => (
                                           <tr key={cd.id} className="group/cd-row hover:bg-white transition-colors relative">
                                             {/* Connector Horizontal Line */}
                                             <div className="absolute -left-[34px] top-1/2 w-8 border-t-2 border-blue-200"></div>
@@ -773,21 +823,36 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
                                                 {formatClassDayDate(cd.date)}
                                               </div>
                                             </td>
-                                            <td className="px-4 py-3 text-slate-500 font-bold whitespace-nowrap">
-                                              {formatClassDayTime(cd.startTime)}{cd.endTime ? ` ~ ${formatClassDayTime(cd.endTime)}` : ""}
+                                            <td className="px-4 py-3 font-bold text-slate-500 whitespace-nowrap">
+                                              {idx + 1}일차
                                             </td>
                                             <td className="px-4 py-3 font-bold text-slate-800">{cd.title || "-"}</td>
                                             <td className="px-4 py-3 text-center font-bold text-slate-500">{cd.capacity}</td>
                                             <td className="px-4 py-3 text-center font-black text-blue-600">{cd.participantCount}</td>
                                             <td className="px-4 py-3">
                                               <div className="flex items-center justify-center gap-1">
+                                                {!isMember && (
+                                                  <Button 
+                                                    variant="ghost" 
+                                                    size="sm" 
+                                                    onClick={(e) => { 
+                                                      e.stopPropagation();
+                                                      setActiveSession(session); 
+                                                      setSurveyFormData({ pdfPath: session.resultPdfPath || "", googleUrl: session.resultGoogleFormUrl || "", excelFile: null, templateId: "" }); 
+                                                      setShowSurveyModal(true); 
+                                                    }}
+                                                    className="h-7 px-2 text-blue-600 font-black hover:bg-blue-50 rounded-lg border border-blue-100 flex gap-1 items-center transform transition-all active:scale-95 text-[9px] mr-1"
+                                                  >
+                                                    <FilePlus2 className="w-2.5 h-2.5" /> 입력
+                                                  </Button>
+                                                )}
                                                 {canEdit && (
-                                                  <Button variant="ghost" size="sm" onClick={() => openClassDayModal(session.id, cd)} className="h-7 w-7 p-0 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg">
+                                                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); openClassDayModal(session.id, cd); }} className="h-7 w-7 p-0 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg">
                                                     <Pencil className="h-3 w-3" />
                                                   </Button>
                                                 )}
                                                 {canDelete && (
-                                                  <Button variant="ghost" size="sm" onClick={() => { setDeleteId(cd.id); setDeleteType("classday"); setIsDeleteConfirmOpen(true); }} className="h-7 w-7 p-0 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg">
+                                                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setDeleteId(cd.id); setDeleteType("classday"); setIsDeleteConfirmOpen(true); }} className="h-7 w-7 p-0 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg">
                                                     <Trash2 className="h-3 w-3" />
                                                   </Button>
                                                 )}
