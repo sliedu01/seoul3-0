@@ -63,19 +63,16 @@ export default function CalendarPage() {
       
       if (Array.isArray(sessionsData)) {
         const parsedSessions = sessionsData.map((s: any) => {
-          // Helper to get local date from ISO string (KST based if possible, or just the date part)
-          const getLocalDate = (isoStr: string | null) => {
+          // DB에 KST 값이 UTC로 저장되어 있으므로 UTC 그대로 파싱
+          const getUTCDate = (isoStr: string | null) => {
             if (!isoStr) return null;
-            // Force KST for ISO strings to get the correct "Day" in Korea
             const d = new Date(isoStr);
-            const dateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(d);
-            const [y, m, day] = dateStr.split('-').map(Number);
-            return new Date(y, m - 1, day);
+            return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
           };
 
-          const sDate = getLocalDate(s.date);
-          const sStart = getLocalDate(s.startTime) || sDate;
-          const sEnd = getLocalDate(s.endTime) || sStart;
+          const sDate = getUTCDate(s.date);
+          const sStart = getUTCDate(s.startTime) || sDate;
+          const sEnd = getUTCDate(s.endTime) || sStart;
 
           return { 
             id: `session-${s.id}`,
@@ -93,9 +90,7 @@ export default function CalendarPage() {
       if (Array.isArray(meetingsData)) {
         const parsedMeetings = meetingsData.map((m: any) => {
           const d = new Date(m.date);
-          const dateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(d);
-          const [y, mm, dd] = dateStr.split('-').map(Number);
-          const mDate = new Date(y, mm - 1, dd);
+          const mDate = new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
           return {
             id: `meeting-${m.id}`,
             program: "회의",
@@ -111,14 +106,12 @@ export default function CalendarPage() {
 
       if (Array.isArray(schedulesData)) {
         const parsedSchedules = schedulesData.map((s: any) => {
-          const getLocalDate = (isoStr: string) => {
+          const getUTCDate = (isoStr: string) => {
             const d = new Date(isoStr);
-            const dateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(d);
-            const [y, m, day] = dateStr.split('-').map(Number);
-            return new Date(y, m - 1, day);
+            return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
           };
-          const sStart = getLocalDate(s.startDate)
-          const sEnd = s.endDate ? getLocalDate(s.endDate) : sStart
+          const sStart = getUTCDate(s.startDate)
+          const sEnd = s.endDate ? getUTCDate(s.endDate) : sStart
           return {
             id: `other-${s.id}`,
             program: "기타일정",

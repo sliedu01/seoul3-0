@@ -127,9 +127,9 @@ export default function ProgramsPage() {
     const url = editingSessionId ? `/api/sessions/${editingSessionId}` : "/api/sessions"
     const method = editingSessionId ? "PATCH" : "POST"
 
-    // Prepare date+time strings with KST (+09:00) offset
-    const startDateTime = sessionFormData.startTime ? `${sessionFormData.startDate}T${sessionFormData.startTime}:00+09:00` : null
-    const endDateTime = sessionFormData.endTime ? `${sessionFormData.endDate || sessionFormData.startDate}T${sessionFormData.endTime}:00+09:00` : null
+    // DB에 KST 값을 그대로 저장 (UTC 컬럼에 KST 시간을 직접 저장하는 방식)
+    const startDateTime = sessionFormData.startTime ? `${sessionFormData.startDate}T${sessionFormData.startTime}:00.000Z` : null
+    const endDateTime = sessionFormData.endTime ? `${sessionFormData.endDate || sessionFormData.startDate}T${sessionFormData.endTime}:00.000Z` : null
 
     const res = await fetch(url, {
       method,
@@ -373,17 +373,20 @@ export default function ProgramsPage() {
     if (session) {
       setEditingSessionId(session.id)
       
-      // Helper to extract KST date and time
-      const getKST = (dateStr: string | null) => {
+      // DB에 KST 값이 UTC로 저장되어 있으므로 UTC 그대로 파싱
+      const getDateTimeParts = (dateStr: string | null) => {
         if (!dateStr) return { date: "", time: "" };
         const d = new Date(dateStr);
-        const datePart = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Seoul' }).format(d);
-        const timePart = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Seoul' }).format(d);
-        return { date: datePart, time: timePart };
+        const yyyy = d.getUTCFullYear();
+        const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+        const dd = String(d.getUTCDate()).padStart(2, '0');
+        const hh = String(d.getUTCHours()).padStart(2, '0');
+        const mi = String(d.getUTCMinutes()).padStart(2, '0');
+        return { date: `${yyyy}-${mm}-${dd}`, time: `${hh}:${mi}` };
       };
 
-      const start = session.startTime ? getKST(session.startTime) : { date: getKST(session.date).date, time: "" };
-      const end = session.endTime ? getKST(session.endTime) : { date: getKST(session.date).date, time: "" };
+      const start = session.startTime ? getDateTimeParts(session.startTime) : { date: getDateTimeParts(session.date).date, time: "" };
+      const end = session.endTime ? getDateTimeParts(session.endTime) : { date: getDateTimeParts(session.date).date, time: "" };
 
       setSessionFormData({
         partnerId: session.partnerId || "",
@@ -413,23 +416,25 @@ export default function ProgramsPage() {
     setIsSessionModalOpen(true)
   }
 
+  // DB에 KST 값이 UTC로 저장되어 있으므로 UTC 그대로 읽어 표시
   const formatPeriod = (s: Session) => {
-    const tz = 'Asia/Seoul'
-    const startD = s.startTime 
-      ? new Date(s.startTime).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric', weekday: 'short', timeZone: tz }) 
-      : new Date(s.date).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric', weekday: 'short', timeZone: tz })
-    
-    const startT = s.startTime 
-      ? new Date(s.startTime).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz }) 
-      : ""
-    
-    const endD = s.endTime 
-      ? new Date(s.endTime).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric', weekday: 'short', timeZone: tz }) 
-      : ""
-    
-    const endT = s.endTime 
-      ? new Date(s.endTime).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz }) 
-      : ""
+    const formatDateUTC = (iso: string) => {
+      const d = new Date(iso);
+      const month = d.getUTCMonth() + 1;
+      const day = d.getUTCDate();
+      const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
+      const wd = weekdays[d.getUTCDay()];
+      return `${month}. ${String(day).padStart(2, '0')}. (${wd})`;
+    };
+    const formatTimeUTC = (iso: string) => {
+      const d = new Date(iso);
+      return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+    };
+
+    const startD = s.startTime ? formatDateUTC(s.startTime) : formatDateUTC(s.date);
+    const startT = s.startTime ? formatTimeUTC(s.startTime) : "";
+    const endD = s.endTime ? formatDateUTC(s.endTime) : "";
+    const endT = s.endTime ? formatTimeUTC(s.endTime) : "";
     
     // In case no time is provided
     if (!startT && !endT) return startD;

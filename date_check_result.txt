@@ -1,0 +1,27 @@
+PROGRAM: 진로캠퍼스
+
+Session 1: 버츄얼, IoT, 알파미니, 알티노
+  date_iso     = 2026-03-21T00:00:00.000Z
+  startTime_iso= 2026-03-21T10:00:00.000Z
+  endTime_iso  = 2026-03-21T13:00:00.000Z
+
+Session 2: 웹툰 작가란 무엇일까?
+  date_iso     = 2026-04-18T00:00:00.000Z
+  startTime_iso= 2026-04-18T13:00:00.000Z
+  endTime_iso  = 2026-04-18T15:00:00.000Z
+
+Session 3: 뮤직비디오 기초 교육 1
+  date_iso     = 2026-05-02T09:00:00.000Z
+  startTime_iso= 2026-05-02T10:00:00.000Z
+  endTime_iso  = 2026-05-02T13:00:00.000Z
+
+Session 4: 뮤직비디오 기초 교육 2
+  date_iso     = 2026-05-03T09:00:00.000Z
+  startTime_iso= 2026-05-03T10:00:00.000Z
+  endTime_iso  = 2026-05-03T13:00:00.000Z
+
+Session 5: 뮤직비디오 기초 교육 3
+  date_iso     = 2026-05-09T09:00:00.000Z
+  startTime_iso= 2026-05-09T10:00:00.000Z
+  endTime_iso  = 2026-05-09T13:00:00.000Z
+
