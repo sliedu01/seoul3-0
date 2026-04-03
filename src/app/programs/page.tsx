@@ -75,7 +75,8 @@ export default function ProgramsPage() {
     courseName: "",
     instructorName: "",
     capacity: "30",
-    participantCount: "0"
+    participantCount: "0",
+    classDays: [] as any[] // Add this
   })
 
   // Survey Entry Modal
@@ -165,7 +166,8 @@ export default function ProgramsPage() {
         startTime: startDateTime,
         endTime: endDateTime,
         capacity: Number(sessionFormData.capacity),
-        participantCount: Number(sessionFormData.participantCount)
+        participantCount: Number(sessionFormData.participantCount),
+        classDays: sessionFormData.classDays // Pass the array
       }),
       headers: { "Content-Type": "application/json" }
     })
@@ -384,16 +386,26 @@ export default function ProgramsPage() {
   const handleDeleteConfirm = async () => {
     if (!deleteId) return
     setIsDeleting(true)
-    let url = ""
-    if (deleteType === "program") url = `/api/programs/${deleteId}`
-    else if (deleteType === "session") url = `/api/sessions/${deleteId}`
-    else url = `/api/classdays/${deleteId}`
-    const res = await fetch(url, { method: "DELETE" })
-    if (res.ok) {
-      setIsDeleteConfirmOpen(false)
-      fetchData()
+    try {
+      let url = ""
+      if (deleteType === "program") url = `/api/programs/${deleteId}`
+      else if (deleteType === "session") url = `/api/sessions/${deleteId}`
+      else url = `/api/classdays/${deleteId}`
+      
+      const res = await fetch(url, { method: "DELETE" })
+      if (res.ok) {
+        setIsDeleteConfirmOpen(false)
+        fetchData()
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        alert(`삭제 실패: ${errorData.error || "서버 오류가 발생했습니다."}`);
+      }
+    } catch (err) {
+      console.error("Delete error:", err)
+      alert("삭제 중 네트워크 오류가 발생했습니다. 서버 상태를 확인해주세요.")
+    } finally {
+      setIsDeleting(false)
     }
-    setIsDeleting(false)
   }
 
   // ClassDay (교육일) handlers
@@ -514,7 +526,8 @@ export default function ProgramsPage() {
         courseName: session.courseName || "",
         instructorName: session.instructorName || "",
         capacity: session.capacity.toString(),
-        participantCount: session.participantCount.toString()
+        participantCount: session.participantCount.toString(),
+        classDays: session.classDays || []
       })
     } else {
       setEditingSessionId(null)
@@ -527,7 +540,8 @@ export default function ProgramsPage() {
         courseName: "",
         instructorName: "",
         capacity: "30",
-        participantCount: "0"
+        participantCount: "0",
+        classDays: []
       })
     }
     setIsSessionModalOpen(true)
@@ -661,142 +675,151 @@ export default function ProgramsPage() {
                 <tbody className="divide-y divide-slate-50">
                   {program.sessions.length === 0 ? (
                     <tr><td colSpan={8} className="px-8 py-10 text-center text-sm font-bold text-slate-300 italic">등록된 교육 과정이 없습니다.</td></tr>
-                  ) : program.sessions.map(session => {
-                    const isExpanded = expandedSessions.has(session.id)
-                    const hasClassDays = session.classDays && session.classDays.length > 0
-                    return (
-                      <React.Fragment key={session.id}>
-                        <tr 
-                          className={cn(
-                            "text-sm transition-colors group",
-                            hasClassDays ? "cursor-pointer hover:bg-blue-50/30" : "hover:bg-slate-50/50",
-                            isExpanded && "bg-blue-50/20"
-                          )} 
-                          onClick={() => hasClassDays && toggleSessionExpand(session.id)}
-                        >
-                          <td className="px-8 py-5 font-bold text-slate-700 whitespace-nowrap">
-                            <div className="flex items-center gap-2">
-                              {hasClassDays && (
-                                <span className="text-blue-500 shrink-0">
+                    ) : program.sessions.map(session => {
+                      const isExpanded = expandedSessions.has(session.id)
+                      const hasClassDays = session.classDays && session.classDays.length > 0
+                      return (
+                        <React.Fragment key={session.id}>
+                          <tr 
+                            className={cn(
+                              "text-sm transition-colors group cursor-pointer",
+                              isExpanded ? "bg-blue-50/20 hover:bg-blue-50/30" : "hover:bg-slate-50/50"
+                            )} 
+                            onClick={() => toggleSessionExpand(session.id)}
+                          >
+                            <td className="px-8 py-5 font-bold text-slate-700 whitespace-nowrap">
+                              <div className="flex items-center gap-2">
+                                <span className={cn("shrink-0 transition-colors", isExpanded ? "text-blue-500" : "text-slate-300 group-hover:text-blue-400")}>
                                   {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                                 </span>
-                              )}
-                              {formatPeriod(session)}
-                            </div>
-                          </td>
-                          <td className="px-6 py-5 whitespace-nowrap">
-                            <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-[10px] font-black whitespace-nowrap">{session.sessionNumber}회차</span>
-                          </td>
-                          <td className="px-6 py-5 font-bold text-slate-600">
-                            {session.partner?.name || "-"}
-                          </td>
-                          <td className="px-6 py-5 font-bold text-slate-900">{session.courseName || "-"}</td>
-                          <td className="px-6 py-5 text-slate-500 font-bold whitespace-nowrap">{session.instructorName || "-"}</td>
-                          <td className="px-5 py-5 text-center font-bold text-slate-500">
-                            {hasClassDays ? (
-                              <span className="text-xs text-slate-400" title="교육일 합산">{session.capacity}<span className="text-[9px] ml-0.5 opacity-60">합계</span></span>
-                            ) : session.capacity}
-                          </td>
-                          <td className="px-5 py-5 text-center font-black text-blue-600 font-mono italic text-lg">
-                            {session.participantCount}
-                          </td>
-                          <td className="px-8 py-5 whitespace-nowrap" onClick={e => e.stopPropagation()}>
-                            <div className="flex items-center justify-center gap-2 min-w-[120px]">
-                              {canEdit && (
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  onClick={() => { setActiveSession(session); setSurveyFormData({ pdfPath: session.resultPdfPath || "", googleUrl: session.resultGoogleFormUrl || "", excelFile: null, templateId: "" }); setShowSurveyModal(true); }}
-                                  className="h-8 md:h-9 px-2 md:px-3 text-blue-600 font-black hover:bg-blue-50 rounded-xl flex gap-1 items-center transition-all active:scale-95 border border-blue-100 whitespace-nowrap text-[10px] md:text-sm"
-                                >
-                                  <FilePlus2 className="w-3 md:w-4 h-3 md:h-4 shrink-0" /> <span className="whitespace-nowrap">입력</span>
-                                </Button>
-                              )}
-                              {canEdit && (
-                                <Button variant="ghost" size="sm" onClick={() => openSessionModal(program.id, session)} className="h-8 w-8 md:h-9 md:w-9 p-0 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all">
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                              )}
-                              {canDelete && (
-                                <Button variant="ghost" size="sm" onClick={() => { setDeleteId(session.id); setDeleteType("session"); setIsDeleteConfirmOpen(true); }} className="h-8 w-8 md:h-9 md:w-9 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all">
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                        {/* Expanded ClassDays */}
-                        {isExpanded && hasClassDays && (
-                          <>
-                            <tr className="bg-blue-50/10">
-                              <td colSpan={8} className="px-0 py-0">
-                                <div className="border-l-4 border-blue-400 ml-8">
-                                  <table className="w-full">
-                                    <thead>
-                                      <tr className="text-[10px] font-black text-blue-400 uppercase tracking-wider border-b border-blue-100/50">
-                                        <th className="px-6 py-2.5 whitespace-nowrap">교육일</th>
-                                        <th className="px-4 py-2.5">시간</th>
-                                        <th className="px-4 py-2.5 min-w-[160px]">수업명</th>
-                                        <th className="px-4 py-2.5 text-center whitespace-nowrap">정원</th>
-                                        <th className="px-4 py-2.5 text-center whitespace-nowrap">참여</th>
-                                        <th className="px-6 py-2.5 text-center whitespace-nowrap">관리</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-blue-50">
-                                      {session.classDays.map((cd, idx) => (
-                                        <tr key={cd.id} className="text-xs hover:bg-blue-50/40 transition-colors">
-                                          <td className="px-6 py-3 font-bold text-slate-600 whitespace-nowrap">
-                                            <div className="flex items-center gap-2">
-                                              <CalendarDays className="w-3.5 h-3.5 text-blue-400" />
-                                              {formatClassDayDate(cd.date)}
-                                            </div>
-                                          </td>
-                                          <td className="px-4 py-3 text-slate-500 font-bold whitespace-nowrap">
-                                            {formatClassDayTime(cd.startTime)}{cd.endTime ? ` ~ ${formatClassDayTime(cd.endTime)}` : ""}
-                                          </td>
-                                          <td className="px-4 py-3 font-bold text-slate-800">{cd.title || "-"}</td>
-                                          <td className="px-4 py-3 text-center font-bold text-slate-500">{cd.capacity}</td>
-                                          <td className="px-4 py-3 text-center font-black text-blue-600">{cd.participantCount}</td>
-                                          <td className="px-6 py-3 whitespace-nowrap">
-                                            <div className="flex items-center justify-center gap-1">
-                                              {canEdit && (
-                                                <Button variant="ghost" size="sm" onClick={() => openClassDayModal(session.id, cd)} className="h-7 w-7 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all">
-                                                  <Pencil className="h-3 w-3" />
-                                                </Button>
-                                              )}
-                                              {canDelete && (
-                                                <Button variant="ghost" size="sm" onClick={() => { setDeleteId(cd.id); setDeleteType("classday"); setIsDeleteConfirmOpen(true); }} className="h-7 w-7 p-0 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all">
-                                                  <Trash2 className="h-3 w-3" />
-                                                </Button>
-                                              )}
-                                            </div>
-                                          </td>
+                                {formatPeriod(session)}
+                              </div>
+                            </td>
+                            <td className="px-6 py-5 whitespace-nowrap">
+                              <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-[10px] font-black whitespace-nowrap">{session.sessionNumber}회차</span>
+                            </td>
+                            <td className="px-6 py-5 font-bold text-slate-600">
+                              {session.partner?.name || "-"}
+                            </td>
+                            <td className="px-6 py-5 font-bold text-slate-900">{session.courseName || "-"}</td>
+                            <td className="px-6 py-5 text-slate-500 font-bold whitespace-nowrap">{session.instructorName || "-"}</td>
+                            <td className="px-5 py-5 text-center font-bold text-slate-500">
+                              {hasClassDays ? (
+                                <span className="text-xs text-slate-400" title="교육일 합산">{session.capacity}<span className="text-[9px] ml-0.5 opacity-60">합계</span></span>
+                              ) : session.capacity}
+                            </td>
+                            <td className="px-5 py-5 text-center font-black text-blue-600 font-mono italic text-lg">
+                              {session.participantCount}
+                            </td>
+                            <td className="px-8 py-5 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                              <div className="flex items-center justify-center gap-2 min-w-[120px]">
+                                {canEdit && (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    onClick={() => { setActiveSession(session); setSurveyFormData({ pdfPath: session.resultPdfPath || "", googleUrl: session.resultGoogleFormUrl || "", excelFile: null, templateId: "" }); setShowSurveyModal(true); }}
+                                    className="h-8 md:h-9 px-2 md:px-3 text-blue-600 font-black hover:bg-blue-50 rounded-xl flex gap-1 items-center transition-all active:scale-95 border border-blue-100 whitespace-nowrap text-[10px] md:text-sm"
+                                  >
+                                    <FilePlus2 className="w-3 md:w-4 h-3 md:h-4 shrink-0" /> <span className="whitespace-nowrap">입력</span>
+                                  </Button>
+                                )}
+                                {canEdit && (
+                                  <Button variant="ghost" size="sm" onClick={() => openSessionModal(program.id, session)} className="h-8 w-8 md:h-9 md:w-9 p-0 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all">
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {canDelete && (
+                                  <Button variant="ghost" size="sm" onClick={() => { setDeleteId(session.id); setDeleteType("session"); setIsDeleteConfirmOpen(true); }} className="h-8 w-8 md:h-9 md:w-9 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all">
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                          
+                          {/* Tree Connector Styling for ClassDays */}
+                          {isExpanded && (
+                            <tr className="bg-slate-50/20">
+                              <td colSpan={8} className="p-0">
+                                <div className="relative ml-12 pl-8 pb-4 border-l-2 border-blue-200">
+                                  {hasClassDays ? (
+                                    <table className="w-full text-xs border-collapse">
+                                      <thead>
+                                        <tr className="text-[10px] font-black text-slate-400 uppercase border-b border-slate-100">
+                                          <th className="px-4 py-2 text-left">수업일</th>
+                                          <th className="px-4 py-2 text-left">시간</th>
+                                          <th className="px-4 py-2 text-left">수업명</th>
+                                          <th className="px-4 py-2 text-center">정원</th>
+                                          <th className="px-4 py-2 text-center">참여</th>
+                                          <th className="px-4 py-2 text-center">관리</th>
                                         </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
+                                      </thead>
+                                      <tbody className="divide-y divide-slate-50">
+                                        {session.classDays.map((cd) => (
+                                          <tr key={cd.id} className="group/cd-row hover:bg-white transition-colors relative">
+                                            {/* Connector Horizontal Line */}
+                                            <div className="absolute -left-[34px] top-1/2 w-8 border-t-2 border-blue-200"></div>
+                                            
+                                            <td className="px-4 py-3 font-bold text-slate-600 whitespace-nowrap">
+                                              <div className="flex items-center gap-2">
+                                                <CalendarDays className="w-3.5 h-3.5 text-blue-400" />
+                                                {formatClassDayDate(cd.date)}
+                                              </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-slate-500 font-bold whitespace-nowrap">
+                                              {formatClassDayTime(cd.startTime)}{cd.endTime ? ` ~ ${formatClassDayTime(cd.endTime)}` : ""}
+                                            </td>
+                                            <td className="px-4 py-3 font-bold text-slate-800">{cd.title || "-"}</td>
+                                            <td className="px-4 py-3 text-center font-bold text-slate-500">{cd.capacity}</td>
+                                            <td className="px-4 py-3 text-center font-black text-blue-600">{cd.participantCount}</td>
+                                            <td className="px-4 py-3">
+                                              <div className="flex items-center justify-center gap-1">
+                                                {canEdit && (
+                                                  <Button variant="ghost" size="sm" onClick={() => openClassDayModal(session.id, cd)} className="h-7 w-7 p-0 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg">
+                                                    <Pencil className="h-3 w-3" />
+                                                  </Button>
+                                                )}
+                                                {canDelete && (
+                                                  <Button variant="ghost" size="sm" onClick={() => { setDeleteId(cd.id); setDeleteType("classday"); setIsDeleteConfirmOpen(true); }} className="h-7 w-7 p-0 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg">
+                                                    <Trash2 className="h-3 w-3" />
+                                                  </Button>
+                                                )}
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  ) : (
+                                    <div className="py-6 px-4 text-center">
+                                      <div className="absolute -left-[34px] top-1/2 w-8 border-t-2 border-blue-200"></div>
+                                      <CalendarDays className="w-8 h-8 text-slate-200 mx-auto mb-2" />
+                                      <p className="text-xs font-bold text-slate-400 italic">등록된 수업일이 없습니다.</p>
+                                      <p className="text-[10px] text-slate-300 mt-1">아래 버튼으로 수업일을 추가해 주세요.</p>
+                                    </div>
+                                  )}
                                 </div>
                               </td>
                             </tr>
-                          </>
-                        )}
-                        {/* Add ClassDay button - always show for expanded or non-classday sessions */}
-                        {(isExpanded || !hasClassDays) && canEdit && (
-                          <tr className="bg-slate-50/30">
-                            <td colSpan={8} className={cn("py-2", hasClassDays ? "pl-14" : "pl-8")}>
-                              <button
-                                onClick={() => openClassDayModal(session.id)}
-                                className="flex items-center gap-2 px-4 py-2 text-[11px] font-bold text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-xl transition-all"
-                              >
-                                <CalendarDays className="w-3.5 h-3.5" />
-                                세부 교육일 추가
-                              </button>
-                            </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
-                    )
-                  })}
+                          )}
+  
+                          {/* Add ClassDay button - show when expanded */}
+                          {isExpanded && canEdit && (
+                            <tr className="bg-slate-50/30">
+                              <td colSpan={8} className="pl-14 py-2">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); openClassDayModal(session.id); }}
+                                  className="flex items-center gap-2 px-4 py-2 text-[11px] font-bold text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-xl transition-all"
+                                >
+                                  <Plus className="w-3.5 h-3.5" />
+                                  수업일 추가
+                                </button>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      )
+                    })}
                 </tbody>
               </table>
             </div>
@@ -912,13 +935,112 @@ export default function ProgramsPage() {
                   <label className="text-xs font-black text-slate-400 ml-1 uppercase flex gap-2 items-center"><User className="w-3 h-3" /> 강사명</label>
                   <input value={sessionFormData.instructorName} onChange={e => setSessionFormData({...sessionFormData, instructorName: e.target.value})} className="w-full h-12 px-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500" placeholder="강사 성함" />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-400 ml-1 uppercase">정원</label>
-                  <input type="number" value={sessionFormData.capacity} onChange={e => setSessionFormData({...sessionFormData, capacity: e.target.value})} className="w-full h-12 px-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-400 ml-1 uppercase">출석 인원</label>
-                  <input type="number" value={sessionFormData.participantCount} onChange={e => setSessionFormData({...sessionFormData, participantCount: e.target.value})} className="w-full h-12 px-4 bg-slate-50 border-none rounded-2xl text-sm font-black focus:ring-2 focus:ring-blue-500 text-blue-600" />
+                <div className="col-span-2 mt-4 space-y-4 pt-6 border-t border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-black text-slate-400 ml-1 uppercase flex gap-2 items-center">
+                      <CalendarDays className="w-3 h-3 text-blue-600" /> 상세 교육일 (수업날짜/시간)
+                    </label>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => {
+                        const newClassDays = [...(sessionFormData.classDays || [])];
+                        // Default to next day after the last class day, or the start date
+                        const lastDate = newClassDays.length > 0 ? new Date(newClassDays[newClassDays.length - 1].date) : new Date(sessionFormData.startDate || new Date());
+                        if (newClassDays.length > 0) lastDate.setDate(lastDate.getDate() + 1);
+                        
+                        newClassDays.push({
+                          date: lastDate.toISOString().split('T')[0],
+                          startTime: sessionFormData.startTime || "09:00",
+                          endTime: sessionFormData.endTime || "12:00",
+                          title: `${sessionFormData.courseName || ""} ${newClassDays.length + 1}차시`,
+                          capacity: sessionFormData.capacity || "30",
+                          participantCount: "0"
+                        });
+                        setSessionFormData({...sessionFormData, classDays: newClassDays});
+                      }}
+                      className="h-8 px-3 text-[10px] font-black border-blue-200 text-blue-600 hover:bg-blue-50 rounded-xl whitespace-nowrap"
+                    >
+                      <Plus className="w-3 h-3 mr-1" /> 교육일 추가
+                    </Button>
+                  </div>
+                  
+                  <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                    {sessionFormData.classDays?.map((cd: any, idx: number) => (
+                      <div key={idx} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-3 relative group/cd">
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            const newClassDays = sessionFormData.classDays.filter((_: any, i: number) => i !== idx);
+                            setSessionFormData({...sessionFormData, classDays: newClassDays});
+                          }}
+                          className="absolute top-2 right-2 p-1 text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover/cd:opacity-100"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-400">날짜</label>
+                            <input 
+                              type="date" 
+                              value={cd.date} 
+                              onChange={e => {
+                                const newClassDays = [...sessionFormData.classDays];
+                                newClassDays[idx].date = e.target.value;
+                                setSessionFormData({...sessionFormData, classDays: newClassDays});
+                              }}
+                              className="w-full h-8 px-2 bg-white border-none rounded-lg text-[11px] font-bold focus:ring-1 focus:ring-blue-500" 
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-400">수업명</label>
+                            <input 
+                              type="text" 
+                              value={cd.title} 
+                              onChange={e => {
+                                const newClassDays = [...sessionFormData.classDays];
+                                newClassDays[idx].title = e.target.value;
+                                setSessionFormData({...sessionFormData, classDays: newClassDays});
+                              }}
+                              className="w-full h-8 px-2 bg-white border-none rounded-lg text-[11px] font-bold focus:ring-1 focus:ring-blue-500" 
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-400">시작 시간</label>
+                            <input 
+                              type="time" 
+                              value={cd.startTime} 
+                              onChange={e => {
+                                const newClassDays = [...sessionFormData.classDays];
+                                newClassDays[idx].startTime = e.target.value;
+                                setSessionFormData({...sessionFormData, classDays: newClassDays});
+                              }}
+                              className="w-full h-8 px-2 bg-white border-none rounded-lg text-[11px] font-bold focus:ring-1 focus:ring-blue-500" 
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-400">종료 시간</label>
+                            <input 
+                              type="time" 
+                              value={cd.endTime} 
+                              onChange={e => {
+                                const newClassDays = [...sessionFormData.classDays];
+                                newClassDays[idx].endTime = e.target.value;
+                                setSessionFormData({...sessionFormData, classDays: newClassDays});
+                              }}
+                              className="w-full h-8 px-2 bg-white border-none rounded-lg text-[11px] font-bold focus:ring-1 focus:ring-blue-500" 
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {(!sessionFormData.classDays || sessionFormData.classDays.length === 0) && (
+                      <div className="text-center py-6 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                        <p className="text-[11px] font-bold text-slate-400 italic">추가된 세부 교육일이 없습니다.</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* v1.0.4: Partner Documents Management Section (Business Registration, Contract, Insurance, Bankbook, Checklist) */}

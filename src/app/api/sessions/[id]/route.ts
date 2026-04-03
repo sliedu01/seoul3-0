@@ -59,29 +59,38 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 }
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  console.log(`[API] Attempting to delete session: ${id}`);
+  
   try {
-    const { id } = await params;
-    
     const existingSession = await prisma.programSession.findUnique({
       where: { id }
     });
 
     if (!existingSession) {
+      console.warn(`[API] Session not found for deletion: ${id}`);
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
 
     const programId = existingSession.programId;
 
+    // Use transaction if possible, or at least log progress
+    console.log(`[API] Found session ${id}, deleting...`);
     await prisma.programSession.delete({
       where: { id }
     });
+    console.log(`[API] Session ${id} deleted successfully. Renumbering sessions for program ${programId}...`);
 
     // Re-number after delete
     await renumberSessions(programId);
+    console.log(`[API] Sessions renumbered for program ${programId}.`);
 
     return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: "Failed to delete session" }, { status: 500 });
+  } catch (error: any) {
+    console.error(`[API] Failed to delete session ${id}:`, error);
+    return NextResponse.json({ 
+      error: "Failed to delete session", 
+      details: error.message || String(error)
+    }, { status: 500 });
   }
 }

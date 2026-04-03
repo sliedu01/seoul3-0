@@ -1,7 +1,7 @@
 "use client"
 import React, { useState, useEffect } from 'react'
 import { Card, CardContent } from "@/components/ui/card"
-import { Search, Filter, FileText, ChevronLeft, ChevronRight, User, Calendar as CalendarIcon, Building, Trash2, Edit3, Plus, X, Globe, FileUp, Eye, Save, AlertCircle } from "lucide-react"
+import { Search, Filter, FileText, ChevronLeft, ChevronRight, User, Calendar as CalendarIcon, Building, Trash2, Edit3, Plus, X, Globe, FileUp, Eye, Save, AlertCircle, Pencil, CalendarDays } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
@@ -41,6 +41,34 @@ export default function SurveysPage() {
   const [programs, setPrograms] = useState<any[]>([])
   const [partners, setPartners] = useState<any[]>([])
   const [instructors, setInstructors] = useState<string[]>([])
+
+  // Management State
+  const [isProgramModalOpen, setIsProgramModalOpen] = useState(false)
+  const [editingProgramId, setEditingProgramId] = useState<string | null>(null)
+  const [programFormData, setProgramFormData] = useState({ name: "", description: "", coreGoals: "", order: "" })
+  
+  const [isSessionModalOpen, setIsSessionModalOpen] = useState(false)
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null)
+  const [selectedProgramId, setSelectedProgramId] = useState<string | null>(null)
+  const [sessionFormData, setSessionFormData] = useState({
+    partnerId: "",
+    startDate: "",
+    startTime: "",
+    endDate: "",
+    endTime: "",
+    courseName: "",
+    instructorName: "",
+    capacity: "30",
+    participantCount: "0",
+    classDays: [] as any[]
+  })
+
+  // Inline Editing State
+  const [inlineEditingSessionId, setInlineEditingSessionId] = useState<string | null>(null)
+  const [inlineFormData, setInlineFormData] = useState({
+    courseName: "",
+    instructorName: ""
+  })
 
   const fetchData = () => {
     setLoading(true)
@@ -157,6 +185,109 @@ export default function SurveysPage() {
       console.error(err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Management Handlers
+  const handleProgramSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const url = editingProgramId ? `/api/programs/${editingProgramId}` : "/api/programs"
+    const method = editingProgramId ? "PUT" : "POST"
+    const res = await fetch(url, {
+      method,
+      body: JSON.stringify(programFormData),
+      headers: { "Content-Type": "application/json" }
+    })
+    if (res.ok) {
+      setIsProgramModalOpen(false)
+      const progRes = await fetch("/api/programs").then(r => r.json())
+      setPrograms(progRes)
+      fetchData()
+    }
+  }
+
+  const handleSessionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const url = editingSessionId ? `/api/sessions/${editingSessionId}` : "/api/sessions"
+    const method = editingSessionId ? "PATCH" : "POST"
+
+    // Convert local date/time to UTC
+    const startDateTime = sessionFormData.startTime ? `${sessionFormData.startDate}T${sessionFormData.startTime}:00.000Z` : null;
+    const endDateTime = sessionFormData.endTime ? `${sessionFormData.endDate}T${sessionFormData.endTime}:00.000Z` : null;
+
+    const body = {
+      programId: selectedProgramId,
+      partnerId: sessionFormData.partnerId,
+      date: `${sessionFormData.startDate}T00:00:00.000Z`,
+      startTime: startDateTime,
+      endTime: endDateTime,
+      sessionNumber: 1, // Default or increment logic
+      courseName: sessionFormData.courseName,
+      instructorName: sessionFormData.instructorName,
+      capacity: Number(sessionFormData.capacity),
+      participantCount: Number(sessionFormData.participantCount),
+      classDays: sessionFormData.classDays
+    }
+
+    const res = await fetch(url, {
+      method,
+      body: JSON.stringify(body),
+      headers: { "Content-Type": "application/json" }
+    })
+    if (res.ok) {
+      setIsSessionModalOpen(false)
+      fetchData()
+    }
+  }
+
+  const handleDeleteSession = async (sessionId: string) => {
+    if (!confirm("정말 이 교육과정을 삭제하시겠습니까? 관련 설문 데이터도 모두 삭제됩니다.")) return
+    const res = await fetch(`/api/sessions/${sessionId}`, { method: "DELETE" })
+    if (res.ok) fetchData()
+  }
+
+  const openProgramModal = (program?: any) => {
+    if (program) {
+      setEditingProgramId(program.id)
+      setProgramFormData({ name: program.name, description: program.description || "", coreGoals: program.coreGoals || "", order: program.order.toString() })
+    } else {
+      setEditingProgramId(null)
+      setProgramFormData({ name: "", description: "", coreGoals: "", order: (programs.length + 1).toString() })
+    }
+    setIsProgramModalOpen(true)
+  }
+
+  const openSessionModal = (programId: string) => {
+    setSelectedProgramId(programId)
+    setEditingSessionId(null)
+    setSessionFormData({
+      partnerId: "",
+      startDate: new Date().toISOString().split('T')[0],
+      startTime: "09:00",
+      endDate: new Date().toISOString().split('T')[0],
+      endTime: "12:00",
+      courseName: "",
+      instructorName: "",
+      capacity: "30",
+      participantCount: "0",
+      classDays: []
+    })
+    setIsSessionModalOpen(true)
+  }
+
+  const handleInlineSave = async (sessionId: string) => {
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(inlineFormData)
+      })
+      if (res.ok) {
+        setInlineEditingSessionId(null)
+        fetchData()
+      }
+    } catch (err) {
+      console.error(err)
     }
   }
 
@@ -419,6 +550,18 @@ export default function SurveysPage() {
           <h1 className="text-3xl font-black tracking-tight text-slate-900 font-inter">설문 결과 관리</h1>
           <p className="text-slate-500 mt-1 font-bold italic">수집된 전/후 성숙도 및 만족도 데이터를 정밀하게 관리하고 리포트에 즉시 반영합니다.</p>
         </div>
+        <div className="flex gap-2">
+            {canEdit && (
+                <Button onClick={() => openProgramModal()} className="h-10 px-4 bg-slate-900 hover:bg-slate-800 text-white font-black rounded-xl shadow-lg transition-all active:scale-95 text-xs">
+                    <Plus className="mr-1 h-4 w-4" /> 새 사업
+                </Button>
+            )}
+            {canEdit && programs.length > 0 && (
+                <Button onClick={() => openSessionModal(programs[0].id)} className="h-10 px-4 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl shadow-lg transition-all active:scale-95 text-xs">
+                    <Plus className="mr-1 h-4 w-4" /> 교육과정 추가
+                </Button>
+            )}
+        </div>
       </div>
 
       {/* Advanced Filters - AI 리포트 스타일 */}
@@ -639,34 +782,103 @@ export default function SurveysPage() {
                                 </span>
                             ));
                         })()}
-                        <div className="flex items-center gap-1.5 text-slate-400 text-xs font-bold uppercase tracking-widest">
-                            <Building className="w-3.5 h-3.5" /> {group.info.partner}
-                        </div>
-                    </div>
-                    <h3 className="text-2xl font-black text-slate-900 group-hover:text-blue-600 transition-colors">{group.info.program.split('. ')[1] || group.info.program}</h3>
-                    <div className="flex gap-4 text-[11px] font-black uppercase text-slate-500 tracking-tighter">
-                        <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-lg">{group.info.session}회차 교육과정</span>
-                        <span className="bg-slate-50 text-slate-500 px-3 py-1 rounded-lg">강사: {group.info.instructor}</span>
-                        <span className="bg-slate-50 text-slate-500 px-3 py-1 rounded-lg">응답수: {group.items.length}명</span>
-                        <div className="flex gap-2 ml-2">
-                             <Button 
-                                onClick={(e) => { e.stopPropagation(); handleDownloadExcel(key, group.items); }} 
-                                size="sm" variant="outline" 
-                                className="h-7 gap-1 rounded-lg text-[10px] font-black border-emerald-200 text-emerald-700 hover:bg-emerald-50 transition-all bg-white"
-                             >
-                                <FileText className="w-3 h-3" /> 엑셀(다운로드)
-                             </Button>
-                             <Button 
-                                onClick={(e) => { 
-                                  e.stopPropagation(); 
-                                  router.push(`/reports?programId=${group.info.programId}&partnerId=${group.info.partnerId}`);
-                                }} 
-                                size="sm" 
-                                className="h-7 gap-1 rounded-lg text-[10px] font-black bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-sm"
-                             >
-                                <Globe className="w-3 h-3" /> AI 분석 보고서
-                             </Button>
-                        </div>
+                      </div>
+                      
+                      <div className="flex flex-col">
+                        {(() => {
+                            const firstItem = group.items[0];
+                            const sessionId = firstItem?.sessionId;
+                            const isEditing = inlineEditingSessionId === sessionId;
+                            
+                            if (isEditing) {
+                                return (
+                                    <div className="flex flex-col gap-2 bg-slate-50 p-3 rounded-2xl border border-blue-100 animate-in fade-in zoom-in-95 duration-200">
+                                        <div className="flex gap-2">
+                                            <input 
+                                                value={inlineFormData.courseName}
+                                                onChange={e => setInlineFormData({...inlineFormData, courseName: e.target.value})}
+                                                className="h-8 px-3 rounded-lg border-none bg-white text-sm font-bold w-64 focus:ring-2 focus:ring-blue-500"
+                                                placeholder="교육과정명"
+                                            />
+                                            <input 
+                                                value={inlineFormData.instructorName}
+                                                onChange={e => setInlineFormData({...inlineFormData, instructorName: e.target.value})}
+                                                className="h-8 px-3 rounded-lg border-none bg-white text-sm font-bold w-32 focus:ring-2 focus:ring-blue-500"
+                                                placeholder="강사명"
+                                            />
+                                        </div>
+                                        <div className="flex gap-1 justify-end mt-1">
+                                            <Button size="sm" onClick={(e) => { e.stopPropagation(); handleInlineSave(sessionId); }} className="h-7 bg-blue-600 text-white font-black rounded-lg text-[10px]">
+                                                저장
+                                            </Button>
+                                            <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setInlineEditingSessionId(null); }} className="h-7 bg-slate-200 text-slate-600 font-black rounded-lg text-[10px]">
+                                                취소
+                                            </Button>
+                                        </div>
+                                    </div>
+                                );
+                            }
+
+                            return (
+                                <>
+                                    <div className="flex items-center gap-1.5 text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">
+                                        <Building className="w-3.5 h-3.5" /> {group.info.partner}
+                                    </div>
+                                    <div className="flex items-center gap-3 mb-1">
+                                        <h3 className="text-2xl font-black text-slate-900 group-hover:text-blue-600 transition-colors">
+                                            {group.info.program.split('. ')[1] || group.info.program}
+                                        </h3>
+                                        {canEdit && (
+                                            <div className="flex opacity-0 group-hover:opacity-100 gap-1 transition-opacity">
+                                                <button 
+                                                    onClick={(e) => { 
+                                                        e.stopPropagation(); 
+                                                        setInlineEditingSessionId(sessionId); 
+                                                        setInlineFormData({ 
+                                                            courseName: group.info.session || "", 
+                                                            instructorName: group.info.instructor || "" 
+                                                        }); 
+                                                    }}
+                                                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                                >
+                                                    <Pencil className="w-3.5 h-3.5" />
+                                                </button>
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); handleDeleteSession(sessionId); }}
+                                                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex gap-4 text-[11px] font-black uppercase text-slate-500 tracking-tighter">
+                                        <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-lg">{group.info.session}회차 교육과정</span>
+                                        <span className="bg-slate-50 text-slate-500 px-3 py-1 rounded-lg">강사: {group.info.instructor}</span>
+                                        <span className="bg-slate-50 text-slate-500 px-3 py-1 rounded-lg">응답수: {group.items.length}명</span>
+                                        <div className="flex gap-2 ml-2">
+                                             <Button 
+                                                onClick={(e) => { e.stopPropagation(); handleDownloadExcel(key, group.items); }} 
+                                                size="sm" variant="outline" 
+                                                className="h-7 gap-1 rounded-lg text-[10px] font-black border-emerald-200 text-emerald-700 hover:bg-emerald-50 transition-all bg-white"
+                                             >
+                                                <FileText className="w-3 h-3" /> 엑셀(다운로드)
+                                             </Button>
+                                             <Button 
+                                                onClick={(e) => { 
+                                                  e.stopPropagation(); 
+                                                  router.push(`/reports?programId=${group.info.programId}&partnerId=${group.info.partnerId}`);
+                                                }} 
+                                                size="sm" 
+                                                className="h-7 gap-1 rounded-lg text-[10px] font-black bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-sm"
+                                             >
+                                                <Globe className="w-3 h-3" /> AI 분석 보고서
+                                             </Button>
+                                        </div>
+                                    </div>
+                                </>
+                            );
+                        })()}
                     </div>
                   </div>
 
@@ -1073,6 +1285,79 @@ export default function SurveysPage() {
                 <Save className="w-5 h-5 mr-3" /> 수정 내용 저장 및 리포트 즉시 반영
               </Button>
             </div>
+          </Card>
+        </div>
+      )}
+      {/* Program Modal */}
+      {isProgramModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <Card className="w-full max-w-lg border-none shadow-2xl rounded-[2.5rem] bg-white overflow-hidden p-0">
+            <div className="bg-slate-900 px-8 py-6 text-white flex justify-between items-center">
+              <h3 className="text-xl font-black">{editingProgramId ? "사업 정보 수정" : "새 사업 등록"}</h3>
+              <button onClick={() => setIsProgramModalOpen(false)} className="hover:rotate-90 transition-transform"><X className="w-6 h-6" /></button>
+            </div>
+            <form onSubmit={handleProgramSubmit} className="p-8 space-y-6">
+              <div className="space-y-4">
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="space-y-2 col-span-1">
+                    <label className="text-xs font-black text-slate-400 ml-1 uppercase">번호 *</label>
+                    <input type="number" required value={programFormData.order} onChange={e => setProgramFormData({...programFormData, order: e.target.value})} className="w-full h-12 px-4 bg-slate-50 border-none rounded-2xl text-sm font-black focus:ring-2 focus:ring-blue-500" placeholder="1" />
+                  </div>
+                  <div className="space-y-2 col-span-3">
+                    <label className="text-xs font-black text-slate-400 ml-1 uppercase">사업명 *</label>
+                    <input required value={programFormData.name} onChange={e => setProgramFormData({...programFormData, name: e.target.value})} className="w-full h-12 px-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500" placeholder="예: 2026 청소년 진로캠프" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-400 ml-1 uppercase">핵심 목표 *</label>
+                  <input required value={programFormData.coreGoals} onChange={e => setProgramFormData({...programFormData, coreGoals: e.target.value})} className="w-full h-12 px-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500" placeholder="예: 진로 탐색 및 역량 강화" />
+                </div>
+              </div>
+              <Button type="submit" className="w-full h-14 bg-slate-900 hover:bg-slate-800 text-white font-black rounded-2xl transition-all active:scale-[0.98]">
+                저장 완료
+              </Button>
+            </form>
+          </Card>
+        </div>
+      )}
+
+      {/* Session Modal */}
+      {isSessionModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <Card className="w-full max-w-xl border-none shadow-2xl rounded-[2.5rem] bg-white overflow-hidden p-0">
+            <div className="bg-blue-600 px-8 py-6 text-white flex justify-between items-center">
+              <div>
+                <h3 className="text-xl font-black">{editingSessionId ? "교육과정 수정" : "새 교육과정 추가"}</h3>
+                <p className="text-xs font-bold opacity-80 mt-1">교육 일정 및 강사 정보를 입력하세요.</p>
+              </div>
+              <button onClick={() => setIsSessionModalOpen(false)} className="hover:rotate-90 transition-transform"><X className="w-6 h-6" /></button>
+            </div>
+            <form onSubmit={handleSessionSubmit} className="p-8 space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                      <label className="text-xs font-black text-slate-400 ml-1 uppercase">시작 일자 *</label>
+                      <input type="date" required value={sessionFormData.startDate} onChange={e => setSessionFormData({...sessionFormData, startDate: e.target.value})} className="w-full h-12 px-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div className="space-y-2">
+                      <label className="text-xs font-black text-slate-400 ml-1 uppercase">강사명 *</label>
+                      <input type="text" required value={sessionFormData.instructorName} onChange={e => setSessionFormData({...sessionFormData, instructorName: e.target.value})} className="w-full h-12 px-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500" placeholder="홍길동" />
+                  </div>
+              </div>
+              <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-400 ml-1 uppercase">교육과정명 *</label>
+                  <input required value={sessionFormData.courseName} onChange={e => setSessionFormData({...sessionFormData, courseName: e.target.value})} className="w-full h-12 px-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500" placeholder="예: 찾아가는 진로캠프 1회차" />
+              </div>
+              <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-400 ml-1 uppercase">협력 파트너</label>
+                  <select value={sessionFormData.partnerId} onChange={e => setSessionFormData({...sessionFormData, partnerId: e.target.value})} className="w-full h-12 px-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500">
+                      <option value="">파트너 선택 (선택 사항)</option>
+                      {partners.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+              </div>
+              <Button type="submit" className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl transition-all active:scale-[0.98]">
+                등록 완료
+              </Button>
+            </form>
           </Card>
         </div>
       )}

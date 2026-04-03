@@ -30,8 +30,49 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { programId, partnerId, date, startTime, endTime, courseName, instructorName, capacity, participantCount } = body;
+    const { 
+      programId, 
+      partnerId, 
+      date, 
+      startTime, 
+      endTime, 
+      courseName, 
+      instructorName, 
+      capacity, 
+      participantCount,
+      classDays // Added for bulk creation
+    } = body;
     
+    // Build classDays create data
+    let classDaysCreate;
+    if (classDays && Array.isArray(classDays) && classDays.length > 0) {
+      // 사용자가 명시적으로 교육일을 지정한 경우
+      classDaysCreate = {
+        create: classDays.map((cd: any, idx: number) => ({
+          date: new Date(cd.date),
+          startTime: cd.startTime ? new Date(cd.startTime) : null,
+          endTime: cd.endTime ? new Date(cd.endTime) : null,
+          title: cd.title,
+          capacity: Number(cd.capacity || 0),
+          participantCount: Number(cd.participantCount || 0),
+          order: cd.order || idx
+        }))
+      };
+    } else {
+      // 세부 교육일이 없는 경우 → 교육과정 정보로 기본 1건 자동 생성
+      classDaysCreate = {
+        create: [{
+          date: new Date(date),
+          startTime: startTime ? new Date(startTime) : null,
+          endTime: endTime ? new Date(endTime) : null,
+          title: courseName || null,
+          capacity: Number(capacity || 0),
+          participantCount: Number(participantCount || 0),
+          order: 0
+        }]
+      };
+    }
+
     // Create the session
     const newSession = await prisma.programSession.create({
       data: {
@@ -44,7 +85,8 @@ export async function POST(req: Request) {
         instructorName,
         sessionNumber: 0, // Temporary
         capacity: Number(capacity || 0),
-        participantCount: Number(participantCount || 0)
+        participantCount: Number(participantCount || 0),
+        classDays: classDaysCreate
       }
     });
 
