@@ -63,15 +63,27 @@ export default function CalendarPage() {
       
       if (Array.isArray(sessionsData)) {
         const parsedSessions = sessionsData.map((s: any) => {
-          const startDate = s.startTime ? new Date(s.startTime) : new Date(s.date)
-          const endDate = s.endTime ? new Date(s.endTime) : (s.startTime ? new Date(s.startTime) : new Date(s.date))
+          // Helper to get local date from ISO string (KST based if possible, or just the date part)
+          const getLocalDate = (isoStr: string | null) => {
+            if (!isoStr) return null;
+            // Force KST for ISO strings to get the correct "Day" in Korea
+            const d = new Date(isoStr);
+            const dateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(d);
+            const [y, m, day] = dateStr.split('-').map(Number);
+            return new Date(y, m - 1, day);
+          };
+
+          const sDate = getLocalDate(s.date);
+          const sStart = getLocalDate(s.startTime) || sDate;
+          const sEnd = getLocalDate(s.endTime) || sStart;
+
           return { 
             id: `session-${s.id}`,
             program: s.program.name,
             partner: s.partner?.name || "미지정",
             session: s.sessionNumber,
-            startDate, 
-            endDate: endDate < startDate ? startDate : endDate,
+            startDate: sStart, 
+            endDate: (sEnd && sStart && sEnd < sStart) ? sStart : sEnd,
             type: 'session'
           }
         })
@@ -80,7 +92,10 @@ export default function CalendarPage() {
 
       if (Array.isArray(meetingsData)) {
         const parsedMeetings = meetingsData.map((m: any) => {
-          const mDate = new Date(m.date)
+          const d = new Date(m.date);
+          const dateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(d);
+          const [y, mm, dd] = dateStr.split('-').map(Number);
+          const mDate = new Date(y, mm - 1, dd);
           return {
             id: `meeting-${m.id}`,
             program: "회의",
@@ -96,8 +111,14 @@ export default function CalendarPage() {
 
       if (Array.isArray(schedulesData)) {
         const parsedSchedules = schedulesData.map((s: any) => {
-          const sStart = new Date(s.startDate)
-          const sEnd = s.endDate ? new Date(s.endDate) : sStart
+          const getLocalDate = (isoStr: string) => {
+            const d = new Date(isoStr);
+            const dateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(d);
+            const [y, m, day] = dateStr.split('-').map(Number);
+            return new Date(y, m - 1, day);
+          };
+          const sStart = getLocalDate(s.startDate)
+          const sEnd = s.endDate ? getLocalDate(s.endDate) : sStart
           return {
             id: `other-${s.id}`,
             program: "기타일정",

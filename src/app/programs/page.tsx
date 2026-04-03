@@ -382,8 +382,8 @@ export default function ProgramsPage() {
         return { date: datePart, time: timePart };
       };
 
-      const start = getKST(session.startTime || session.date);
-      const end = getKST(session.endTime || session.date);
+      const start = session.startTime ? getKST(session.startTime) : { date: getKST(session.date).date, time: "" };
+      const end = session.endTime ? getKST(session.endTime) : { date: getKST(session.date).date, time: "" };
 
       setSessionFormData({
         partnerId: session.partnerId || "",
@@ -414,10 +414,22 @@ export default function ProgramsPage() {
   }
 
   const formatPeriod = (s: Session) => {
-    const startD = s.startTime ? new Date(s.startTime).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric', weekday: 'short' }) : new Date(s.date).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric', weekday: 'short' })
-    const startT = s.startTime ? new Date(s.startTime).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false }).replace(/(오전|오후)\s/,'') : ""
-    const endD = s.endTime ? new Date(s.endTime).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric', weekday: 'short' }) : ""
-    const endT = s.endTime ? new Date(s.endTime).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false }).replace(/(오전|오후)\s/,'') : ""
+    const tz = 'Asia/Seoul'
+    const startD = s.startTime 
+      ? new Date(s.startTime).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric', weekday: 'short', timeZone: tz }) 
+      : new Date(s.date).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric', weekday: 'short', timeZone: tz })
+    
+    const startT = s.startTime 
+      ? new Date(s.startTime).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz }) 
+      : ""
+    
+    const endD = s.endTime 
+      ? new Date(s.endTime).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric', weekday: 'short', timeZone: tz }) 
+      : ""
+    
+    const endT = s.endTime 
+      ? new Date(s.endTime).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz }) 
+      : ""
     
     // In case no time is provided
     if (!startT && !endT) return startD;
