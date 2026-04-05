@@ -31,7 +31,10 @@ export default function BudgetPage() {
     taxAmount: '',
     totalAmount: '',
     evidenceType: '세금계산서',
-    memo: ''
+    memo: '',
+    evidenceFileName: undefined as string | undefined,
+    evidenceFileId: undefined as string | undefined,
+    originalFileName: undefined as string | undefined
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
@@ -49,9 +52,8 @@ export default function BudgetPage() {
   const [editCatBudget, setEditCatBudget] = useState('');
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
 
-  // 4. 집행 내역(Expenditure) 인라인 수정 상태
+  // 4. 집행 내역(Expenditure) 인라인 수정/팝업 폼 상태 통합
   const [editingExpId, setEditingExpId] = useState<string | null>(null);
-  const [editSubDetailName, setEditSubDetailName] = useState('');
 
   // 데이터 로드
   const fetchData = async () => {
@@ -134,12 +136,12 @@ export default function BudgetPage() {
     }
   };
 
-  const handleCreateExpenditure = async (e: React.FormEvent) => {
+  const handleSubmitExpenditure = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.categoryId) return alert("세세목(항목)을 선택해주세요.");
     
     try {
-      let evidenceFileName, evidenceFileId, originalFileName;
+      let evidenceFileName = formData.evidenceFileName, evidenceFileId = formData.evidenceFileId, originalFileName = formData.originalFileName;
       
       if (selectedFile) {
         const fileData = new FormData();
@@ -166,23 +168,58 @@ export default function BudgetPage() {
         originalFileName
       };
 
-      const res = await fetch('/api/budget/expenditures', {
-        method: 'POST',
+      const url = editingExpId ? `/api/budget/expenditures/${editingExpId}` : '/api/budget/expenditures';
+      const method = editingExpId ? 'PATCH' : 'POST';
+
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(submitData)
       });
 
       if (res.ok) {
-        alert("집행 내역이 등록되었습니다.");
+        alert(editingExpId ? "집행 내역이 수정되었습니다." : "집행 내역이 등록되었습니다.");
         setShowForm(false);
-        setFormData({ executionDate: '', categoryId: '', subDetailName: '', purpose: '', supplyAmount: '', taxAmount: '', totalAmount: '', evidenceType: '세금계산서', memo: '' });
+        setEditingExpId(null);
+        setFormData({ executionDate: '', categoryId: '', subDetailName: '', purpose: '', supplyAmount: '', taxAmount: '', totalAmount: '', evidenceType: '세금계산서', memo: '', evidenceFileName: undefined, evidenceFileId: undefined, originalFileName: undefined });
         setFormL1(''); setFormL2('');
         setSelectedFile(null);
         fetchData();
       }
     } catch(e) {
-      alert("등록 중 오류가 발생했습니다.");
+      alert("등록/수정 중 오류가 발생했습니다.");
     }
+  };
+
+  const openAddModal = () => {
+    setEditingExpId(null);
+    setFormData({ executionDate: '', categoryId: '', subDetailName: '', purpose: '', supplyAmount: '', taxAmount: '', totalAmount: '', evidenceType: '세금계산서', memo: '', evidenceFileName: undefined, evidenceFileId: undefined, originalFileName: undefined });
+    setFormL1(''); setFormL2('');
+    setSelectedFile(null);
+    setShowForm(true);
+  };
+
+  const openEditModal = (exp: any) => {
+    setEditingExpId(exp.id);
+    const parentId = exp.category?.parent?.id || '';
+    setFormL1(parentId);
+    setFormL2(exp.categoryId || '');
+    setFormData({
+      executionDate: exp.executionDate ? new Date(exp.executionDate).toISOString().split('T')[0] : '',
+      categoryId: exp.categoryId || '',
+      subDetailName: exp.subDetailName || '',
+      purpose: exp.purpose || '',
+      supplyAmount: exp.supplyAmount != null ? exp.supplyAmount.toString() : '',
+      taxAmount: exp.taxAmount != null ? exp.taxAmount.toString() : '',
+      totalAmount: exp.totalAmount != null ? exp.totalAmount.toString() : '',
+      evidenceType: exp.evidenceType || '세금계산서',
+      memo: exp.memo || '',
+      evidenceFileName: exp.evidenceFileName,
+      evidenceFileId: exp.evidenceFileId,
+      originalFileName: exp.originalFileName
+    } as any);
+    setSelectedFile(null);
+    setShowForm(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -192,25 +229,6 @@ export default function BudgetPage() {
       fetchData();
     } catch (e) {
       alert("삭제 실패");
-    }
-  };
-
-  const handleUpdateSubDetail = async (id: string) => {
-    if (!editSubDetailName) return alert("내용을 입력해주세요.");
-    try {
-      const res = await fetch(`/api/budget/expenditures/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subDetailName: editSubDetailName })
-      });
-      if (res.ok) {
-        setEditingExpId(null);
-        fetchData();
-      } else {
-        alert("수정 실패");
-      }
-    } catch (e) {
-      alert("서버 오류");
     }
   };
 
@@ -781,105 +799,23 @@ export default function BudgetPage() {
         </div>
       </h2>
 
-      {showForm ? (
-        <Card className="p-6 mb-6 border-blue-200 shadow-xl shadow-blue-900/5">
-          <form onSubmit={handleCreateExpenditure} className="space-y-4">
-             <div className="flex justify-between items-center mb-4">
-                <h3 className="font-black text-lg text-slate-800 flex items-center gap-2">새 집행명세 등록 <span className="text-xs bg-slate-100 text-slate-500 px-2 py-1 rounded">3단계 선택</span></h3>
-                <button type="button" onClick={() => setShowForm(false)} className="text-slate-400 hover:text-slate-600"><XIcon className="w-5 h-5"/></button>
-             </div>
-             
-             {/* 3단계 Cascading Dropdowns */}
-             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 pb-4 border-b border-slate-100">
-               <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">비목 (Level 1) <span className="text-red-500">*</span></label>
-                  <select className="w-full p-2 border rounded-lg text-sm font-bold" value={formL1} onChange={e => {setFormL1(e.target.value); setFormL2(''); setFormData({...formData, categoryId: ''});}} required>
-                    <option value="">-- 비목 선택 --</option>
-                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
-               </div>
-               <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">관리세목 (Level 2) <span className="text-red-500">*</span></label>
-                  <select className="w-full p-2 border rounded-lg text-sm font-bold" value={formL2} onChange={e => {setFormL2(e.target.value); setFormData({...formData, categoryId: e.target.value});}} required disabled={!formL1}>
-                    <option value="">-- 관리세목 선택 --</option>
-                    {categories.find(c => c.id === formL1)?.children?.map((c:any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
-               </div>
-               <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">세세목명 (상세 내역) <span className="text-red-500">*</span></label>
-                  <input type="text" placeholder="직접 입력 (예: 강사료, 여비 등)" className="w-full p-2 border rounded-lg text-sm font-bold bg-blue-50" value={formData.subDetailName} onChange={e => setFormData({...formData, subDetailName: e.target.value})} required disabled={!formL2} />
-               </div>
-             </div>
-
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-               <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">집행일 (비우면 사용예정액)</label>
-                  <input type="date" className="w-full p-2 border rounded-lg text-sm font-bold" value={formData.executionDate} onChange={e => setFormData({...formData, executionDate: e.target.value})} />
-               </div>
-               
-               {/* 3개 금액 분할 입력 */}
-               <div className="col-span-3 grid grid-cols-3 gap-3">
-                 <div>
-                    <label className="block text-xs font-black text-blue-600 mb-1">금액 (합계) <span className="text-[10px] text-slate-400 font-normal">*입력 시 분리</span></label>
-                    <input type="text" placeholder="원" required className="w-full p-2 border-2 border-blue-200 rounded-lg text-sm font-black text-slate-800 text-right bg-blue-50" value={formData.totalAmount} onChange={e => handleAmountChange('total', e.target.value)} />
-                 </div>
-                 <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">공급가액</label>
-                    <input type="text" placeholder="원" className="w-full p-2 border rounded-lg text-sm font-bold text-slate-700 text-right bg-white" value={formData.supplyAmount} onChange={e => handleAmountChange('supply', e.target.value)} />
-                 </div>
-                 <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">부가세</label>
-                    <input type="text" placeholder="원" className="w-full p-2 border rounded-lg text-sm font-bold text-slate-700 text-right bg-white" value={formData.taxAmount} onChange={e => handleAmountChange('tax', e.target.value)} />
-                 </div>
-               </div>
-
-               <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">증빙 종류</label>
-                  <select className="w-full p-2 border rounded-lg text-sm" value={formData.evidenceType} onChange={e => setFormData({...formData, evidenceType: e.target.value})}>
-                    <option>세금계산서</option><option>입금증</option><option>영수증</option><option>기타증빙</option>
-                  </select>
-               </div>
-               <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">증빙 파일 (PDF/Img)</label>
-                  <input type="file" accept=".pdf,image/*" className="w-full text-xs text-slate-500 file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-blue-50 hover:file:bg-blue-100 cursor-pointer" onChange={e => setSelectedFile(e.target.files?.[0] || null)} />
-               </div>
-               <div className="col-span-2 flex gap-3">
-                  <div className="flex-1">
-                     <label className="block text-xs font-bold text-slate-500 mb-1">집행 용도 / 적요</label>
-                     <input type="text" className="w-full p-2 border rounded-lg text-sm" value={formData.purpose} onChange={e => setFormData({...formData, purpose: e.target.value})} />
-                  </div>
-                  <div className="flex-1">
-                     <label className="block text-xs font-bold text-slate-500 mb-1">메모</label>
-                     <input type="text" className="w-full p-2 border rounded-lg text-sm" value={formData.memo} onChange={e => setFormData({...formData, memo: e.target.value})} />
-                  </div>
-               </div>
-             </div>
-             <div className="flex justify-end pt-2 border-t border-slate-100">
-                <button type="submit" className="px-8 py-2.5 bg-blue-600 text-white rounded-xl font-black shadow-md hover:bg-blue-700 flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5"/> 목록에 추가
-                </button>
-             </div>
-          </form>
-        </Card>
-      ) : (
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-              <input type="text" placeholder="명세서 내용 검색..." className="pl-9 pr-4 py-2 border rounded-xl text-sm font-bold text-slate-600 w-64 bg-white shadow-sm" />
-            </div>
-            <button 
-              onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-sm shadow-sm hover:bg-slate-50 transition-all"
-            >
-              {sortOrder === 'desc' ? '최신순' : '오래된순'}
-            </button>
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+            <input type="text" placeholder="명세서 내용 검색..." className="pl-9 pr-4 py-2 border rounded-xl text-sm font-bold text-slate-600 w-64 bg-white shadow-sm" />
           </div>
-          <button onClick={() => setShowForm(true)} className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl font-bold text-sm shadow-md hover:bg-blue-600 transition-colors">
-            <Plus className="w-4 h-4" /> 내역 추가 등록
+          <button 
+            onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-sm shadow-sm hover:bg-slate-50 transition-all"
+          >
+            {sortOrder === 'desc' ? '최신순' : '오래된순'}
           </button>
         </div>
-      )}
+        <button onClick={openAddModal} className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl font-bold text-sm shadow-md hover:bg-blue-600 transition-colors">
+          <Plus className="w-4 h-4" /> 내역 추가 등록
+        </button>
+      </div>
 
       {/* 명세 그리드 */}
       <Card className="border-none shadow-sm overflow-hidden bg-white">
@@ -933,21 +869,9 @@ export default function BudgetPage() {
                         </span>
                       </td>
                       <td className="px-3 py-3">
-                        {editingExpId === exp.id ? (
-                          <div className="flex items-center gap-1">
-                            <input 
-                              className="p-1 text-sm border-2 border-blue-200 rounded w-full bg-white shadow-sm font-bold text-blue-700" 
-                              value={editSubDetailName} 
-                              onChange={e => setEditSubDetailName(e.target.value)}
-                              onKeyDown={e => { if(e.key==='Enter') handleUpdateSubDetail(exp.id); }}
-                              autoFocus
-                            />
-                          </div>
-                        ) : (
-                          <span className="text-sm font-black text-slate-800 cursor-pointer hover:underline decoration-blue-300 underline-offset-4" onClick={() => { setEditingExpId(exp.id); setEditSubDetailName(exp.subDetailName || ''); }}>
-                            {exp.subDetailName || exp.category?.name || '세세목 미지정'}
-                          </span>
-                        )}
+                        <span className="text-sm font-black text-slate-800">
+                          {exp.subDetailName || exp.category?.name || '세세목 미지정'}
+                        </span>
                       </td>
                      <td className="px-4 py-3">
                        <div className="font-bold text-slate-700">{exp.purpose}</div>
@@ -977,25 +901,12 @@ export default function BudgetPage() {
                      </td>
                      <td className="px-3 py-3">
                         <div className="flex justify-center items-center gap-1.5 min-w-[120px]">
-                          {editingExpId === exp.id ? (
-                            <>
-                              <button onClick={() => handleUpdateSubDetail(exp.id)} className="px-2.5 py-1.5 bg-blue-600 text-white rounded-lg shadow-sm hover:bg-blue-700 transition-colors flex items-center gap-1 text-[11px] font-black" title="저장">
-                                <CheckCircle2 className="w-3.5 h-3.5" /> 저장
-                              </button>
-                              <button onClick={() => setEditingExpId(null)} className="px-2.5 py-1.5 bg-slate-100 text-slate-500 rounded-lg hover:bg-slate-200 transition-colors flex items-center gap-1 text-[11px] font-bold" title="취소">
-                                <XIcon className="w-3.5 h-3.5" /> 취소
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <button onClick={() => { setEditingExpId(exp.id); setEditSubDetailName(exp.subDetailName || ''); }} className="px-2.5 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors flex items-center gap-1 text-[11px] font-black border border-blue-100" title="수정">
-                                <Edit className="w-3.5 h-3.5" /> 수정
-                              </button>
-                              <button onClick={()=>handleDelete(exp.id)} className="px-2.5 py-1.5 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition-colors flex items-center gap-1 text-[11px] font-black border border-red-100" title="삭제">
-                                <Trash2 className="w-3.5 h-3.5" /> 삭제
-                              </button>
-                            </>
-                          )}
+                          <button onClick={() => openEditModal(exp)} className="px-2.5 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors flex items-center gap-1 text-[11px] font-black border border-blue-100" title="수정">
+                            <Edit className="w-3.5 h-3.5" /> 수정
+                          </button>
+                          <button onClick={()=>handleDelete(exp.id)} className="px-2.5 py-1.5 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition-colors flex items-center gap-1 text-[11px] font-black border border-red-100" title="삭제">
+                            <Trash2 className="w-3.5 h-3.5" /> 삭제
+                          </button>
                         </div>
                      </td>
                    </tr>
@@ -1005,6 +916,97 @@ export default function BudgetPage() {
           </table>
         </div>
       </Card>
+
+      {/* Modal Overlay for Add / Edit Expenditure */}
+      {showForm && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-white shadow-2xl p-6 rounded-2xl border-0 ring-1 ring-slate-200/50 relative">
+            <form onSubmit={handleSubmitExpenditure} className="space-y-6">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+                <h3 className="font-black text-xl text-slate-800 flex items-center gap-2">
+                  {editingExpId ? '집행명세 수정' : '새 집행명세 등록'}
+                  {!editingExpId && <span className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded">3단계 선택</span>}
+                </h3>
+                <button type="button" onClick={() => {setShowForm(false); setEditingExpId(null);}} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"><XIcon className="w-5 h-5"/></button>
+              </div>
+              
+              {/* 3단계 Cascading Dropdowns */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pb-5 border-b border-slate-100">
+                <div>
+                  <label className="block text-[11px] font-black uppercase text-slate-500 mb-2 tracking-wider">비목 (Level 1) <span className="text-red-500">*</span></label>
+                  <select className="w-full p-2.5 border-2 border-slate-200 rounded-lg text-sm font-bold bg-slate-50 focus:bg-white focus:border-blue-400 transition-colors outline-none" value={formL1} onChange={e => {setFormL1(e.target.value); setFormL2(''); setFormData({...formData, categoryId: ''});}} required>
+                    <option value="">-- 비목 선택 --</option>
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-black uppercase text-slate-500 mb-2 tracking-wider">관리세목 (Level 2) <span className="text-red-500">*</span></label>
+                  <select className="w-full p-2.5 border-2 border-slate-200 rounded-lg text-sm font-bold bg-slate-50 focus:bg-white focus:border-blue-400 transition-colors outline-none" value={formL2} onChange={e => {setFormL2(e.target.value); setFormData({...formData, categoryId: e.target.value});}} required disabled={!formL1}>
+                    <option value="">-- 관리세목 선택 --</option>
+                    {categories.find(c => c.id === formL1)?.children?.map((c:any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-black uppercase text-slate-500 mb-2 tracking-wider">세세목명 (상세 내역) <span className="text-red-500">*</span></label>
+                  <input type="text" placeholder="직접 입력 (예: 강사료, 여비 등)" className="w-full p-2.5 border-2 border-indigo-200 rounded-lg text-sm font-black bg-indigo-50/50 text-indigo-900 focus:bg-white focus:border-indigo-400 transition-colors outline-none placeholder:font-normal placeholder:text-indigo-300" value={formData.subDetailName} onChange={e => setFormData({...formData, subDetailName: e.target.value})} required disabled={!formL2} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                <div>
+                  <label className="block text-[11px] font-black uppercase text-slate-500 mb-2 tracking-wider">집행일 <span className="normal-case text-slate-400 font-bold ml-1">(비우면 예정)</span></label>
+                  <input type="date" className="w-full p-2.5 border-2 border-slate-200 rounded-lg text-sm font-bold bg-slate-50 focus:bg-white focus:border-blue-400 transition-colors outline-none" value={formData.executionDate} onChange={e => setFormData({...formData, executionDate: e.target.value})} />
+                </div>
+                
+                {/* 3개 금액 분할 입력 */}
+                <div className="col-span-3 grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-black uppercase text-blue-600 mb-2 tracking-wider flex items-center justify-between">금액 (합계) <span className="text-[9px] text-slate-400 font-bold lowercase">*입력시 자동분리</span></label>
+                    <input type="text" placeholder="예: 110,000" required className="w-full p-2.5 border-2 border-blue-300 rounded-lg text-base font-black text-slate-900 text-right bg-blue-50/30 focus:bg-white focus:border-blue-500 outline-none transition-colors" value={formData.totalAmount} onChange={e => handleAmountChange('total', e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-black uppercase text-slate-500 mb-2 tracking-wider">공급가액</label>
+                    <input type="text" placeholder="0" className="w-full p-2.5 border-2 border-slate-200 rounded-lg text-sm font-bold text-slate-700 text-right bg-white focus:border-slate-400 outline-none transition-colors" value={formData.supplyAmount} onChange={e => handleAmountChange('supply', e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-black uppercase text-slate-500 mb-2 tracking-wider">부가세</label>
+                    <input type="text" placeholder="0" className="w-full p-2.5 border-2 border-slate-200 rounded-lg text-sm font-bold text-slate-700 text-right bg-white focus:border-slate-400 outline-none transition-colors" value={formData.taxAmount} onChange={e => handleAmountChange('tax', e.target.value)} />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-black uppercase text-slate-500 mb-2 tracking-wider">증빙 종류</label>
+                  <select className="w-full p-2.5 border-2 border-slate-200 rounded-lg text-sm font-bold bg-slate-50 focus:bg-white focus:border-blue-400 outline-none transition-colors" value={formData.evidenceType} onChange={e => setFormData({...formData, evidenceType: e.target.value})}>
+                    <option>세금계산서</option><option>입금증</option><option>영수증</option><option>기타증빙</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-black uppercase text-slate-500 mb-2 tracking-wider">증빙 파일 <span className="normal-case text-slate-400 font-bold ml-1">(PDF/Img)</span></label>
+                  <input type="file" accept=".pdf,image/*" className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-slate-100 hover:file:bg-slate-200 file:font-black file:text-slate-700 cursor-pointer transition-colors" onChange={e => setSelectedFile(e.target.files?.[0] || null)} />
+                </div>
+                <div className="col-span-2 flex gap-4">
+                  <div className="flex-1">
+                    <label className="block text-[11px] font-black uppercase text-slate-500 mb-2 tracking-wider">집행 용도 / 적요</label>
+                    <input type="text" placeholder="용도를 간단히 기록하세요" className="w-full p-2.5 border-2 border-slate-200 rounded-lg text-sm font-bold bg-slate-50 focus:bg-white focus:border-blue-400 outline-none transition-colors" value={formData.purpose} onChange={e => setFormData({...formData, purpose: e.target.value})} />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-[11px] font-black uppercase text-slate-500 mb-2 tracking-wider">메모</label>
+                    <input type="text" placeholder="기타 참고사항" className="w-full p-2.5 border-2 border-slate-200 rounded-lg text-sm font-medium bg-slate-50 focus:bg-white focus:border-blue-400 outline-none transition-colors italic" value={formData.memo} onChange={e => setFormData({...formData, memo: e.target.value})} />
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 pt-6">
+                <button type="button" onClick={() => {setShowForm(false); setEditingExpId(null);}} className="px-6 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors">
+                  취소
+                </button>
+                <button type="submit" className="px-8 py-3 bg-blue-600 text-white rounded-xl font-black shadow-md hover:bg-blue-700 flex items-center gap-2 transition-colors">
+                  <CheckCircle2 className="w-5 h-5"/> {editingExpId ? '수정 내용 저장' : '목록에 추가'}
+                </button>
+              </div>
+            </form>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
