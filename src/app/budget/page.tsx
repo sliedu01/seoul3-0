@@ -903,27 +903,32 @@ export default function BudgetPage() {
                        </div>
                      </td>
                      <td className="px-3 py-3">
-                       <div className="flex flex-col">
-                         <span className="text-[10px] text-slate-400 leading-tight">
-                           {exp.category?.parent?.parent?.name || '비목없음'} ➔ {exp.category?.parent?.name || '세목없음'}
-                         </span>
-                         {editingExpId === exp.id ? (
-                           <div className="mt-1 flex items-center gap-1">
-                             <input 
-                               className="p-1 text-sm border-2 border-blue-200 rounded w-full bg-white shadow-sm font-bold text-blue-700" 
-                               value={editSubDetailName} 
-                               onChange={e => setEditSubDetailName(e.target.value)}
-                               onKeyDown={e => { if(e.key==='Enter') handleUpdateSubDetail(exp.id); }}
-                               autoFocus
-                             />
-                           </div>
-                         ) : (
-                           <span className="text-sm font-black text-slate-800 cursor-pointer hover:underline decoration-blue-300 underline-offset-4" onClick={() => { setEditingExpId(exp.id); setEditSubDetailName(exp.subDetailName || ''); }}>
-                             {exp.subDetailName || exp.category?.name || '세세목 미지정'}
-                           </span>
-                         )}
-                       </div>
-                     </td>
+                        <span className="text-[11px] font-black text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">
+                          {exp.category?.parent?.name || '비목없음'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3">
+                        <span className="text-xs font-bold text-slate-600">
+                          {exp.category?.name || '관리세목없음'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3">
+                        {editingExpId === exp.id ? (
+                          <div className="flex items-center gap-1">
+                            <input 
+                              className="p-1 text-sm border-2 border-blue-200 rounded w-full bg-white shadow-sm font-bold text-blue-700" 
+                              value={editSubDetailName} 
+                              onChange={e => setEditSubDetailName(e.target.value)}
+                              onKeyDown={e => { if(e.key==='Enter') handleUpdateSubDetail(exp.id); }}
+                              autoFocus
+                            />
+                          </div>
+                        ) : (
+                          <span className="text-sm font-black text-slate-800 cursor-pointer hover:underline decoration-blue-300 underline-offset-4" onClick={() => { setEditingExpId(exp.id); setEditSubDetailName(exp.subDetailName || ''); }}>
+                            {exp.subDetailName || exp.category?.name || '세세목 미지정'}
+                          </span>
+                        )}
+                      </td>
                      <td className="px-4 py-3">
                        <div className="font-bold text-slate-700">{exp.purpose}</div>
                        {exp.memo && <div className="text-[11px] text-slate-400 mt-0.5 italic">{exp.memo}</div>}
