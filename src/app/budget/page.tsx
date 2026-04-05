@@ -12,6 +12,7 @@ export default function BudgetPage() {
   const [categories, setCategories] = useState<any[]>([]);
   const [expenditures, setExpenditures] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   
   // Drill-down 필터 상태 (대시보드 행 클릭시 세세목 레벨 ID)
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -87,9 +88,9 @@ export default function BudgetPage() {
     return flat;
   }, [categories]);
 
-  // 필터링 적용된 명세
+  // 필터링 및 정렬 적용된 명세
   const filteredExpenditures = useMemo(() => {
-    return selectedCategoryId 
+    let result = selectedCategoryId 
       ? expenditures.filter(exp => {
           if (selectedCategoryId.startsWith('virtual-l3-')) {
             const [,,l2Id, name] = selectedCategoryId.split('-');
@@ -101,8 +102,19 @@ export default function BudgetPage() {
           }
           return exp.categoryId === selectedCategoryId;
         })
-      : expenditures;
-  }, [selectedCategoryId, expenditures, categories]);
+      : [...expenditures];
+
+    return result.sort((a, b) => {
+      if (!a.executionDate && b.executionDate) return 1;
+      if (a.executionDate && !b.executionDate) return -1;
+      if (!a.executionDate && !b.executionDate) return 0;
+      
+      const dateA = new Date(a.executionDate).getTime();
+      const dateB = new Date(b.executionDate).getTime();
+      
+      return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
+    });
+  }, [selectedCategoryId, expenditures, categories, sortOrder]);
 
   // ---- 폼 관련 로직 ----
   
@@ -851,9 +863,17 @@ export default function BudgetPage() {
         </Card>
       ) : (
         <div className="flex justify-between items-center mb-4">
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-            <input type="text" placeholder="명세서 내용 검색..." className="pl-9 pr-4 py-2 border rounded-xl text-sm font-bold text-slate-600 w-64 bg-white shadow-sm" />
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+              <input type="text" placeholder="명세서 내용 검색..." className="pl-9 pr-4 py-2 border rounded-xl text-sm font-bold text-slate-600 w-64 bg-white shadow-sm" />
+            </div>
+            <button 
+              onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-sm shadow-sm hover:bg-slate-50 transition-all"
+            >
+              {sortOrder === 'desc' ? '최신순' : '오래된순'}
+            </button>
           </div>
           <button onClick={() => setShowForm(true)} className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl font-bold text-sm shadow-md hover:bg-blue-600 transition-colors">
             <Plus className="w-4 h-4" /> 내역 추가 등록
