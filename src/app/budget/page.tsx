@@ -818,8 +818,8 @@ export default function BudgetPage() {
       </div>
 
       {/* 명세 그리드 */}
-      <Card className="border-none shadow-sm overflow-hidden bg-white">
-        <div className="overflow-auto max-h-[520px]">
+      <Card className="border-none shadow-sm bg-white overflow-hidden">
+        <div className="overflow-auto h-[550px] custom-scrollbar border border-slate-100 rounded-lg">
           <table className="w-full text-[13px] text-left border-collapse min-w-[1400px]">
              <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500 font-bold text-[11px] uppercase tracking-widest border-b border-slate-100">
                <tr>
