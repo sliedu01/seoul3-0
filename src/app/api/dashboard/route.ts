@@ -91,16 +91,7 @@ export async function GET() {
     const fetchSessions = (start: Date, end: Date) => {
       return prisma.programSession.findMany({
         where: {
-          OR: [
-            { date: { gte: start, lte: end } },
-            { endTime: { gte: start, lte: end } },
-            { 
-               AND: [
-                 { date: { lte: start } },
-                 { endTime: { gte: end } }
-               ]
-            }
-          ]
+          date: { gte: start, lte: end }
         },
         include: {
           program: true,
