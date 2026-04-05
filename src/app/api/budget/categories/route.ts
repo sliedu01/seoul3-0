@@ -60,8 +60,9 @@ export async function GET() {
           if (!l3Map[name]) {
             l3Map[name] = { id: `virtual-l3-${l2.id}-${name}`, name: name, level: 3, budgetAmount: 0, totalUsed: BigInt(0), totalExpected: BigInt(0), order: 99 };
           }
-          if (exp.executionDate) l3Map[name].totalUsed += exp.totalAmount;
-          else l3Map[name].totalExpected += exp.totalAmount;
+          const amount = BigInt(exp.totalAmount || 0); // 형변환 보강
+          if (exp.executionDate) l3Map[name].totalUsed += amount;
+          else l3Map[name].totalExpected += amount;
         });
 
         // L3 하위에 달린 집행 내역 처리
@@ -71,8 +72,9 @@ export async function GET() {
              if (!l3Map[name]) {
                l3Map[name] = { id: `virtual-l3-${l2.id}-${name}`, name: name, level: 3, budgetAmount: 0, totalUsed: BigInt(0), totalExpected: BigInt(0), order: 99 };
              }
-             if (exp.executionDate) l3Map[name].totalUsed += exp.totalAmount;
-             else l3Map[name].totalExpected += exp.totalAmount;
+             const amount = BigInt(exp.totalAmount || 0); // 형변환 보강
+             if (exp.executionDate) l3Map[name].totalUsed += amount;
+             else l3Map[name].totalExpected += amount;
           });
         });
 

@@ -868,18 +868,18 @@ export default function BudgetPage() {
       {/* 명세 그리드 */}
       <Card className="border-none shadow-sm overflow-hidden bg-white">
         <div className="overflow-x-auto min-h-[400px]">
-          <table className="w-full text-[13px] text-left border-collapse min-w-[1300px]">
+          <table className="w-full text-[13px] text-left border-collapse min-w-[1400px]">
              <thead className="bg-slate-50/80 text-slate-500 font-bold text-[11px] uppercase tracking-widest border-b border-slate-100">
                <tr>
                  <th className="px-3 py-3 w-12 text-center">No</th>
-                 <th className="px-3 py-3 w-24">상태/일자</th>
-                 <th className="px-3 py-3 w-48">비목 → 관리세목 → 세세목</th>
-                 <th className="px-3 py-3">집행 용도</th>
+                 <th className="px-3 py-3 w-32">상태 / 일자</th>
+                 <th className="px-3 py-3 w-64">집행 항목 (비목 → 세목 → 세세목)</th>
+                 <th className="px-4 py-3">집행 용도 / 적요</th>
                  <th className="px-3 py-3 w-32 text-right text-blue-700">금액(합계)</th>
                  <th className="px-3 py-3 w-28 text-right">공급가액</th>
                  <th className="px-3 py-3 w-28 text-right">부가세</th>
-                 <th className="px-3 py-3 w-32">증빙</th>
-                 <th className="px-3 py-3 w-16 text-center">삭제</th>
+                 <th className="px-4 py-3 w-40">증빙 / 비고</th>
+                 <th className="px-3 py-3 w-24 text-center">관리</th>
                </tr>
              </thead>
              <tbody>
@@ -887,27 +887,93 @@ export default function BudgetPage() {
                  <tr><td colSpan={9} className="py-20 text-center font-bold text-slate-400">등록된 집행 데이터가 없습니다.</td></tr>
                ) : (
                  filteredExpenditures.map((exp: any, idx: number) => (
-                   <tr key={exp.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                   <tr key={exp.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
                      <td className="px-3 py-3 text-slate-400 text-center font-black">{idx + 1}</td>
                      <td className="px-3 py-3">
-                       {exp.executionDate ? <span className="font-bold text-slate-700">{new Date(exp.executionDate).toLocaleDateString()}</span> : <span className="px-2 py-1 bg-orange-100 text-orange-600 text-[10px] font-black rounded-lg">미정</span>}
+                       <div className="flex flex-col gap-1">
+                         {exp.executionDate ? (
+                           <>
+                             <span className="inline-flex items-center w-fit px-1.5 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-black rounded">집행완료</span>
+                             <span className="font-bold text-slate-700">{new Date(exp.executionDate).toLocaleDateString()}</span>
+                           </>
+                         ) : (
+                           <>
+                             <span className="inline-flex items-center w-fit px-1.5 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-black rounded">집행예정</span>
+                             <span className="text-slate-400 text-[11px] italic">날짜 미지정</span>
+                           </>
+                         )}
+                       </div>
                      </td>
-                     <td className="px-3 py-3 font-bold text-slate-700">
-                       <span className="text-[10px] text-slate-400">{exp.category?.parent?.parent?.name || ''} ➔ {exp.category?.parent?.name || ''}</span><br/>
-                       {exp.category?.name || '-'}
-                     </td>
-                     <td className="px-3 py-3 font-bold text-slate-600">{exp.purpose} {exp.memo && <span className="text-xs text-slate-400">({exp.memo})</span>}</td>
-                     <td className="px-3 py-3 text-right font-black text-slate-800 bg-slate-50/50">{Number(exp.totalAmount).toLocaleString()}</td>
-                     <td className="px-3 py-3 text-right font-bold text-slate-500">{Number(exp.supplyAmount).toLocaleString()}</td>
-                     <td className="px-3 py-3 text-right font-bold text-slate-500">{Number(exp.taxAmount).toLocaleString()}</td>
                      <td className="px-3 py-3">
+                       <div className="flex flex-col">
+                         <span className="text-[10px] text-slate-400 leading-tight">
+                           {exp.category?.parent?.parent?.name || '비목없음'} ➔ {exp.category?.parent?.name || '세목없음'}
+                         </span>
+                         {editingExpId === exp.id ? (
+                           <div className="mt-1 flex items-center gap-1">
+                             <input 
+                               className="p-1 text-sm border-2 border-blue-200 rounded w-full bg-white shadow-sm font-bold text-blue-700" 
+                               value={editSubDetailName} 
+                               onChange={e => setEditSubDetailName(e.target.value)}
+                               onKeyDown={e => { if(e.key==='Enter') handleUpdateSubDetail(exp.id); }}
+                               autoFocus
+                             />
+                           </div>
+                         ) : (
+                           <span className="text-sm font-black text-slate-800 cursor-pointer hover:underline decoration-blue-300 underline-offset-4" onClick={() => { setEditingExpId(exp.id); setEditSubDetailName(exp.subDetailName || ''); }}>
+                             {exp.subDetailName || exp.category?.name || '세세목 미지정'}
+                           </span>
+                         )}
+                       </div>
+                     </td>
+                     <td className="px-4 py-3">
+                       <div className="font-bold text-slate-700">{exp.purpose}</div>
+                       {exp.memo && <div className="text-[11px] text-slate-400 mt-0.5 italic">{exp.memo}</div>}
+                     </td>
+                     <td className="px-3 py-3 text-right font-black text-slate-900 bg-slate-50/30">
+                       {Number(exp.totalAmount).toLocaleString()}
+                     </td>
+                     <td className="px-3 py-3 text-right font-bold text-slate-500">
+                       {Number(exp.supplyAmount).toLocaleString()}
+                     </td>
+                     <td className="px-3 py-3 text-right font-bold text-slate-500">
+                       {Number(exp.taxAmount).toLocaleString()}
+                     </td>
+                     <td className="px-4 py-3">
                         <div className="flex flex-col gap-1">
-                          <span className="text-[11px] font-black text-slate-500">{exp.evidenceType || '-'}</span>
-                          {exp.originalFileName && <span className="text-[10px] text-emerald-600 truncate max-w-[120px]">{exp.originalFileName}</span>}
+                          <div className="flex items-center gap-1 text-[11px] font-black text-slate-600">
+                            <FileText className="w-3 h-3 text-slate-400" />
+                            {exp.evidenceType || '-'}
+                          </div>
+                          {exp.originalFileName && (
+                            <span className="text-[10px] text-emerald-600 truncate max-w-[140px] font-bold" title={exp.originalFileName}>
+                              📎 {exp.originalFileName}
+                            </span>
+                          )}
                         </div>
                      </td>
-                     <td className="px-3 py-3 text-center">
-                       <button onClick={()=>handleDelete(exp.id)} className="p-1 text-slate-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                     <td className="px-3 py-3">
+                        <div className="flex justify-center items-center gap-1.5">
+                          {editingExpId === exp.id ? (
+                            <>
+                              <button onClick={() => handleUpdateSubDetail(exp.id)} className="w-8 h-8 flex items-center justify-center bg-blue-600 text-white rounded-lg shadow-sm hover:bg-blue-700 transition-colors" title="저장">
+                                <CheckCircle2 className="w-4 h-4" />
+                              </button>
+                              <button onClick={() => setEditingExpId(null)} className="w-8 h-8 flex items-center justify-center bg-slate-100 text-slate-500 rounded-lg hover:bg-slate-200 transition-colors" title="취소">
+                                <XIcon className="w-4 h-4" />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button onClick={() => { setEditingExpId(exp.id); setEditSubDetailName(exp.subDetailName || ''); }} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="수정">
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button onClick={()=>handleDelete(exp.id)} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="삭제">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+                        </div>
                      </td>
                    </tr>
                  ))
