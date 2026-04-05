@@ -78,9 +78,10 @@ export async function GET() {
       });
 
       // L1 (비목) 레벨 합계 추산
-      const l1Budget = l1.isRate 
+      const l2Sum = processedL2.reduce((sum, c) => sum + c.budgetAmount, 0);
+      const l1Budget = (l1.isRate && l2Sum === 0) 
           ? Number(l1.budgetAmount) 
-          : processedL2.reduce((sum, c) => sum + c.budgetAmount, 0) + Number(l1.budgetAmount);
+          : l2Sum + Number(l1.budgetAmount);
           
       const l1Used = processedL2.reduce((sum, c) => sum + c.totalUsed, 0) + 
         l1.expenditures.reduce((sum, e) => sum + (e.executionDate ? Number(e.totalAmount) : 0), 0);

@@ -359,72 +359,94 @@ export default function BudgetPage() {
               </tr>
             </thead>
             <tbody>
-              {categories.map((l1) => (
-                <React.Fragment key={l1.id}>
-                  {l1.children?.map((l2: any, i2: number) => (
-                     <React.Fragment key={l2.id}>
-                       {(l2.children?.length > 0 ? l2.children : [{ id: `dummy-${l2.id}`, name: '미지정', budgetAmount: l2.budgetAmount, totalUsed: l2.totalUsed, totalExpected: l2.totalExpected, balance: l2.balance, usageRate: l2.usageRate }]).map((l3: any, i3: number) => (
-                         <tr 
-                           key={l3.id} 
-                           onClick={() => setSelectedCategoryId(l3.id === selectedCategoryId ? null : l3.id)}
-                           className={`cursor-pointer transition-colors border-b border-slate-50
-                             ${l3.id === selectedCategoryId ? 'bg-blue-50/50 outline outline-1 outline-blue-200 z-10 relative' : 'hover:bg-slate-50'}`}
-                         >
-                           {/* 비목(L1) 컬럼: 첫 행에만 표시 */}
-                           <td className="px-4 py-3 font-black text-slate-800 bg-white border-r border-slate-100">
-                             {i2 === 0 && i3 === 0 ? l1.name : ""}
-                           </td>
-                           {/* 관리세목(L2) 컬럼: 해당 세목의 첫 행에만 표시 */}
-                           <td className="px-4 py-3 border-l border-slate-100 font-bold text-slate-600 bg-slate-50/30">
-                             {i3 === 0 ? l2.name : ""}
-                           </td>
-                           <td className="px-4 py-3 border-l border-slate-100 font-bold text-slate-700">
-                             {l3.name}
-                           </td>
-                           <td className="px-4 py-3 text-right font-black border-l border-slate-100 text-slate-800">
-                             {l3.budgetAmount.toLocaleString()}원
-                           </td>
-                           <td className="px-4 py-3 text-right font-bold text-slate-600">
-                             {l3.totalUsed > 0 ? l3.totalUsed.toLocaleString() : '-'}
-                           </td>
-                           <td className="px-4 py-3 text-right font-bold text-orange-500">
-                             {l3.totalExpected > 0 ? l3.totalExpected.toLocaleString() : '-'}
-                           </td>
-                           <td className="px-4 py-3 text-right font-black text-slate-700">
-                             {l3.balance.toLocaleString()}원
-                           </td>
-                           <td className="px-4 py-3 border-l border-slate-100">
-                              <div className="flex items-center justify-between">
-                                <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden mr-2">
-                                   <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(l3.usageRate, 100)}%` }}></div>
-                                </div>
-                                <span className="font-black text-[11px] text-slate-600">{l3.usageRate}%</span>
-                              </div>
-                           </td>
-                         </tr>
-                       ))}
-                       {/* L2 (관리세목) 소계 */}
-                       <tr className="bg-slate-100/60 border-b border-slate-200">
-                         <td className="bg-white border-r border-slate-100"></td> {/* L1 공백 */}
-                         <td colSpan={2} className="px-4 py-2 text-right font-bold text-slate-500 text-[10px] tracking-wider">[{l2.name} 소계]</td>
-                         <td className="px-4 py-2 text-right font-black text-slate-600 text-[11px]">{l2.budgetAmount.toLocaleString()}원</td>
-                         <td colSpan={4} className="text-right text-[10px] font-bold text-slate-400">...</td>
-                       </tr>
-                     </React.Fragment>
-                  ))}
-                  {/* L1 (비목) 단위 총합계 */}
-                  <tr className="bg-slate-50/80 border-b-4 border-slate-300">
-                    <td colSpan={3} className="px-4 py-3 font-black text-slate-600 text-center tracking-widest text-xs">
-                      [{l1.name} 총계]
-                    </td>
-                    <td className="px-4 py-3 text-right font-black text-slate-800 border-l border-slate-100">{l1.budgetAmount.toLocaleString()}원</td>
-                    <td className="px-4 py-3 text-right font-black text-blue-600">{l1.totalUsed.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right font-black text-orange-500">{l1.totalExpected.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right font-black text-slate-800">{l1.balance.toLocaleString()}원</td>
-                    <td className="px-4 py-3 font-black text-center text-blue-600 text-xs border-l border-slate-100">{l1.usageRate}%</td>
-                  </tr>
-                </React.Fragment>
-              ))}
+               {categories.map((l1) => (
+                 <React.Fragment key={l1.id}>
+                   {l1.children?.map((l2: any, i2: number) => (
+                      <React.Fragment key={l2.id}>
+                        {(l2.children?.length > 0 ? l2.children : [{ id: `dummy-${l2.id}`, name: '미지정', budgetAmount: l2.budgetAmount, totalUsed: l2.totalUsed, totalExpected: l2.totalExpected, balance: l2.balance, usageRate: l2.usageRate }]).map((l3: any, i3: number) => (
+                          <tr 
+                            key={l3.id} 
+                            onClick={() => setSelectedCategoryId(l3.id === selectedCategoryId ? null : l3.id)}
+                            className={`cursor-pointer transition-colors border-b border-slate-50
+                              ${l3.id === selectedCategoryId ? 'bg-blue-50/50 outline outline-1 outline-blue-200 z-10 relative' : 'hover:bg-slate-50'}`}
+                          >
+                            {/* 비목(L1) 컬럼: 첫 행에만 표시 */}
+                            <td className="px-4 py-3 font-black text-slate-800 bg-white border-r border-slate-100">
+                              {i2 === 0 && i3 === 0 ? l1.name : ""}
+                            </td>
+                            {/* 관리세목(L2) 컬럼: 해당 세목의 첫 행에만 표시 */}
+                            <td className="px-4 py-3 border-l border-slate-100 font-bold text-slate-600 bg-slate-50/30">
+                              {i3 === 0 ? l2.name : ""}
+                            </td>
+                            <td className="px-4 py-3 border-l border-slate-100 font-bold text-slate-700">
+                              {l3.name}
+                            </td>
+                            <td className="px-4 py-3 text-right font-black border-l border-slate-100 text-slate-800">
+                              {l3.budgetAmount.toLocaleString()}원
+                            </td>
+                            <td className="px-4 py-3 text-right font-bold text-slate-600">
+                              {l3.totalUsed > 0 ? l3.totalUsed.toLocaleString() : '-'}
+                            </td>
+                            <td className="px-4 py-3 text-right font-bold text-orange-500">
+                              {l3.totalExpected > 0 ? l3.totalExpected.toLocaleString() : '-'}
+                            </td>
+                            <td className="px-4 py-3 text-right font-black text-slate-700">
+                              {l3.balance.toLocaleString()}원
+                            </td>
+                            <td className="px-4 py-3 border-l border-slate-100">
+                               <div className="flex items-center justify-between">
+                                 <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden mr-2">
+                                    <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(l3.usageRate, 100)}%` }}></div>
+                                 </div>
+                                 <span className="font-black text-[11px] text-slate-600">{l3.usageRate}%</span>
+                               </div>
+                            </td>
+                          </tr>
+                        ))}
+                        {/* L2 (관리세목) 소계 */}
+                        <tr className="bg-slate-100/60 border-b border-slate-200">
+                          <td className="bg-white border-r border-slate-100"></td> {/* L1 공백 */}
+                          <td colSpan={2} className="px-4 py-2 text-right font-bold text-slate-500 text-[10px] tracking-wider">[{l2.name} 소계]</td>
+                          <td className="px-4 py-2 text-right font-black text-slate-600 text-[11px]">{l2.budgetAmount.toLocaleString()}원</td>
+                          <td colSpan={4} className="text-right text-[10px] font-bold text-slate-400">...</td>
+                        </tr>
+                      </React.Fragment>
+                   ))}
+                   {/* L1 (비목) 단위 총합계 */}
+                   <tr className="bg-slate-50/80 border-b-4 border-slate-300">
+                     <td colSpan={3} className="px-4 py-3 font-black text-slate-600 text-center tracking-widest text-xs">
+                       [{l1.name} 총계]
+                     </td>
+                     <td className="px-4 py-3 text-right font-black text-slate-800 border-l border-slate-100">{l1.budgetAmount.toLocaleString()}원</td>
+                     <td className="px-4 py-3 text-right font-black text-blue-600">{l1.totalUsed.toLocaleString()}</td>
+                     <td className="px-4 py-3 text-right font-black text-orange-500">{l1.totalExpected.toLocaleString()}</td>
+                     <td className="px-4 py-3 text-right font-black text-slate-800">{l1.balance.toLocaleString()}원</td>
+                     <td className="px-4 py-3 font-black text-center text-blue-600 text-xs border-l border-slate-100">{l1.usageRate}%</td>
+                   </tr>
+                 </React.Fragment>
+               ))}
+
+               {/* 최종 합계 (Grand Total) */}
+               {(() => {
+                 const gBudget = categories.reduce((s: number, c: any) => s + c.budgetAmount, 0);
+                 const gUsed = categories.reduce((s: number, c: any) => s + (c.totalUsed || 0), 0);
+                 const gExpected = categories.reduce((s: number, c: any) => s + (c.totalExpected || 0), 0);
+                 const gBalance = gBudget - gUsed - gExpected;
+                 const gRate = gBudget > 0 ? (((gUsed + gExpected) / gBudget) * 100).toFixed(1) : "0";
+
+                 return (
+                   <tr className="bg-slate-900 text-white border-t-4 border-double border-slate-500">
+                     <td colSpan={3} className="px-4 py-4 font-black text-center tracking-[0.5em] text-sm italic">
+                       최 종 합 계 (Total)
+                     </td>
+                     <td className="px-4 py-4 text-right font-black text-yellow-400 text-base">{gBudget.toLocaleString()}원</td>
+                     <td className="px-4 py-4 text-right font-black text-blue-300">{gUsed.toLocaleString()}</td>
+                     <td className="px-4 py-4 text-right font-black text-orange-300">{gExpected.toLocaleString()}</td>
+                     <td className="px-4 py-4 text-right font-black text-white">{gBalance.toLocaleString()}원</td>
+                     <td className="px-4 py-4 font-black text-center text-blue-400 text-sm border-l border-slate-700">{gRate}%</td>
+                   </tr>
+                 );
+               })()}
             </tbody>
           </table>
         </div>
