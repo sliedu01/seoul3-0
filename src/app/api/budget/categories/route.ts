@@ -38,45 +38,55 @@ export async function GET() {
     // 가중치(order) 순으로 정렬되어 있으므로 순차적으로 처리하며 예산 누적
     for (const l1 of categories) {
       const processedL2 = l1.children.map(l2 => {
-        // L2 (관리세목) 하위의 지출 내역을 세세목명(subDetailName) 기준으로 그룹화
-        const groupedByDetail: { [key: string]: any[] } = {};
+        // 1. DB에 등록된 세세목(L3)들을 기본으로 맵핑
+        const l3Map: { [key: string]: any } = {};
         
-        l2.expenditures.forEach((exp: any) => {
-          const name = exp.subDetailName || '미지정';
-          if (!groupedByDetail[name]) groupedByDetail[name] = [];
-          groupedByDetail[name].push(exp);
-        });
-
         l2.children.forEach(l3 => {
-          l3.expenditures.forEach((exp: any) => {
-             const name = exp.subDetailName || l3.name || '미지정';
-             if (!groupedByDetail[name]) groupedByDetail[name] = [];
-             groupedByDetail[name].push(exp);
-          });
-        });
-
-        const processedL3 = Object.entries(groupedByDetail).map(([name, exps], idx) => {
-          let totalUsed = BigInt(0);
-          let totalExpected = BigInt(0);
-
-          exps.forEach(exp => {
-            if (exp.executionDate) totalUsed += exp.totalAmount;
-            else totalExpected += exp.totalAmount;
-          });
-
-          return {
-            id: `virtual-l3-${l2.id}-${idx}`,
-            name: name,
+          l3Map[l3.name] = {
+            id: l3.id,
+            name: l3.name,
             level: 3,
-            budgetAmount: 0, 
-            totalUsed: Number(totalUsed),
-            totalExpected: Number(totalExpected),
-            balance: -Number(totalUsed + totalExpected),
-            usageRate: 0 
+            budgetAmount: Number(l3.budgetAmount),
+            totalUsed: BigInt(0),
+            totalExpected: BigInt(0),
+            order: l3.order
           };
         });
 
-        const l2Budget = Number(l2.budgetAmount);
+        // 2. 집행 내역(Expenditures)을 세세목에 배분
+        // L2에 직접 달린 집행 내역 처리
+        l2.expenditures.forEach((exp: any) => {
+          const name = exp.subDetailName || '미지정';
+          if (!l3Map[name]) {
+            l3Map[name] = { id: `virtual-l3-${l2.id}-${name}`, name: name, level: 3, budgetAmount: 0, totalUsed: BigInt(0), totalExpected: BigInt(0), order: 99 };
+          }
+          if (exp.executionDate) l3Map[name].totalUsed += exp.totalAmount;
+          else l3Map[name].totalExpected += exp.totalAmount;
+        });
+
+        // L3 하위에 달린 집행 내역 처리
+        l2.children.forEach(l3 => {
+          l3.expenditures.forEach((exp: any) => {
+             const name = exp.subDetailName || l3.name || '미지정';
+             if (!l3Map[name]) {
+               l3Map[name] = { id: `virtual-l3-${l2.id}-${name}`, name: name, level: 3, budgetAmount: 0, totalUsed: BigInt(0), totalExpected: BigInt(0), order: 99 };
+             }
+             if (exp.executionDate) l3Map[name].totalUsed += exp.totalAmount;
+             else l3Map[name].totalExpected += exp.totalAmount;
+          });
+        });
+
+        // 3. 가공된 L3 리스트 생성 및 L2 예산 합산
+        const processedL3 = Object.values(l3Map).map(item => ({
+          ...item,
+          totalUsed: Number(item.totalUsed),
+          totalExpected: Number(item.totalExpected),
+          balance: item.budgetAmount - Number(item.totalUsed + item.totalExpected),
+          usageRate: item.budgetAmount > 0 ? parseFloat(((Number(item.totalUsed + item.totalExpected) / item.budgetAmount) * 100).toFixed(2)) : 0
+        })).sort((a, b) => a.order - b.order);
+
+        // L2 예산은 본인 예산 + 모든 하위 세세목 예산의 합
+        const l2Budget = Number(l2.budgetAmount) + processedL3.reduce((sum, c) => sum + c.budgetAmount, 0);
         const l2Used = processedL3.reduce((sum, c) => sum + c.totalUsed, 0);
         const l2Expected = processedL3.reduce((sum, c) => sum + c.totalExpected, 0);
         const l2UsageRate = l2Budget > 0 ? ((l2Used + l2Expected) / l2Budget) * 100 : 0;
