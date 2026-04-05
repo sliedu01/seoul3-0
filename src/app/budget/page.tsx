@@ -429,7 +429,7 @@ export default function BudgetPage() {
         </div>
       </Card>
 
-      {/* MIDDLE VIEW: 예산 항목(비목/세목) 관리 프레임 */}
+      {/* MIDDLE VIEW: 예산 항목(비목/세목) 관리 */}
       <h2 className="text-2xl font-black mt-12 mb-4 flex items-center gap-2">
         <Settings className="w-6 h-6 text-indigo-600" />
         예산/정산 항목 관리
@@ -514,7 +514,7 @@ export default function BudgetPage() {
                       </td>
                     </tr>
                   ))}
-                  {settingsViewLevel === 2 && categories.map(l1 => l1.children?.map((l2:any) => (
+                  {settingsViewLevel === 2 && categories.flatMap(l1 => (l1.children || []).map((l2: any) => (
                     <tr key={l2.id} className={`border-b border-slate-100 transition-colors ${selectedCategoryIds.includes(l2.id) ? 'bg-blue-50/30' : 'hover:bg-slate-50/50'}`}>
                       <td className="p-3 text-center">
                         <input 
@@ -555,7 +555,7 @@ export default function BudgetPage() {
                       </td>
                     </tr>
                   )))}
-                  {settingsViewLevel === 3 && categories.map(l1 => l1.children?.map((l2:any) => l2.children?.map((l3:any) => (
+                  {settingsViewLevel === 3 && categories.flatMap(l1 => (l1.children || []).flatMap((l2: any) => (l2.children || []).map((l3: any) => (
                     <tr key={l3.id} className={`border-b border-slate-100 transition-colors ${selectedCategoryIds.includes(l3.id) ? 'bg-blue-50/30' : 'hover:bg-slate-50/50'}`}>
                       <td className="p-3 text-center">
                         <input 
@@ -596,6 +596,7 @@ export default function BudgetPage() {
                       </td>
                     </tr>
                   ))))}
+
                 </tbody>
               </table>
             </div>
