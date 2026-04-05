@@ -244,8 +244,10 @@ export default function BudgetPage() {
         </div>
         <div className="flex gap-2">
           <button 
-            onClick={() => setShowSettings(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-200 text-slate-700 rounded-lg font-bold text-sm shadow-sm hover:bg-slate-300"
+            onClick={() => {
+              document.getElementById('settings-frame')?.scrollIntoView({ behavior: 'smooth' });
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg font-bold text-sm shadow-sm hover:bg-indigo-200"
           >
             <Settings className="w-4 h-4" /> 항목/카테고리 관리
           </button>
@@ -354,8 +356,73 @@ export default function BudgetPage() {
         </div>
       </Card>
 
+      {/* MIDDLE VIEW: 예산 항목(비목/세목) 관리 프레임 */}
+      <h2 className="text-2xl font-black mt-12 mb-4 flex items-center gap-2">
+        <Settings className="w-6 h-6 text-indigo-600" />
+        예산/정산 항목 관리 프레임
+      </h2>
+      <Card className="p-6 mb-12 border-indigo-200 shadow-md">
+         <div className="flex border-b border-slate-200 mb-4 bg-slate-50 p-1 rounded-lg w-fit">
+            {[1, 2, 3].map(lvl => (
+              <button key={lvl} onClick={() => {setSettingsViewLevel(lvl); setSettingParentId(null);}} className={`px-6 py-2 text-sm font-bold rounded-md transition ${settingsViewLevel === lvl ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:bg-slate-100'}`}>
+                {lvl===1 ? '1. 비목 관리' : lvl===2 ? '2. 관리세목 관리' : '3. 세세목 관리'}
+              </button>
+            ))}
+         </div>
+
+         <div className="flex gap-6">
+            <div className="flex-1 overflow-y-auto max-h-[400px] border border-slate-200 rounded-lg custom-scrollbar">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-100/80 sticky top-0 text-slate-600 uppercase text-[11px] font-black tracking-wider">
+                  <tr><th className="p-3 text-left">항목명</th><th className="p-3 text-left">소속 상위항목</th><th className="p-3 text-right">기본예산</th><th className="p-3 text-center w-20">삭제</th></tr>
+                </thead>
+                <tbody>
+                  {settingsViewLevel === 1 && categories.map(c => (
+                    <tr key={c.id} className="border-b border-slate-100"><td className="p-3 font-bold text-slate-800">{c.name}</td><td className="p-3 text-slate-400">-</td><td className="p-3 text-right font-black">{c.budgetAmount.toLocaleString()}</td><td className="p-3 text-center"><button onClick={()=>handleDeleteCategory(c.id)} className="text-red-400 hover:text-red-600 p-1 bg-red-50 rounded"><Trash2 className="w-4 h-4"/></button></td></tr>
+                  ))}
+                  {settingsViewLevel === 2 && categories.map(l1 => l1.children?.map((l2:any) => (
+                    <tr key={l2.id} className="border-b border-slate-100"><td className="p-3 font-bold text-slate-800">{l2.name}</td><td className="p-3 text-xs font-bold text-slate-500 bg-slate-50 rounded px-2">{l1.name}</td><td className="p-3 text-right font-black">{l2.budgetAmount.toLocaleString()}</td><td className="p-3 text-center"><button onClick={()=>handleDeleteCategory(l2.id)} className="text-red-400 hover:text-red-600 p-1 bg-red-50 rounded"><Trash2 className="w-4 h-4"/></button></td></tr>
+                  )))}
+                  {settingsViewLevel === 3 && categories.map(l1 => l1.children?.map((l2:any) => l2.children?.map((l3:any) => (
+                    <tr key={l3.id} className="border-b border-slate-100"><td className="p-3 font-bold text-slate-800">{l3.name}</td><td className="p-3 text-[10px] font-bold tracking-tighter text-slate-500 break-words">{l1.name} <span className="text-slate-300 mx-1">&gt;</span> {l2.name}</td><td className="p-3 text-right text-indigo-600 font-black">{l3.budgetAmount.toLocaleString()}</td><td className="p-3 text-center"><button onClick={()=>handleDeleteCategory(l3.id)} className="text-red-400 hover:text-red-600 p-1 bg-red-50 rounded"><Trash2 className="w-4 h-4"/></button></td></tr>
+                  ))))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="w-[320px] bg-slate-50 p-5 rounded-xl border border-slate-200 self-start">
+              <h3 className="text-xs font-black text-slate-800 mb-4 uppercase tracking-widest flex items-center gap-2"><Plus className="w-4 h-4 text-indigo-500"/> 신규 등록</h3>
+              <form onSubmit={handleAddCategory} className="flex flex-col gap-4">
+                {settingsViewLevel > 1 && (
+                  <div>
+                    <label className="block text-[11px] font-black text-slate-500 mb-1.5"><span className="text-red-500">*</span> 상위 소속 항목 선택</label>
+                    <select className="w-full p-2 text-sm font-bold border border-slate-300 rounded shadow-sm bg-white" required value={settingParentId||''} onChange={e=>setSettingParentId(e.target.value)}>
+                      <option value="">-- 부모 항목 --</option>
+                      {settingsViewLevel === 2 
+                        ? categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)
+                        : categories.flatMap(c => c.children?.map((c2:any)=><option key={c2.id} value={c2.id}>[{c.name}] {c2.name}</option>))
+                      }
+                    </select>
+                  </div>
+                )}
+                <div>
+                  <label className="block text-[11px] font-black text-slate-500 mb-1.5"><span className="text-red-500">*</span> 신규 항목 이름</label>
+                  <input type="text" required placeholder="예: 여비, 강사료 등" className="w-full p-2 text-sm font-bold border border-slate-300 shadow-sm rounded bg-white" value={newCatName} onChange={e=>setNewCatName(e.target.value)} />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-black text-slate-500 mb-1.5"><span className="text-red-500">*</span> 초기 배정 금액 (원)</label>
+                  <input type="number" required placeholder="0" className="w-full p-2 text-sm font-black text-indigo-700 bg-white border border-slate-300 shadow-sm rounded text-right" value={newCatBudget} onChange={e=>setNewCatBudget(e.target.value)} />
+                </div>
+                <button type="submit" className="w-full mt-2 bg-indigo-600 text-white px-4 py-3 text-sm rounded-lg font-black tracking-wide shadow-md hover:bg-indigo-700 transition">
+                  {settingsViewLevel === 1 ? '비목 등록' : settingsViewLevel === 2 ? '관리세목 등록' : '세세목 등록'}
+                </button>
+              </form>
+            </div>
+         </div>
+      </Card>
+
       {/* BOTTOM VIEW: 집행명세서 그리드 */}
-      <h2 className="text-2xl font-black mt-12 mb-4 flex items-between gap-2 flex-wrap items-center">
+      <h2 id="bottom-view-heading" className="text-2xl font-black mt-12 mb-4 flex items-between gap-2 flex-wrap items-center">
         <div className="flex items-center gap-2">
           <FileSpreadsheet className="w-6 h-6 text-emerald-600" />
           상세 집행명세
@@ -412,18 +479,18 @@ export default function BudgetPage() {
                </div>
                
                {/* 3개 금액 분할 입력 */}
-               <div className="col-span-3 grid grid-cols-3 gap-2">
+               <div className="col-span-3 grid grid-cols-3 gap-3">
+                 <div>
+                    <label className="block text-xs font-black text-blue-600 mb-1">금액 (합계) <span className="text-[10px] text-slate-400 font-normal">*입력 시 분리</span></label>
+                    <input type="text" placeholder="원" required className="w-full p-2 border-2 border-blue-200 rounded-lg text-sm font-black text-slate-800 text-right bg-blue-50" value={formData.totalAmount} onChange={e => handleAmountChange('total', e.target.value)} />
+                 </div>
                  <div>
                     <label className="block text-xs font-bold text-slate-500 mb-1">공급가액</label>
-                    <input type="text" placeholder="원" className="w-full p-2 border rounded-lg text-sm font-bold text-slate-700 text-right" value={formData.supplyAmount} onChange={e => handleAmountChange('supply', e.target.value)} />
+                    <input type="text" placeholder="원" className="w-full p-2 border rounded-lg text-sm font-bold text-slate-700 text-right bg-white" value={formData.supplyAmount} onChange={e => handleAmountChange('supply', e.target.value)} />
                  </div>
                  <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">부가세액</label>
-                    <input type="text" placeholder="원" className="w-full p-2 border rounded-lg text-sm font-bold text-slate-700 text-right" value={formData.taxAmount} onChange={e => handleAmountChange('tax', e.target.value)} />
-                 </div>
-                 <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1 text-blue-600">전체금액(합계) *입력시 자동10/11</label>
-                    <input type="text" placeholder="원" required className="w-full p-2 border-2 border-blue-200 rounded-lg text-sm font-black text-slate-800 text-right" value={formData.totalAmount} onChange={e => handleAmountChange('total', e.target.value)} />
+                    <label className="block text-xs font-bold text-slate-500 mb-1">부가세</label>
+                    <input type="text" placeholder="원" className="w-full p-2 border rounded-lg text-sm font-bold text-slate-700 text-right bg-white" value={formData.taxAmount} onChange={e => handleAmountChange('tax', e.target.value)} />
                  </div>
                </div>
 
@@ -477,9 +544,9 @@ export default function BudgetPage() {
                  <th className="px-3 py-3 w-24">상태/일자</th>
                  <th className="px-3 py-3 w-48">비목 → 관리세목 → 세세목</th>
                  <th className="px-3 py-3">집행 용도</th>
+                 <th className="px-3 py-3 w-32 text-right text-blue-700">금액(합계)</th>
                  <th className="px-3 py-3 w-28 text-right">공급가액</th>
-                 <th className="px-3 py-3 w-28 text-right">부가세액</th>
-                 <th className="px-3 py-3 w-32 text-right text-blue-700">전체금액(합계)</th>
+                 <th className="px-3 py-3 w-28 text-right">부가세</th>
                  <th className="px-3 py-3 w-32">증빙</th>
                  <th className="px-3 py-3 w-16 text-center">삭제</th>
                </tr>
@@ -499,9 +566,9 @@ export default function BudgetPage() {
                        {exp.category?.name || '-'}
                      </td>
                      <td className="px-3 py-3 font-bold text-slate-600">{exp.purpose} {exp.memo && <span className="text-xs text-slate-400">({exp.memo})</span>}</td>
+                     <td className="px-3 py-3 text-right font-black text-slate-800 bg-slate-50/50">{Number(exp.totalAmount).toLocaleString()}</td>
                      <td className="px-3 py-3 text-right font-bold text-slate-500">{Number(exp.supplyAmount).toLocaleString()}</td>
                      <td className="px-3 py-3 text-right font-bold text-slate-500">{Number(exp.taxAmount).toLocaleString()}</td>
-                     <td className="px-3 py-3 text-right font-black text-slate-800 bg-slate-50/50">{Number(exp.totalAmount).toLocaleString()}</td>
                      <td className="px-3 py-3">
                         <div className="flex flex-col gap-1">
                           <span className="text-[11px] font-black text-slate-500">{exp.evidenceType || '-'}</span>
@@ -518,72 +585,6 @@ export default function BudgetPage() {
           </table>
         </div>
       </Card>
-
-      {/* 설정 모달 (카테고리 관리) */}
-      {showSettings && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in">
-           <Card className="max-w-2xl w-full bg-white shadow-2xl p-6 rounded-2xl flex flex-col max-h-[90vh]">
-             <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-black flex items-center gap-2"><Settings className="w-5 h-5"/> 예산 항목 / 구조 관리</h2>
-                <button onClick={() => setShowSettings(false)} className="bg-slate-100 p-2 rounded-full hover:bg-slate-200"><XIcon className="w-4 h-4"/></button>
-             </div>
-             
-             <div className="flex border-b border-slate-200 mb-4 bg-slate-50 p-1 rounded-lg">
-                {[1, 2, 3].map(lvl => (
-                  <button key={lvl} onClick={() => {setSettingsViewLevel(lvl); setSettingParentId(null);}} className={`flex-1 py-2 text-sm font-bold rounded-md transition ${settingsViewLevel === lvl ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:bg-slate-100'}`}>
-                    Level {lvl} {lvl===1?'(비목)':lvl===2?'(관리세목)':'(세세목)'}
-                  </button>
-                ))}
-             </div>
-
-             <div className="flex-1 overflow-y-auto mb-4 custom-scrollbar">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-100/50 sticky top-0 text-slate-500 uppercase text-[10px] font-bold">
-                    <tr><th className="p-2 text-left">항목명</th><th className="p-2 text-left">소속 상위항목</th><th className="p-2 text-right">기본예산</th><th className="p-2 text-center w-16">관 리</th></tr>
-                  </thead>
-                  <tbody>
-                    {settingsViewLevel === 1 && categories.map(c => (
-                      <tr key={c.id} className="border-b"><td className="p-2 font-bold">{c.name}</td><td className="p-2 text-slate-400">-</td><td className="p-2 text-right">{c.budgetAmount.toLocaleString()}</td><td className="p-2 text-center"><button onClick={()=>handleDeleteCategory(c.id)} className="text-red-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5"/></button></td></tr>
-                    ))}
-                    {settingsViewLevel === 2 && categories.map(l1 => l1.children?.map((l2:any) => (
-                      <tr key={l2.id} className="border-b"><td className="p-2 font-bold">{l2.name}</td><td className="p-2 text-xs text-slate-500">{l1.name}</td><td className="p-2 text-right">{l2.budgetAmount.toLocaleString()}</td><td className="p-2 text-center"><button onClick={()=>handleDeleteCategory(l2.id)} className="text-red-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5"/></button></td></tr>
-                    )))}
-                    {settingsViewLevel === 3 && categories.map(l1 => l1.children?.map((l2:any) => l2.children?.map((l3:any) => (
-                      <tr key={l3.id} className="border-b"><td className="p-2 font-bold">{l3.name}</td><td className="p-2 text-[10px] tracking-tighter text-slate-400 break-words">{l1.name} &gt; {l2.name}</td><td className="p-2 text-right text-blue-600 font-bold">{l3.budgetAmount.toLocaleString()}</td><td className="p-2 text-center"><button onClick={()=>handleDeleteCategory(l3.id)} className="text-red-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5"/></button></td></tr>
-                    ))))}
-                  </tbody>
-                </table>
-             </div>
-
-             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mt-auto">
-               <h3 className="text-xs font-black text-slate-500 mb-3 uppercase tracking-wider">신규 항목 추가 (Level {settingsViewLevel})</h3>
-               <form onSubmit={handleAddCategory} className="flex flex-wrap gap-2 items-end">
-                 {settingsViewLevel > 1 && (
-                   <div className="flex-1 min-w-[150px]">
-                     <label className="block text-[10px] font-bold text-slate-400 mb-1">상위 부모 지정 필수</label>
-                     <select className="w-full p-2 text-sm border rounded" required value={settingParentId||''} onChange={e=>setSettingParentId(e.target.value)}>
-                       <option value="">-- 부모 항목 --</option>
-                       {settingsViewLevel === 2 
-                         ? categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)
-                         : categories.flatMap(c => c.children?.map((c2:any)=><option key={c2.id} value={c2.id}>[{c.name}] {c2.name}</option>))
-                       }
-                     </select>
-                   </div>
-                 )}
-                 <div className="flex-2 min-w-[150px]">
-                   <label className="block text-[10px] font-bold text-slate-400 mb-1">항목 이름</label>
-                   <input type="text" required placeholder="이름" className="w-full p-2 text-sm border rounded" value={newCatName} onChange={e=>setNewCatName(e.target.value)} />
-                 </div>
-                 <div className="w-24">
-                   <label className="block text-[10px] font-bold text-slate-400 mb-1">초기 배정예산</label>
-                   <input type="number" required placeholder="0원" className="w-full p-2 text-sm border rounded text-right" value={newCatBudget} onChange={e=>setNewCatBudget(e.target.value)} />
-                 </div>
-                 <button type="submit" className="bg-slate-800 text-white px-3 py-2 text-sm rounded font-bold hover:bg-slate-900 h-[38px]"><Plus className="w-4 h-4"/></button>
-               </form>
-             </div>
-           </Card>
-        </div>
-      )}
     </div>
   );
 }
