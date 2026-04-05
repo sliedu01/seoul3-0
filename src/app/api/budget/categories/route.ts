@@ -31,39 +31,54 @@ export async function GET() {
       where: { parentId: null } // 최상위 비목
     });
 
-    // 2. 대시보드 통계를 위한 상향식(Bottom-up) 집계 계산
-    const formattedCategories = categories.map(l1 => {
-      
-      const processedL2 = l1.children.map(l2 => {
-        const processedL3 = l2.children.map(l3 => {
-          let totalUsed = BigInt(0); 
-          let totalExpected = BigInt(0); 
+    // 2. 대시보드 통계를 위한 상향식(Bottom-up) 집계 계산 및 요율(%) 기반 비목 처리
+    let accumulatedDirectBudget = 0;
+    const formattedCategories = [];
 
-          l3.expenditures.forEach(exp => {
+    // 가중치(order) 순으로 정렬되어 있으므로 순차적으로 처리하며 예산 누적
+    for (const l1 of categories) {
+      const processedL2 = l1.children.map(l2 => {
+        // L2 (관리세목) 하위의 지출 내역을 세세목명(subDetailName) 기준으로 그룹화
+        const groupedByDetail: { [key: string]: any[] } = {};
+        
+        l2.expenditures.forEach((exp: any) => {
+          const name = exp.subDetailName || '미지정';
+          if (!groupedByDetail[name]) groupedByDetail[name] = [];
+          groupedByDetail[name].push(exp);
+        });
+
+        l2.children.forEach(l3 => {
+          l3.expenditures.forEach((exp: any) => {
+             const name = exp.subDetailName || l3.name || '미지정';
+             if (!groupedByDetail[name]) groupedByDetail[name] = [];
+             groupedByDetail[name].push(exp);
+          });
+        });
+
+        const processedL3 = Object.entries(groupedByDetail).map(([name, exps], idx) => {
+          let totalUsed = BigInt(0);
+          let totalExpected = BigInt(0);
+
+          exps.forEach(exp => {
             if (exp.executionDate) totalUsed += exp.totalAmount;
             else totalExpected += exp.totalAmount;
           });
 
-          const allocated = Number(l3.budgetAmount);
-          const usedAndExpected = Number(totalUsed + totalExpected);
-          const usageRate = allocated > 0 ? (usedAndExpected / allocated) * 100 : 0;
-
           return {
-            ...l3,
-            budgetAmount: allocated,
+            id: `virtual-l3-${l2.id}-${idx}`,
+            name: name,
+            level: 3,
+            budgetAmount: 0, 
             totalUsed: Number(totalUsed),
             totalExpected: Number(totalExpected),
-            balance: allocated - Number(totalUsed) - Number(totalExpected),
-            usageRate: parseFloat(usageRate.toFixed(2))
+            balance: -Number(totalUsed + totalExpected),
+            usageRate: 0 
           };
         });
 
-        // L2 (관리세목) 합계 계산
-        const l2Budget = processedL3.reduce((sum, c) => sum + c.budgetAmount, 0) + Number(l2.budgetAmount);
-        const l2Used = processedL3.reduce((sum, c) => sum + c.totalUsed, 0) + 
-          l2.expenditures.reduce((sum, e) => sum + (e.executionDate ? Number(e.totalAmount) : 0), 0);
-        const l2Expected = processedL3.reduce((sum, c) => sum + c.totalExpected, 0) +
-          l2.expenditures.reduce((sum, e) => sum + (!e.executionDate ? Number(e.totalAmount) : 0), 0);
+        const l2Budget = Number(l2.budgetAmount);
+        const l2Used = processedL3.reduce((sum, c) => sum + c.totalUsed, 0);
+        const l2Expected = processedL3.reduce((sum, c) => sum + c.totalExpected, 0);
         const l2UsageRate = l2Budget > 0 ? ((l2Used + l2Expected) / l2Budget) * 100 : 0;
 
         return {
@@ -77,19 +92,26 @@ export async function GET() {
         };
       });
 
-      // L1 (비목) 레벨 합계 추산
-      const l2Sum = processedL2.reduce((sum, c) => sum + c.budgetAmount, 0);
-      const l1Budget = (l1.isRate && l2Sum === 0) 
-          ? Number(l1.budgetAmount) 
-          : l2Sum + Number(l1.budgetAmount);
-          
-      const l1Used = processedL2.reduce((sum, c) => sum + c.totalUsed, 0) + 
-        l1.expenditures.reduce((sum, e) => sum + (e.executionDate ? Number(e.totalAmount) : 0), 0);
-      const l1Expected = processedL2.reduce((sum, c) => sum + c.totalExpected, 0) +
-        l1.expenditures.reduce((sum, e) => sum + (!e.executionDate ? Number(e.totalAmount) : 0), 0);
+      // L1 (비목) 레벨 합계 및 요율 계산
+      let l1Budget = 0;
+      if (l1.isRate) {
+        // 요율 기반 비목 (예: 일반관리비, 이윤)
+        const rate = (l1.ratePercent || 0) / 100;
+        l1Budget = Math.floor(accumulatedDirectBudget * rate);
+      } else {
+        // 일반 비목: 하위 관리세목 예산의 합계 + 본인 예산(있을 경우)
+        const l2Sum = processedL2.reduce((sum, c) => sum + c.budgetAmount, 0);
+        l1Budget = l2Sum + Number(l1.budgetAmount);
+      }
+      
+      // 누적 예산 업데이트 (이후 요율 계산의 기준이 됨)
+      accumulatedDirectBudget += l1Budget;
+
+      const l1Used = processedL2.reduce((sum, c) => sum + c.totalUsed, 0);
+      const l1Expected = processedL2.reduce((sum, c) => sum + c.totalExpected, 0);
       const l1UsageRate = l1Budget > 0 ? ((l1Used + l1Expected) / l1Budget) * 100 : 0;
 
-      return {
+      formattedCategories.push({
         ...l1,
         budgetAmount: l1Budget,
         totalUsed: l1Used,
@@ -97,8 +119,8 @@ export async function GET() {
         balance: l1Budget - l1Used - l1Expected,
         usageRate: parseFloat(l1UsageRate.toFixed(2)),
         children: processedL2
-      };
-    });
+      });
+    }
 
     return NextResponse.json(formattedCategories);
   } catch (error) {

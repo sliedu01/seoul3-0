@@ -60,6 +60,7 @@ export async function POST(req: Request) {
 
       return {
         categoryId: item.categoryId,
+        subDetailName: item.subDetailName, // 세세목 명칭 (직접 입력)
         executionDate: item.executionDate ? new Date(item.executionDate) : null,
         purpose: item.purpose,
         supplyAmount,

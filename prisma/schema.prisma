@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
@@ -10,186 +10,176 @@ datasource db {
 }
 
 model Program {
-  id           String   @id @default(cuid())
-  name         String
-  description  String?
-  coreGoals    String?
-  order        Int      @default(0)
-  sessions     ProgramSession[]
-  templates    QuestionTemplate[]
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id          String             @id @default(cuid())
+  name        String
+  description String?
+  coreGoals   String?
+  order       Int                @default(0)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  sessions    ProgramSession[]
+  templates   QuestionTemplate[]
 }
 
 model Partner {
-  id                   String   @id @default(cuid())
+  id                   String           @id @default(cuid())
   name                 String
-  contactName          String?  // 담당자성명
-  contactPhone         String?  // 연락처
-  contactEmail         String?  // 이메일
-  address              String?  // 회사주소
-  businessRegistration String?  
-  contractFile         String?  
-  insuranceFile        String?  
-  bankbookFile         String?  
-  preInspectionFile    String?  // 사전점검체크리스트
+  contactName          String?
+  contactPhone         String?
+  contactEmail         String?
+  address              String?
+  businessRegistration String?
+  contractFile         String?
+  insuranceFile        String?
+  bankbookFile         String?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  preInspectionFile    String?
   sessions             ProgramSession[]
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
 }
 
 model ProgramSession {
-  id             String   @id @default(cuid())
-  programId      String
-  program        Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
-  partnerId      String?
-  partner        Partner? @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-  sessionNumber  Int      
-  date           DateTime 
-  startTime      DateTime? // 시작 시간
-  endTime        DateTime? // 종료 시간
-  courseName     String?   // 강의명
-  instructorName String?   // 강사명
-  
-  classDays        ClassDay[]
-  facilityCheck    FacilityChecklist?
-  responses        SurveyResponse[]
-  surveyDocuments  SurveyDocument[]
-  
-  capacity        Int      @default(0)
-  participantCount Int     @default(0)
-  completerCount   Int     @default(0)
-  
-  resultPdfPath      String?  
-  resultGoogleFormUrl String? 
-
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                  String             @id @default(cuid())
+  programId           String
+  partnerId           String?
+  sessionNumber       Int
+  date                DateTime
+  startTime           DateTime?
+  endTime             DateTime?
+  courseName          String?
+  instructorName      String?
+  capacity            Int                @default(0)
+  participantCount    Int                @default(0)
+  completerCount      Int                @default(0)
+  resultPdfPath       String?
+  resultGoogleFormUrl String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  classDays           ClassDay[]
+  facilityCheck       FacilityChecklist?
+  partner             Partner?           @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  program             Program            @relation(fields: [programId], references: [id], onDelete: Cascade)
+  surveyDocuments     SurveyDocument[]
+  responses           SurveyResponse[]
 }
 
 model ClassDay {
-  id               String   @id @default(cuid())
+  id               String         @id @default(cuid())
   programSessionId String
+  date             DateTime
+  startTime        DateTime?
+  endTime          DateTime?
+  title            String?
+  capacity         Int            @default(0)
+  participantCount Int            @default(0)
+  order            Int            @default(0)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
   session          ProgramSession @relation(fields: [programSessionId], references: [id], onDelete: Cascade)
-  date             DateTime           // 교육일 날짜
-  startTime        DateTime?          // 시작 시간
-  endTime          DateTime?          // 종료 시간
-  title            String?            // 수업명
-  capacity         Int      @default(0)   // 정원
-  participantCount Int      @default(0)   // 참여인원
-  order            Int      @default(0)   // 순서
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
 }
 
 model FacilityChecklist {
-  id               String   @id @default(cuid())
-  programSessionId String   @unique
+  id               String         @id @default(cuid())
+  programSessionId String         @unique
+  data             String
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
   session          ProgramSession @relation(fields: [programSessionId], references: [id], onDelete: Cascade)
-  data             String   
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
 }
 
 model QuestionTemplate {
-  id          String   @id @default(cuid())
-  name        String   
-  type        String   // MATURITY, SATISFACTION
-  subType     String?  // PRE_POST, CHANGE, NORMAL
-  scope       String   
-  description String?
+  id            String           @id @default(cuid())
+  name          String
+  type          String
+  subType       String?
+  scope         String
+  description   String?
   googleFormUrl String?
-  programId   String?
-  program     Program? @relation(fields: [programId], references: [id], onDelete: Cascade)
-  questions   Question[]
-  responses   SurveyResponse[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  programId     String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  questions     Question[]
+  program       Program?         @relation(fields: [programId], references: [id], onDelete: Cascade)
+  responses     SurveyResponse[]
 }
 
 model Question {
-  id          String   @id @default(cuid())
-  templateId  String
-  template    QuestionTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  category    String   
-  type        String   
-  growthType  String?  // PRE_POST, CHANGE, NONE
-  content     String
-  order       Int      @default(0)
-  answers     Answer[]
+  id         String           @id @default(cuid())
+  templateId String
+  category   String
+  type       String
+  growthType String?
+  content    String
+  order      Int              @default(0)
+  answers    Answer[]
+  template   QuestionTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
 }
 
 model SurveyResponse {
-  id               String   @id @default(cuid())
+  id               String            @id @default(cuid())
   programSessionId String
-  session          ProgramSession @relation(fields: [programSessionId], references: [id], onDelete: Cascade)
   templateId       String?
-  template         QuestionTemplate? @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  respondentId     String   
-  researchTarget   String?  // ELEMENTARY, MIDDLE, HIGH, UNIVERSITY, OTHER (초/중/고/대/기타)
-  type             String   
+  respondentId     String
+  researchTarget   String?
+  type             String
+  createdAt        DateTime          @default(now())
   answers          Answer[]
-  createdAt        DateTime @default(now())
+  session          ProgramSession    @relation(fields: [programSessionId], references: [id], onDelete: Cascade)
+  template         QuestionTemplate? @relation(fields: [templateId], references: [id], onDelete: Cascade)
 }
 
 model Answer {
-  id         String   @id @default(cuid())
+  id         String         @id @default(cuid())
   responseId String
-  response   SurveyResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
   questionId String
-  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  score      Int?     // 사후 환산 점수
-  preScore   Int?     // 수업 전 점수
-  postChange Int?     // 수업 후 변화량 (-1, 0, +1, +2)
-  text       String?  
+  score      Int?
+  preScore   Int?
+  postChange Int?
+  text       String?
+  question   Question       @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  response   SurveyResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
 }
 
 model MeetingMinute {
   id             String   @id @default(cuid())
   title          String
   date           DateTime
-  time           String?                 // 회의 시간
-  location       String?                 // 회의 장소
-  sequenceNumber Int      @default(1)    // 회차
-  managedOrg     String?                 // 담당기관
-  attendees      String?                 // 참석자
-  purpose        String?                 // 목적
-  agenda         String?                 // 주요안건
-  preparation    String?                 // 준비사항
-  nextSchedule   String?                 // 차기일정
-  meetingContent String?  @default("")   // 회의내용
-  others         String?                 // 기타사항
-  pdfFilePath    String   
+  sequenceNumber Int      @default(1)
+  managedOrg     String?
+  attendees      String?
+  purpose        String?
+  agenda         String?
+  preparation    String?
+  nextSchedule   String?
+  meetingContent String?  @default("")
+  others         String?
+  pdfFilePath    String
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
-}
-
-enum Role {
-  ADMIN
-  OPERATOR
-  MEMBER
+  location       String?
+  time           String?
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String?
-  phone     String?
-  company   String?
-  role      Role     @default(MEMBER)
-  isApproved Boolean @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(cuid())
+  email      String   @unique
+  password   String
+  name       String?
+  role       Role     @default(MEMBER)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  company    String?
+  isApproved Boolean  @default(false)
+  phone      String?
 }
 
 model OtherSchedule {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   title     String
   startDate DateTime
   endDate   DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 }
 
 model FileStorage {
@@ -197,62 +187,60 @@ model FileStorage {
   fileName  String   @unique
   data      Bytes
   mimeType  String
-  fileSize  Int?             // 원본 파일 크기 (bytes)
-  sha256    String?          // SHA-256 해시값 (무결성 검증용)
   createdAt DateTime @default(now())
+  fileSize  Int?
+  sha256    String?
 }
 
-// 설문 증빙 문서 (PDF/이미지) & 데이터 소스 매핑
 model SurveyDocument {
-  id               String   @id @default(cuid())
+  id               String         @id @default(cuid())
   programSessionId String
+  type             String
+  category         String
+  fileName         String?
+  googleFormUrl    String?
+  description      String?
+  uploadedAt       DateTime       @default(now())
   session          ProgramSession @relation(fields: [programSessionId], references: [id], onDelete: Cascade)
-  type             String   // COMPETENCY_PRE, COMPETENCY_POST, SATISFACTION, RESULT_REPORT, DATA_SOURCE
-  category         String   // PDF_EVIDENCE, EXCEL_DATA, GOOGLE_FORM
-  fileName         String?  // FileStorage.fileName 참조 (PDF/Excel 파일명)
-  googleFormUrl    String?  // 구글폼 URL (데이터 소스 참조용)
-  description      String?  // 설명 메모
-  uploadedAt       DateTime @default(now())
 }
 
 model BudgetCategory {
-  id           String   @id @default(cuid())
-  parentId     String?  // NULL = 최상위 비목
+  id           String           @id @default(cuid())
+  parentId     String?
+  level        Int
+  name         String
+  budgetAmount BigInt           @default(0)
+  order        Int              @default(0)
+  isRate       Boolean          @default(false)
+  ratePercent  Float?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
   parent       BudgetCategory?  @relation("CategoryTree", fields: [parentId], references: [id])
   children     BudgetCategory[] @relation("CategoryTree")
-  
-  level        Int      // 1=비목, 2=관리세목, 3=세세목
-  name         String   // "인건비", "사업관리자", "1. 진로캠퍼스" 등
-  budgetAmount BigInt   @default(0)  // 배정예산 (원)
-  order        Int      @default(0)
-  
-  isRate       Boolean  @default(false) // 일반관리비/이윤 등 %계산 항목 여부
-  ratePercent  Float?   // 6.0% 등
-  
   expenditures Expenditure[]
-  
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
 }
 
 model Expenditure {
-  id              String    @id @default(cuid())
-  categoryId      String
-  category        BudgetCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  
-  executionDate   DateTime? // NULL = 미정 → 사용예정액
-  supplyAmount    BigInt    @default(0)  // 공급가액
-  taxAmount       BigInt    @default(0)  // 부가세액
-  totalAmount     BigInt    @default(0)  // 합계 (공급가+부가세)
-  
-  purpose         String?   // 집행 용도
-  evidenceType    String?   // 세금계산서, 입금증, 영수증, 기타증빙
-  evidenceFileId  String?   // 증빙 파일 고유번호 (예: 20260405_세금계산서_001)
-  evidenceFileName String?  // 물리적 저장 파일명
-  originalFileName String?  // 원본 파일명
-  
-  memo            String?   // 비고
-  
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id               String         @id @default(cuid())
+  categoryId       String
+  subDetailName    String?        // 세세목 명칭 (직접 입력)
+  executionDate    DateTime?
+  supplyAmount     BigInt         @default(0)
+  taxAmount        BigInt         @default(0)
+  totalAmount      BigInt         @default(0)
+  purpose          String?
+  evidenceType     String?
+  evidenceFileId   String?
+  evidenceFileName String?
+  originalFileName String?
+  memo             String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  category         BudgetCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+}
+
+enum Role {
+  ADMIN
+  OPERATOR
+  MEMBER
 }

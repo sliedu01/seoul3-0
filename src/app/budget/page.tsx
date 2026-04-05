@@ -23,7 +23,8 @@ export default function BudgetPage() {
   
   const [formData, setFormData] = useState({
     executionDate: '',
-    categoryId: '', // 세세목(L3) ID
+    categoryId: '', // 관리세목(L2) ID (이제 지출은 L2에 귀속됨)
+    subDetailName: '', // 직접 입력하는 세세목 명칭
     purpose: '',
     supplyAmount: '',
     taxAmount: '',
@@ -85,9 +86,19 @@ export default function BudgetPage() {
   // 필터링 적용된 명세
   const filteredExpenditures = useMemo(() => {
     return selectedCategoryId 
-      ? expenditures.filter(exp => exp.categoryId === selectedCategoryId)
+      ? expenditures.filter(exp => {
+          if (selectedCategoryId.startsWith('virtual-l3-')) {
+            const [,,l2Id, name] = selectedCategoryId.split('-');
+            // virtual-l3-{l2Id}-{name} 형식인 경우 (API 수정 필요할 수 있음, 현재는 index 기반)
+            // 임시로 categoryId(L2)와 subDetailName 매칭 시도
+            const l2Child = categories.flatMap(c => c.children).find((c:any) => c.children.some((sub:any) => sub.id === selectedCategoryId));
+            const virtualItem = l2Child?.children.find((sub:any) => sub.id === selectedCategoryId);
+            return exp.categoryId === l2Child?.id && (exp.subDetailName || '미지정') === virtualItem?.name;
+          }
+          return exp.categoryId === selectedCategoryId;
+        })
       : expenditures;
-  }, [selectedCategoryId, expenditures]);
+  }, [selectedCategoryId, expenditures, categories]);
 
   // ---- 폼 관련 로직 ----
   
@@ -148,7 +159,7 @@ export default function BudgetPage() {
       if (res.ok) {
         alert("집행 내역이 등록되었습니다.");
         setShowForm(false);
-        setFormData({ executionDate: '', categoryId: '', purpose: '', supplyAmount: '', taxAmount: '', totalAmount: '', evidenceType: '세금계산서', memo: '' });
+        setFormData({ executionDate: '', categoryId: '', subDetailName: '', purpose: '', supplyAmount: '', taxAmount: '', totalAmount: '', evidenceType: '세금계산서', memo: '' });
         setFormL1(''); setFormL2('');
         setSelectedFile(null);
         fetchData();
@@ -178,9 +189,9 @@ export default function BudgetPage() {
     const exportData = filteredExpenditures.map((exp, idx) => ({
       "No": idx + 1,
       "집행일": exp.executionDate ? new Date(exp.executionDate).toLocaleDateString() : '미정(사용예정)',
-      "비목": exp.category?.parent?.parent?.name || '-',
-      "관리세목": exp.category?.parent?.name || '-',
-      "세세목": exp.category?.name || '-',
+      "비목": exp.category?.parent?.name || exp.category?.name || '-',
+      "관리세목": exp.category?.name || '-',
+      "세세목": exp.subDetailName || '-',
       "집행 용도": exp.purpose || '',
       "공급가액": Number(exp.supplyAmount),
       "부가세액": Number(exp.taxAmount),
@@ -359,72 +370,136 @@ export default function BudgetPage() {
               </tr>
             </thead>
             <tbody>
-               {categories.map((l1) => (
-                 <React.Fragment key={l1.id}>
-                   {l1.children?.map((l2: any, i2: number) => (
-                      <React.Fragment key={l2.id}>
-                        {(l2.children?.length > 0 ? l2.children : [{ id: `dummy-${l2.id}`, name: '미지정', budgetAmount: l2.budgetAmount, totalUsed: l2.totalUsed, totalExpected: l2.totalExpected, balance: l2.balance, usageRate: l2.usageRate }]).map((l3: any, i3: number) => (
-                          <tr 
-                            key={l3.id} 
-                            onClick={() => setSelectedCategoryId(l3.id === selectedCategoryId ? null : l3.id)}
-                            className={`cursor-pointer transition-colors border-b border-slate-50
-                              ${l3.id === selectedCategoryId ? 'bg-blue-50/50 outline outline-1 outline-blue-200 z-10 relative' : 'hover:bg-slate-50'}`}
-                          >
-                            {/* 비목(L1) 컬럼: 첫 행에만 표시 */}
-                            <td className="px-4 py-3 font-black text-slate-800 bg-white border-r border-slate-100">
-                              {i2 === 0 && i3 === 0 ? l1.name : ""}
-                            </td>
-                            {/* 관리세목(L2) 컬럼: 해당 세목의 첫 행에만 표시 */}
-                            <td className="px-4 py-3 border-l border-slate-100 font-bold text-slate-600 bg-slate-50/30">
-                              {i3 === 0 ? l2.name : ""}
-                            </td>
-                            <td className="px-4 py-3 border-l border-slate-100 font-bold text-slate-700">
-                              {l3.name}
-                            </td>
-                            <td className="px-4 py-3 text-right font-black border-l border-slate-100 text-slate-800">
-                              {l3.budgetAmount.toLocaleString()}원
-                            </td>
-                            <td className="px-4 py-3 text-right font-bold text-slate-600">
-                              {l3.totalUsed > 0 ? l3.totalUsed.toLocaleString() : '-'}
-                            </td>
-                            <td className="px-4 py-3 text-right font-bold text-orange-500">
-                              {l3.totalExpected > 0 ? l3.totalExpected.toLocaleString() : '-'}
-                            </td>
-                            <td className="px-4 py-3 text-right font-black text-slate-700">
-                              {l3.balance.toLocaleString()}원
-                            </td>
-                            <td className="px-4 py-3 border-l border-slate-100">
-                               <div className="flex items-center justify-between">
-                                 <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden mr-2">
-                                    <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(l3.usageRate, 100)}%` }}></div>
-                                 </div>
-                                 <span className="font-black text-[11px] text-slate-600">{l3.usageRate}%</span>
-                               </div>
-                            </td>
-                          </tr>
-                        ))}
-                        {/* L2 (관리세목) 소계 */}
-                        <tr className="bg-slate-100/60 border-b border-slate-200">
-                          <td className="bg-white border-r border-slate-100"></td> {/* L1 공백 */}
-                          <td colSpan={2} className="px-4 py-2 text-right font-bold text-slate-500 text-[10px] tracking-wider">[{l2.name} 소계]</td>
-                          <td className="px-4 py-2 text-right font-black text-slate-600 text-[11px]">{l2.budgetAmount.toLocaleString()}원</td>
-                          <td colSpan={4} className="text-right text-[10px] font-bold text-slate-400">...</td>
+               {categories.map((l1) => {
+                 const l2List = l1.children || [];
+                 const totalL3Rows = l2List.reduce((acc: number, l2: any) => acc + Math.max(l2.children?.length || 0, 1), 0);
+                 const l1Rows = Math.max(totalL3Rows, 1);
+
+                 return (
+                   <React.Fragment key={l1.id}>
+                     {l1Rows > 0 ? (
+                       l2List.length > 0 ? (
+                         l2List.map((l2: any, i2: number) => {
+                           const l3List = l2.children || [];
+                           const l2Rows = Math.max(l3List.length, 1);
+
+                           return (
+                             <React.Fragment key={l2.id}>
+                               {l2Rows > 0 ? (
+                                 l3List.length > 0 ? (
+                                   l3List.map((l3: any, i3: number) => (
+                                     <tr 
+                                       key={l3.id} 
+                                       onClick={() => setSelectedCategoryId(l3.id === selectedCategoryId ? null : l3.id)}
+                                       className={`cursor-pointer transition-colors border-b border-slate-50
+                                         ${l3.id === selectedCategoryId ? 'bg-blue-50/50 outline outline-1 outline-blue-200 z-10 relative' : 'hover:bg-slate-50'}`}
+                                     >
+                                       {i2 === 0 && i3 === 0 && (
+                                         <td rowSpan={l1Rows} className="px-4 py-3 font-black text-slate-800 bg-white border-r border-slate-100 align-top">
+                                           {l1.name}
+                                         </td>
+                                       )}
+                                       {i3 === 0 && (
+                                         <td rowSpan={l2Rows} className="px-4 py-3 border-l border-slate-100 font-bold text-slate-600 bg-slate-50/30 align-top">
+                                           {l2.name}
+                                         </td>
+                                       )}
+                                       <td className="px-4 py-3 border-l border-slate-100 font-bold text-slate-700">
+                                         {l3.name}
+                                       </td>
+                                       <td className="px-4 py-3 text-right font-black border-l border-slate-100 text-slate-400 text-xs text-right">
+                                         {l3.budgetAmount > 0 ? l3.budgetAmount.toLocaleString() + '원' : '-'}
+                                       </td>
+                                       <td className="px-4 py-3 text-right font-bold text-slate-600">
+                                         {l3.totalUsed > 0 ? l3.totalUsed.toLocaleString() : '-'}
+                                       </td>
+                                       <td className="px-4 py-3 text-right font-bold text-orange-500">
+                                         {l3.totalExpected > 0 ? l3.totalExpected.toLocaleString() : '-'}
+                                       </td>
+                                       <td className="px-4 py-3 text-right font-black text-slate-700">
+                                         {l3.balance.toLocaleString()}원
+                                       </td>
+                                       <td className="px-4 py-3 border-l border-slate-100">
+                                          <div className="flex items-center justify-between">
+                                            <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden mr-2">
+                                               <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(l3.usageRate, 100)}%` }}></div>
+                                            </div>
+                                            <span className="font-black text-[10px] text-slate-600">{l3.usageRate}%</span>
+                                          </div>
+                                       </td>
+                                     </tr>
+                                   ))
+                                 ) : (
+                                   /* L2만 있고 L3가 없는 경우 (가상 행) */
+                                   <tr className="hover:bg-slate-50 border-b border-slate-100">
+                                     {i2 === 0 && (
+                                       <td rowSpan={l1Rows} className="px-4 py-3 font-black text-slate-800 bg-white border-r border-slate-100 align-top">
+                                         {l1.name}
+                                       </td>
+                                     )}
+                                     <td className="px-4 py-3 border-l border-slate-100 font-bold text-slate-600 bg-slate-50/30 align-top">
+                                       {l2.name}
+                                     </td>
+                                     <td className="px-4 py-3 border-l border-slate-100 text-slate-300 italic">상세 내역 없음</td>
+                                     <td className="px-4 py-3 text-right font-black border-l border-slate-100 text-slate-400 text-xs">
+                                       {l2.budgetAmount > 0 ? l2.budgetAmount.toLocaleString() + '원' : '-'}
+                                     </td>
+                                     <td className="px-4 py-3 text-right font-bold text-slate-600">-</td>
+                                     <td className="px-4 py-3 text-right font-bold text-orange-500">-</td>
+                                     <td className="px-4 py-3 text-right font-black text-slate-700">{l2.balance.toLocaleString()}원</td>
+                                     <td className="px-4 py-3 border-l border-slate-100">
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden mr-2">
+                                             <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(l2.usageRate, 100)}%` }}></div>
+                                          </div>
+                                          <span className="font-black text-[10px] text-slate-600">{l2.usageRate}%</span>
+                                        </div>
+                                     </td>
+                                   </tr>
+                                 )
+                               ) : null}
+                               {/* L2 (관리세목) 소계 - L2 클릭 필터링 기능 추가 가능 */}
+                               <tr className="bg-slate-900 border-b border-slate-200">
+                                 <td className="bg-white border-r border-slate-100"></td>
+                                 <td colSpan={2} className="px-4 py-2 text-right font-bold text-slate-400 text-[10px] tracking-wider uppercase">[{l2.name} 합계]</td>
+                                 <td className="px-4 py-2 text-right font-black text-white text-[11px]">{l2.budgetAmount.toLocaleString()}원</td>
+                                 <td className="px-4 py-2 text-right font-black text-blue-400 bg-blue-900/20">{l2.totalUsed.toLocaleString()}</td>
+                                 <td className="px-4 py-2 text-right font-black text-orange-400">{l2.totalExpected.toLocaleString()}</td>
+                                 <td className="px-4 py-2 text-right font-black text-white">{l2.balance.toLocaleString()}원</td>
+                                 <td className="px-4 py-2 font-black text-center text-blue-400 text-[11px] border-l border-slate-700">{l2.usageRate}%</td>
+                               </tr>
+                             </React.Fragment>
+                           );
+                         })
+                       ) : (
+                         /* L1만 있고 L2가 아예 없는 경우 (일반관리비, 이윤 등) */
+                         <tr className="bg-blue-50/20 border-b border-slate-200">
+                           <td className="px-4 py-4 font-black text-slate-900 bg-white border-r border-slate-100">{l1.name}</td>
+                           <td colSpan={2} className="px-4 py-4 text-center text-slate-400 italic text-xs">하위 세목 없이 직접 집계되는 항목입니다.</td>
+                           <td className="px-4 py-4 text-right font-black border-l border-slate-100 text-blue-700 bg-blue-50/50">{l1.budgetAmount.toLocaleString()}원</td>
+                           <td className="px-4 py-4 text-right font-bold text-slate-600">{l1.totalUsed.toLocaleString()}</td>
+                           <td className="px-4 py-4 text-right font-bold text-orange-500">{l1.totalExpected.toLocaleString()}</td>
+                           <td className="px-4 py-4 text-right font-black text-slate-900">{l1.balance.toLocaleString()}원</td>
+                           <td className="px-4 py-4 font-black text-center text-blue-600 border-l border-slate-100">{l1.usageRate}%</td>
+                         </tr>
+                       )
+                     ) : null}
+                     {/* L1 (비목) 단위 총합계 - 하위 항목이 있을 때만 표시 (중복 방지) */}
+                     {l2List.length > 0 && (
+                        <tr className="bg-slate-50/80 border-b-4 border-slate-300">
+                          <td colSpan={3} className="px-4 py-3 font-black text-slate-600 text-center tracking-widest text-xs">
+                            [{l1.name} 총계]
+                          </td>
+                          <td className="px-4 py-3 text-right font-black text-slate-800 border-l border-slate-100">{l1.budgetAmount.toLocaleString()}원</td>
+                          <td className="px-4 py-3 text-right font-black text-blue-600">{l1.totalUsed.toLocaleString()}</td>
+                          <td className="px-4 py-3 text-right font-black text-orange-500">{l1.totalExpected.toLocaleString()}</td>
+                          <td className="px-4 py-3 text-right font-black text-slate-800">{l1.balance.toLocaleString()}원</td>
+                          <td className="px-4 py-3 font-black text-center text-blue-600 text-xs border-l border-slate-100">{l1.usageRate}%</td>
                         </tr>
-                      </React.Fragment>
-                   ))}
-                   {/* L1 (비목) 단위 총합계 */}
-                   <tr className="bg-slate-50/80 border-b-4 border-slate-300">
-                     <td colSpan={3} className="px-4 py-3 font-black text-slate-600 text-center tracking-widest text-xs">
-                       [{l1.name} 총계]
-                     </td>
-                     <td className="px-4 py-3 text-right font-black text-slate-800 border-l border-slate-100">{l1.budgetAmount.toLocaleString()}원</td>
-                     <td className="px-4 py-3 text-right font-black text-blue-600">{l1.totalUsed.toLocaleString()}</td>
-                     <td className="px-4 py-3 text-right font-black text-orange-500">{l1.totalExpected.toLocaleString()}</td>
-                     <td className="px-4 py-3 text-right font-black text-slate-800">{l1.balance.toLocaleString()}원</td>
-                     <td className="px-4 py-3 font-black text-center text-blue-600 text-xs border-l border-slate-100">{l1.usageRate}%</td>
-                   </tr>
-                 </React.Fragment>
-               ))}
+                     )}
+                   </React.Fragment>
+                 );
+               })}
 
                {/* 최종 합계 (Grand Total) */}
                {(() => {
@@ -460,9 +535,9 @@ export default function BudgetPage() {
       <Card className="p-6 mb-12 border-indigo-200 shadow-md">
           <div className="flex justify-between items-center mb-4">
             <div className="flex border border-slate-200 bg-slate-50 p-1 rounded-lg w-fit">
-               {[1, 2, 3].map(lvl => (
+               {[1, 2].map(lvl => (
                  <button key={lvl} onClick={() => {setSettingsViewLevel(lvl); setSettingParentId(null); setSelectedCategoryIds([]);}} className={`px-6 py-2 text-sm font-bold rounded-md transition ${settingsViewLevel === lvl ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:bg-slate-100'}`}>
-                   {lvl===1 ? '1. 비목 관리' : lvl===2 ? '2. 관리세목 관리' : '3. 세세목 관리'}
+                   {lvl===1 ? '1. 비목 관리' : '2. 관리세목 관리'}
                  </button>
                ))}
             </div>
@@ -694,17 +769,14 @@ export default function BudgetPage() {
                </div>
                <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">관리세목 (Level 2) <span className="text-red-500">*</span></label>
-                  <select className="w-full p-2 border rounded-lg text-sm font-bold" value={formL2} onChange={e => {setFormL2(e.target.value); setFormData({...formData, categoryId: ''});}} required disabled={!formL1}>
+                  <select className="w-full p-2 border rounded-lg text-sm font-bold" value={formL2} onChange={e => {setFormL2(e.target.value); setFormData({...formData, categoryId: e.target.value});}} required disabled={!formL1}>
                     <option value="">-- 관리세목 선택 --</option>
                     {categories.find(c => c.id === formL1)?.children?.map((c:any) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                </div>
                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">세세목 (Level 3) <span className="text-red-500">*</span></label>
-                  <select className="w-full p-2 border rounded-lg text-sm font-bold bg-blue-50" value={formData.categoryId} onChange={e => setFormData({...formData, categoryId: e.target.value})} required disabled={!formL2}>
-                    <option value="">-- 최종 항목 선택 --</option>
-                    {categories.find(c => c.id === formL1)?.children?.find((c:any) => c.id === formL2)?.children?.map((c:any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">세세목명 (상세 내역) <span className="text-red-500">*</span></label>
+                  <input type="text" placeholder="직접 입력 (예: 강사료, 여비 등)" className="w-full p-2 border rounded-lg text-sm font-bold bg-blue-50" value={formData.subDetailName} onChange={e => setFormData({...formData, subDetailName: e.target.value})} required disabled={!formL2} />
                </div>
              </div>
 
