@@ -1,0 +1,66 @@
+commit ccae1f6365885f638030a63b2cfb37afd5dad6d1
+Author: Seoul3.0 User <user@seoul3.0.com>
+Date:   Sun Apr 5 16:02:08 2026 +0900
+
+     chore: Update ESLint next config imports
+
+ eslint.config.mjs | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+commit e4d8622aca013a28933fb3b5f61161168e3c5b47
+Author: Seoul3.0 User <user@seoul3.0.com>
+Date:   Sun Apr 5 15:53:28 2026 +0900
+
+     fix: Type compilation errors in budget API
+
+ backfill_hashes.js                                 |  40 ++
+ next.config.ts                                     |   6 +
+ prisma/schema.prisma                               |  64 +++-
+ prisma/schema.prisma_budget_snippet                |  42 ++
+ seed_budget.mjs                                    |  90 +++++
+ src/app/api/budget/categories/route.ts             | 110 ++++++
+ src/app/api/budget/evidence/upload/route.ts        |  74 ++++
+ src/app/api/budget/expenditures/[id]/route.ts      |  61 +++
+ src/app/api/budget/expenditures/route.ts           |  89 +++++
+ src/app/api/budget/export/route.ts                 | 121 ++++++
+ src/app/api/download/route.ts                      |  57 ++-
+ src/app/api/files/verify/route.ts                  |  99 +++++
+ .../api/sessions/[id]/documents/[docId]/route.ts   |  60 +++
+ src/app/api/sessions/[id]/documents/route.ts       |  81 ++++
+ src/app/api/upload/route.ts                        |  61 ++-
+ src/app/budget/page.tsx                            | 422 +++++++++++++++++++++
+ src/app/partners/page.tsx                          |  41 +-
+ src/app/programs/page.tsx                          |  53 +++
+ src/components/layout/sidebar.tsx                  |   3 +-
+ ts_errors.txt                                      |  13 +
+ 20 files changed, 1558 insertions(+), 29 deletions(-)
+
+commit 22b2b197ea39b51422e6aa50c111e04210f829b0
+Author: Seoul3.0 User <user@seoul3.0.com>
+Date:   Fri Apr 3 16:15:49 2026 +0900
+
+    fix: resolve classDays save issues by preprocessing date strings to ISO format
+
+ src/app/api/sessions/route.ts | 25 ++++++++++++++++---------
+ src/app/programs/page.tsx     | 11 ++++++++++-
+ 2 files changed, 26 insertions(+), 10 deletions(-)
+
+commit b11724dd062ab7a619f16cbbc6e1be12e90095c6
+Author: Seoul3.0 User <user@seoul3.0.com>
+Date:   Fri Apr 3 15:44:51 2026 +0900
+
+    feat: implement optimistic updates and background refetching for better performance
+
+ src/app/api/sessions/route.ts |   4 +-
+ src/app/programs/page.tsx     | 127 +++++++++++++++++++++++++++++++-----------
+ 2 files changed, 98 insertions(+), 33 deletions(-)
+
+commit 927205657d1571a1d0e1df09bfe8936dbcedf434
+Author: Seoul3.0 User <user@seoul3.0.com>
+Date:   Fri Apr 3 14:04:30 2026 +0900
+
+    deploy_fix
+
+ src/app/api/download/route.ts |   1 +
+ src/app/programs/page.tsx     | 121 ++++++++++++++++++++++--------------------
+ 2 files changed, 65 insertions(+), 57 deletions(-)

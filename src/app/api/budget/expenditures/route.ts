@@ -17,7 +17,11 @@ export async function GET(req: Request) {
       where: categoryId ? { categoryId } : undefined,
       include: {
         category: {
-          include: { parent: true }
+          include: { 
+            parent: {
+              include: { parent: true }
+            }
+          }
         }
       },
       orderBy: [
