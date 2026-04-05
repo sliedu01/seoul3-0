@@ -46,7 +46,7 @@ export async function GET() {
             id: l3.id,
             name: l3.name,
             level: 3,
-            budgetAmount: Number(l3.budgetAmount),
+            budgetAmount: Number(l3.budgetAmount), // L3에 예산이 있을 경우 합산용
             totalUsed: BigInt(0),
             totalExpected: BigInt(0),
             order: l3.order
@@ -56,7 +56,7 @@ export async function GET() {
         // 2. 집행 내역(Expenditures)을 세세목에 배분
         // L2에 직접 달린 집행 내역 처리
         l2.expenditures.forEach((exp: any) => {
-          const name = (exp.subDetailName || '미지정').trim(); // 공백 제거 추가
+          const name = (exp.subDetailName || '기타 상세').trim();
           if (!l3Map[name]) {
             l3Map[name] = { id: `virtual-l3-${l2.id}-${name}`, name: name, level: 3, budgetAmount: 0, totalUsed: BigInt(0), totalExpected: BigInt(0), order: 99 };
           }
@@ -68,7 +68,7 @@ export async function GET() {
         // L3 하위에 달린 집행 내역 처리
         l2.children.forEach(l3 => {
           l3.expenditures.forEach((exp: any) => {
-             const name = (exp.subDetailName || l3.name || '미지정').trim(); // 공백 제거 및 trim 추가
+             const name = (exp.subDetailName || l3.name || '기타 상세').trim();
              if (!l3Map[name]) {
                l3Map[name] = { id: `virtual-l3-${l2.id}-${name}`, name: name, level: 3, budgetAmount: 0, totalUsed: BigInt(0), totalExpected: BigInt(0), order: 99 };
              }
@@ -78,19 +78,21 @@ export async function GET() {
           });
         });
 
-        // 3. 가공된 L3 리스트 생성 및 L2 예산 합산
+        // 3. 가공된 L3 리스트 생성
         const processedL3 = Object.values(l3Map).map(item => ({
           ...item,
           totalUsed: Number(item.totalUsed),
           totalExpected: Number(item.totalExpected),
+          // 개별 L3 잔액/사용률은 부가 정보
           balance: item.budgetAmount - Number(item.totalUsed + item.totalExpected),
           usageRate: item.budgetAmount > 0 ? parseFloat(((Number(item.totalUsed + item.totalExpected) / item.budgetAmount) * 100).toFixed(2)) : 0
         })).sort((a, b) => a.order - b.order);
 
-        // L2 예산은 본인 예산 + 모든 하위 세세목 예산의 합
-        const l2Budget = Number(l2.budgetAmount) + processedL3.reduce((sum, c) => sum + c.budgetAmount, 0);
+        // L2 레벨 집계 (L2 자체가 예산 보유 주체)
+        const l2Budget = Number(l2.budgetAmount);
         const l2Used = processedL3.reduce((sum, c) => sum + c.totalUsed, 0);
         const l2Expected = processedL3.reduce((sum, c) => sum + c.totalExpected, 0);
+        const l2Balance = l2Budget - l2Used - l2Expected;
         const l2UsageRate = l2Budget > 0 ? ((l2Used + l2Expected) / l2Budget) * 100 : 0;
 
         return {
@@ -98,7 +100,7 @@ export async function GET() {
           budgetAmount: l2Budget,
           totalUsed: l2Used,
           totalExpected: l2Expected,
-          balance: l2Budget - l2Used - l2Expected,
+          balance: l2Balance,
           usageRate: parseFloat(l2UsageRate.toFixed(2)),
           children: processedL3
         };

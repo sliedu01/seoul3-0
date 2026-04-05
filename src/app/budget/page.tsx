@@ -382,14 +382,14 @@ export default function BudgetPage() {
           <table className="w-full text-sm text-left border-collapse min-w-[1000px]">
             <thead className="sticky top-0 bg-white shadow-sm z-10 text-slate-500">
               <tr className="uppercase text-[11px] font-black tracking-tighter bg-slate-100/80">
-                <th className="px-4 py-3 min-w-[120px]">비목(L1)</th>
-                <th className="px-4 py-3 border-l border-slate-200 min-w-[150px]">관리세목(L2)</th>
-                <th className="px-4 py-3 border-l border-slate-200 min-w-[200px]">세세목(L3)</th>
-                <th className="px-4 py-3 border-l border-slate-200 text-right text-blue-700">배정예산</th>
+                <th className="px-4 py-3 min-w-[100px]">비목(L1)</th>
+                <th className="px-4 py-3 border-l border-slate-200 min-w-[140px]">관리세목(L2)</th>
+                <th className="px-4 py-3 border-l border-slate-200 text-right text-indigo-700 min-w-[140px]">배정예산(L2)</th>
+                <th className="px-4 py-3 border-l border-slate-200 min-w-[180px]">세세목(L3)</th>
                 <th className="px-4 py-3 text-right">사용액</th>
-                <th className="px-4 py-3 text-right text-orange-600">사용예정액(미정)</th>
-                <th className="px-4 py-3 text-right">잔액</th>
-                <th className="px-4 py-3 text-center border-l border-slate-200">사용률</th>
+                <th className="px-4 py-3 text-right text-orange-600">사용예정액</th>
+                <th className="px-4 py-3 text-right font-black text-slate-800 border-l border-slate-200">잔액(L2)</th>
+                <th className="px-4 py-3 text-center border-l border-slate-200">사용률(L2)</th>
               </tr>
             </thead>
             <tbody>
@@ -400,124 +400,120 @@ export default function BudgetPage() {
 
                  return (
                    <React.Fragment key={l1.id}>
-                     {l1Rows > 0 ? (
-                       l2List.length > 0 ? (
-                         l2List.map((l2: any, i2: number) => {
-                           const l3List = l2.children || [];
-                           const l2Rows = Math.max(l3List.length, 1);
+                     {l2List.length > 0 ? (
+                       l2List.map((l2: any, i2: number) => {
+                         const l3List = l2.children || [];
+                         const l2Rows = Math.max(l3List.length, 1);
 
-                           return (
-                             <React.Fragment key={l2.id}>
-                               {l2Rows > 0 ? (
-                                 l3List.length > 0 ? (
-                                   l3List.map((l3: any, i3: number) => (
-                                     <tr 
-                                       key={l3.id} 
-                                       onClick={() => setSelectedCategoryId(l3.id === selectedCategoryId ? null : l3.id)}
-                                       className={`cursor-pointer transition-colors border-b border-slate-50
-                                         ${l3.id === selectedCategoryId ? 'bg-blue-50/50 outline outline-1 outline-blue-200 z-10 relative' : 'hover:bg-slate-50'}`}
-                                     >
-                                       {i2 === 0 && i3 === 0 && (
-                                         <td rowSpan={l1Rows} className="px-4 py-3 font-black text-slate-800 bg-white border-r border-slate-100 align-top">
-                                           {l1.name}
-                                         </td>
-                                       )}
-                                       {i3 === 0 && (
-                                         <td rowSpan={l2Rows} className="px-4 py-3 border-l border-slate-100 font-bold text-slate-600 bg-slate-50/30 align-top">
-                                           {l2.name}
-                                         </td>
-                                       )}
-                                       <td className="px-4 py-3 border-l border-slate-100 font-bold text-slate-700">
-                                         {l3.name}
+                         return (
+                           <React.Fragment key={l2.id}>
+                             {l3List.length > 0 ? (
+                               l3List.map((l3: any, i3: number) => (
+                                 <tr 
+                                   key={l3.id} 
+                                   onClick={() => setSelectedCategoryId(l3.id === selectedCategoryId ? null : l3.id)}
+                                   className={`cursor-pointer transition-colors border-b border-slate-50
+                                     ${l3.id === selectedCategoryId ? 'bg-blue-50/50 outline outline-1 outline-blue-200 z-10 relative' : 'hover:bg-slate-50'}`}
+                                 >
+                                   {i2 === 0 && i3 === 0 && (
+                                     <td rowSpan={l1Rows} className="px-4 py-3 font-black text-slate-800 bg-white border-r border-slate-100 align-top text-center">
+                                       {l1.name}
+                                     </td>
+                                   )}
+                                   {i3 === 0 && (
+                                     <>
+                                       <td rowSpan={l2Rows} className="px-4 py-3 border-l border-slate-100 font-bold text-slate-600 bg-slate-50/20 align-top">
+                                         {l2.name}
                                        </td>
-                                       <td className="px-4 py-3 text-right font-black border-l border-slate-100 text-slate-400 text-xs text-right">
-                                         {l3.budgetAmount > 0 ? l3.budgetAmount.toLocaleString() + '원' : '-'}
+                                       <td rowSpan={l2Rows} className="px-4 py-3 text-right font-black border-l border-slate-100 text-indigo-700 bg-indigo-50/10 align-top">
+                                         {l2.budgetAmount > 0 ? l2.budgetAmount.toLocaleString() + '원' : '-'}
                                        </td>
-                                       <td className="px-4 py-3 text-right font-bold text-slate-600">
-                                         {l3.totalUsed > 0 ? l3.totalUsed.toLocaleString() : '-'}
+                                     </>
+                                   )}
+                                   <td className="px-4 py-3 border-l border-slate-100 font-bold text-slate-500 italic">
+                                     {l3.name}
+                                   </td>
+                                   <td className="px-4 py-3 text-right font-bold text-slate-700">
+                                     {l3.totalUsed > 0 ? l3.totalUsed.toLocaleString() : '-'}
+                                   </td>
+                                   <td className="px-4 py-3 text-right font-bold text-orange-500">
+                                     {l3.totalExpected > 0 ? l3.totalExpected.toLocaleString() : '-'}
+                                   </td>
+                                   {i3 === 0 && (
+                                     <>
+                                       <td rowSpan={l2Rows} className="px-4 py-3 text-right font-black text-slate-900 border-l border-slate-200 bg-slate-50/10 align-top">
+                                         {l2.balance.toLocaleString()}원
                                        </td>
-                                       <td className="px-4 py-3 text-right font-bold text-orange-500">
-                                         {l3.totalExpected > 0 ? l3.totalExpected.toLocaleString() : '-'}
-                                       </td>
-                                       <td className="px-4 py-3 text-right font-black text-slate-700">
-                                         {l3.balance.toLocaleString()}원
-                                       </td>
-                                       <td className="px-4 py-3 border-l border-slate-100">
-                                          <div className="flex items-center justify-between">
-                                            <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden mr-2">
-                                               <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(l3.usageRate, 100)}%` }}></div>
+                                       <td rowSpan={l2Rows} className="px-4 py-3 border-l border-slate-100 align-top">
+                                          <div className="flex flex-col items-center justify-center h-full min-h-[30px]">
+                                            <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden mb-1">
+                                               <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(l2.usageRate, 100)}%` }}></div>
                                             </div>
-                                            <span className="font-black text-[10px] text-slate-600">{l3.usageRate}%</span>
+                                            <span className="font-black text-[10px] text-slate-600">{l2.usageRate}%</span>
                                           </div>
                                        </td>
-                                     </tr>
-                                   ))
-                                 ) : (
-                                   /* L2만 있고 L3가 없는 경우 (가상 행) */
-                                   <tr className="hover:bg-slate-50 border-b border-slate-100">
-                                     {i2 === 0 && (
-                                       <td rowSpan={l1Rows} className="px-4 py-3 font-black text-slate-800 bg-white border-r border-slate-100 align-top">
-                                         {l1.name}
-                                       </td>
-                                     )}
-                                     <td className="px-4 py-3 border-l border-slate-100 font-bold text-slate-600 bg-slate-50/30 align-top">
-                                       {l2.name}
-                                     </td>
-                                     <td className="px-4 py-3 border-l border-slate-100 text-slate-300 italic">상세 내역 없음</td>
-                                     <td className="px-4 py-3 text-right font-black border-l border-slate-100 text-slate-400 text-xs">
-                                       {l2.budgetAmount > 0 ? l2.budgetAmount.toLocaleString() + '원' : '-'}
-                                     </td>
-                                     <td className="px-4 py-3 text-right font-bold text-slate-600">-</td>
-                                     <td className="px-4 py-3 text-right font-bold text-orange-500">-</td>
-                                     <td className="px-4 py-3 text-right font-black text-slate-700">{l2.balance.toLocaleString()}원</td>
-                                     <td className="px-4 py-3 border-l border-slate-100">
-                                        <div className="flex items-center justify-between">
-                                          <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden mr-2">
-                                             <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(l2.usageRate, 100)}%` }}></div>
-                                          </div>
-                                          <span className="font-black text-[10px] text-slate-600">{l2.usageRate}%</span>
-                                        </div>
-                                     </td>
-                                   </tr>
-                                 )
-                               ) : null}
-                               {/* L2 (관리세목) 소계 - L2 클릭 필터링 기능 추가 가능 */}
-                               <tr className="bg-slate-900 border-b border-slate-200">
-                                 <td className="bg-white border-r border-slate-100"></td>
-                                 <td colSpan={2} className="px-4 py-2 text-right font-bold text-slate-400 text-[10px] tracking-wider uppercase">[{l2.name} 합계]</td>
-                                 <td className="px-4 py-2 text-right font-black text-white text-[11px]">{l2.budgetAmount.toLocaleString()}원</td>
-                                 <td className="px-4 py-2 text-right font-black text-blue-400 bg-blue-900/20">{l2.totalUsed.toLocaleString()}</td>
-                                 <td className="px-4 py-2 text-right font-black text-orange-400">{l2.totalExpected.toLocaleString()}</td>
-                                 <td className="px-4 py-2 text-right font-black text-white">{l2.balance.toLocaleString()}원</td>
-                                 <td className="px-4 py-2 font-black text-center text-blue-400 text-[11px] border-l border-slate-700">{l2.usageRate}%</td>
+                                     </>
+                                   )}
+                                 </tr>
+                               ))
+                             ) : (
+                               /* L2만 있고 L3가 없는 경우 (가상 상세 행) */
+                               <tr className="hover:bg-slate-50 border-b border-slate-100">
+                                 {i2 === 0 && (
+                                   <td rowSpan={l1Rows} className="px-4 py-3 font-black text-slate-800 bg-white border-r border-slate-100 align-top text-center">
+                                     {l1.name}
+                                   </td>
+                                 )}
+                                 <td className="px-4 py-3 border-l border-slate-100 font-bold text-slate-600 bg-slate-50/20 align-top">
+                                   {l2.name}
+                                 </td>
+                                 <td className="px-4 py-3 text-right font-black border-l border-slate-100 text-indigo-700 bg-indigo-50/10 align-top">
+                                   {l2.budgetAmount > 0 ? l2.budgetAmount.toLocaleString() + '원' : '-'}
+                                 </td>
+                                 <td className="px-4 py-3 border-l border-slate-100 text-slate-300 italic">-</td>
+                                 <td className="px-4 py-3 text-right text-slate-400">-</td>
+                                 <td className="px-4 py-3 text-right text-slate-400">-</td>
+                                 <td className="px-4 py-3 text-right font-black text-slate-900 border-l border-slate-200 bg-slate-50/10 align-top">
+                                   {l2.balance.toLocaleString()}원
+                                 </td>
+                                 <td className="px-4 py-3 border-l border-slate-100 align-top">
+                                    <div className="flex flex-col items-center justify-center">
+                                      <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden mb-1">
+                                         <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(l2.usageRate, 100)}%` }}></div>
+                                      </div>
+                                      <span className="font-black text-[10px] text-slate-600">{l2.usageRate}%</span>
+                                    </div>
+                                 </td>
                                </tr>
-                             </React.Fragment>
-                           );
-                         })
-                       ) : (
-                         /* L1만 있고 L2가 아예 없는 경우 (일반관리비, 이윤 등) */
-                         <tr className="bg-blue-50/20 border-b border-slate-200">
-                           <td className="px-4 py-4 font-black text-slate-900 bg-white border-r border-slate-100">{l1.name}</td>
-                           <td colSpan={2} className="px-4 py-4 text-center text-slate-400 italic text-xs">하위 세목 없이 직접 집계되는 항목입니다.</td>
-                           <td className="px-4 py-4 text-right font-black border-l border-slate-100 text-blue-700 bg-blue-50/50">{l1.budgetAmount.toLocaleString()}원</td>
-                           <td className="px-4 py-4 text-right font-bold text-slate-600">{l1.totalUsed.toLocaleString()}</td>
-                           <td className="px-4 py-4 text-right font-bold text-orange-500">{l1.totalExpected.toLocaleString()}</td>
-                           <td className="px-4 py-4 text-right font-black text-slate-900">{l1.balance.toLocaleString()}원</td>
-                           <td className="px-4 py-4 font-black text-center text-blue-600 border-l border-slate-100">{l1.usageRate}%</td>
-                         </tr>
-                       )
-                     ) : null}
-                     {/* L1 (비목) 단위 총합계 - 하위 항목이 있을 때만 표시 (중복 방지) */}
-                     {l2List.length > 0 && (
-                        <tr className="bg-slate-50/80 border-b-4 border-slate-300">
-                          <td colSpan={3} className="px-4 py-3 font-black text-slate-600 text-center tracking-widest text-xs">
+                             )}
+                           </React.Fragment>
+                         );
+                       })
+                     ) : (
+                       /* 하위가 아예 없는 비목 (일반관리비 등) */
+                       <tr className="bg-blue-50/10 border-b border-slate-200">
+                         <td className="px-4 py-4 font-black text-slate-900 bg-white border-r border-slate-100 text-center">{l1.name}</td>
+                         <td className="px-4 py-4 font-bold text-slate-400 italic text-center" colSpan={1}>-</td>
+                         <td className="px-4 py-4 text-right font-black border-l border-slate-100 text-indigo-700 bg-indigo-50/10">{l1.budgetAmount.toLocaleString()}원</td>
+                         <td className="px-4 py-4 font-bold text-slate-400 italic text-center" colSpan={1}>-</td>
+                         <td className="px-4 py-4 text-right font-bold text-slate-600">{l1.totalUsed.toLocaleString()}</td>
+                         <td className="px-4 py-4 text-right font-bold text-orange-500">{l1.totalExpected.toLocaleString()}</td>
+                         <td className="px-4 py-4 text-right font-black text-slate-900 border-l border-slate-200">{l1.balance.toLocaleString()}원</td>
+                         <td className="px-4 py-4 font-black text-center text-blue-600 border-l border-slate-100">{l1.usageRate}%</td>
+                       </tr>
+                     )}
+                     {/* L1 (비목) 단위 총합계 - 필요 시 주석 해제하여 사용 (현재는 가독성을 위해 생략 가능) */}
+                     {l2List.length > 1 && (
+                        <tr className="bg-slate-100/50 border-b-2 border-slate-300">
+                          <td colSpan={2} className="px-4 py-2 font-black text-slate-500 text-right text-[10px] tracking-widest bg-white pr-4">
                             [{l1.name} 총계]
                           </td>
-                          <td className="px-4 py-3 text-right font-black text-slate-800 border-l border-slate-100">{l1.budgetAmount.toLocaleString()}원</td>
-                          <td className="px-4 py-3 text-right font-black text-blue-600">{l1.totalUsed.toLocaleString()}</td>
-                          <td className="px-4 py-3 text-right font-black text-orange-500">{l1.totalExpected.toLocaleString()}</td>
-                          <td className="px-4 py-3 text-right font-black text-slate-800">{l1.balance.toLocaleString()}원</td>
-                          <td className="px-4 py-3 font-black text-center text-blue-600 text-xs border-l border-slate-100">{l1.usageRate}%</td>
+                          <td className="px-4 py-2 text-right font-black text-slate-900 border-l border-slate-100 bg-slate-50">{l1.budgetAmount.toLocaleString()}원</td>
+                          <td className="bg-slate-50 border-l border-slate-100"></td>
+                          <td className="px-4 py-2 text-right font-black text-blue-600 bg-slate-50">{l1.totalUsed.toLocaleString()}</td>
+                          <td className="px-4 py-2 text-right font-black text-orange-500 bg-slate-50">{l1.totalExpected.toLocaleString()}</td>
+                          <td className="px-4 py-2 text-right font-black text-slate-900 border-l border-slate-200 bg-slate-50">{l1.balance.toLocaleString()}원</td>
+                          <td className="px-4 py-2 font-black text-center text-blue-600 text-[10px] border-l border-slate-100 bg-slate-50">{l1.usageRate}%</td>
                         </tr>
                      )}
                    </React.Fragment>
