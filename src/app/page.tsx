@@ -55,7 +55,7 @@ export default function Dashboard() {
     )
   }
 
-  const { stats, schedules } = data || { stats: {}, schedules: { lastWeek: [], thisWeek: [], nextWeek: [] } }
+  const { stats, schedules } = data || { stats: {}, schedules: { twoWeeksAgo: [], lastWeek: [], thisWeek: [], nextWeek: [] } }
 
   return (
     <div className="space-y-10 animate-in fade-in duration-500 pb-20 max-w-7xl mx-auto">
@@ -136,6 +136,20 @@ export default function Dashboard() {
             </div>
           </StatsCard>
         </div>
+      </section>
+
+      {/* Row 1.5: 2 Weeks Ago */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-slate-400 rounded-lg text-white">
+              <History className="w-5 h-5" />
+            </div>
+            <h2 className="text-2xl font-black text-slate-800 tracking-tight">2주전 실적</h2>
+          </div>
+          <span className="text-xs font-bold text-slate-400">종료된 사업 및 수료 현황</span>
+        </div>
+        <ScheduleRow sessions={schedules.twoWeeksAgo || []} color="slate" />
       </section>
 
       {/* Row 2: Last Week */}

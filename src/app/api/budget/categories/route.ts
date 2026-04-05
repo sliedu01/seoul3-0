@@ -46,9 +46,10 @@ export async function GET() {
             id: l3.id,
             name: l3.name,
             level: 3,
-            budgetAmount: Number(l3.budgetAmount), // L3에 예산이 있을 경우 합산용
+            budgetAmount: Number(l3.budgetAmount),
             totalUsed: BigInt(0),
             totalExpected: BigInt(0),
+            earliestDate: null as string | null,
             order: l3.order
           };
         });
@@ -58,11 +59,16 @@ export async function GET() {
         l2.expenditures.forEach((exp: any) => {
           const name = (exp.subDetailName || '기타 상세').trim();
           if (!l3Map[name]) {
-            l3Map[name] = { id: `virtual-l3-${l2.id}-${name}`, name: name, level: 3, budgetAmount: 0, totalUsed: BigInt(0), totalExpected: BigInt(0), order: 99 };
+            l3Map[name] = { id: `virtual-l3-${l2.id}-${name}`, name: name, level: 3, budgetAmount: 0, totalUsed: BigInt(0), totalExpected: BigInt(0), earliestDate: null, order: 99 };
           }
           const amount = BigInt(exp.totalAmount || 0);
-          if (exp.executionDate) l3Map[name].totalUsed += amount;
-          else l3Map[name].totalExpected += amount;
+          if (exp.executionDate) {
+            l3Map[name].totalUsed += amount;
+            const dateStr = new Date(exp.executionDate).toISOString();
+            if (!l3Map[name].earliestDate || dateStr < l3Map[name].earliestDate) {
+              l3Map[name].earliestDate = dateStr;
+            }
+          } else l3Map[name].totalExpected += amount;
         });
 
         // L3 하위에 달린 집행 내역 처리
@@ -70,11 +76,16 @@ export async function GET() {
           l3.expenditures.forEach((exp: any) => {
              const name = (exp.subDetailName || l3.name || '기타 상세').trim();
              if (!l3Map[name]) {
-               l3Map[name] = { id: `virtual-l3-${l2.id}-${name}`, name: name, level: 3, budgetAmount: 0, totalUsed: BigInt(0), totalExpected: BigInt(0), order: 99 };
+               l3Map[name] = { id: `virtual-l3-${l2.id}-${name}`, name: name, level: 3, budgetAmount: 0, totalUsed: BigInt(0), totalExpected: BigInt(0), earliestDate: null, order: 99 };
              }
              const amount = BigInt(exp.totalAmount || 0);
-             if (exp.executionDate) l3Map[name].totalUsed += amount;
-             else l3Map[name].totalExpected += amount;
+             if (exp.executionDate) {
+               l3Map[name].totalUsed += amount;
+               const dateStr = new Date(exp.executionDate).toISOString();
+               if (!l3Map[name].earliestDate || dateStr < l3Map[name].earliestDate) {
+                 l3Map[name].earliestDate = dateStr;
+               }
+             } else l3Map[name].totalExpected += amount;
           });
         });
 
@@ -83,10 +94,14 @@ export async function GET() {
           ...item,
           totalUsed: Number(item.totalUsed),
           totalExpected: Number(item.totalExpected),
-          // 개별 L3 잔액/사용률은 부가 정보
           balance: item.budgetAmount - Number(item.totalUsed + item.totalExpected),
           usageRate: item.budgetAmount > 0 ? parseFloat(((Number(item.totalUsed + item.totalExpected) / item.budgetAmount) * 100).toFixed(2)) : 0
-        })).sort((a, b) => a.order - b.order);
+        })).sort((a, b) => {
+          if (a.earliestDate && b.earliestDate) return a.earliestDate.localeCompare(b.earliestDate);
+          if (a.earliestDate) return -1;
+          if (b.earliestDate) return 1;
+          return a.order - b.order;
+        });
 
         // L2 레벨 집계 (L2 자체가 예산 보유 주체)
         const l2Budget = Number(l2.budgetAmount);

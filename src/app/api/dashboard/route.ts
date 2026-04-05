@@ -4,13 +4,17 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
   try {
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    // KST 기준으로 현재 날짜 산출 (UTC + 9시간)
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const kst = new Date(utc + (3600000 * 9));
+    const today = new Date(kst.getFullYear(), kst.getMonth(), kst.getDate());
     
     // Calculate Week ranges (Monday to Sunday)
     const getMonday = (d: Date) => {
-      const day = d.getDay();
-      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-      return new Date(d.setDate(diff)).setHours(0, 0, 0, 0);
+      const date = new Date(d); // 기존 Date 객체 변형 방지
+      const day = date.getDay();
+      const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+      return new Date(date.setDate(diff)).setHours(0, 0, 0, 0);
     };
 
     const thisMonday = new Date(getMonday(new Date(today)));
@@ -23,6 +27,12 @@ export async function GET() {
     const lastSunday = new Date(lastMonday);
     lastSunday.setDate(lastMonday.getDate() + 6);
     lastSunday.setHours(23, 59, 59, 999);
+
+    const twoWeeksAgoMonday = new Date(thisMonday);
+    twoWeeksAgoMonday.setDate(thisMonday.getDate() - 14);
+    const twoWeeksAgoSunday = new Date(twoWeeksAgoMonday);
+    twoWeeksAgoSunday.setDate(twoWeeksAgoMonday.getDate() + 6);
+    twoWeeksAgoSunday.setHours(23, 59, 59, 999);
 
     const nextMonday = new Date(thisMonday);
     nextMonday.setDate(thisMonday.getDate() + 7);
@@ -109,10 +119,12 @@ export async function GET() {
       });
     };
 
-    const [lastWeekSessions, thisWeekSessions, nextWeekSessions, lastWeekM, thisWeekM, nextWeekM] = await Promise.all([
+    const [twoWeeksAgoSessions, lastWeekSessions, thisWeekSessions, nextWeekSessions, twoWeeksAgoM, lastWeekM, thisWeekM, nextWeekM] = await Promise.all([
+      fetchSessions(twoWeeksAgoMonday, twoWeeksAgoSunday),
       fetchSessions(lastMonday, lastSunday),
       fetchSessions(thisMonday, thisSunday),
       fetchSessions(nextMonday, nextSunday),
+      fetchMeetings(twoWeeksAgoMonday, twoWeeksAgoSunday),
       fetchMeetings(lastMonday, lastSunday),
       fetchMeetings(thisMonday, thisSunday),
       fetchMeetings(nextMonday, nextSunday)
@@ -129,6 +141,7 @@ export async function GET() {
       partner: { name: m.title || "회의" }
     }));
 
+    const twoWeeksAgo = [...twoWeeksAgoSessions, ...formatMeetings(twoWeeksAgoM)].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     const lastWeek = [...lastWeekSessions, ...formatMeetings(lastWeekM)].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     const thisWeek = [...thisWeekSessions, ...formatMeetings(thisWeekM)].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     const nextWeek = [...nextWeekSessions, ...formatMeetings(nextWeekM)].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -143,6 +156,7 @@ export async function GET() {
         netGrowth: parseFloat(netGrowth.toFixed(1))
       },
       schedules: {
+        twoWeeksAgo,
         lastWeek,
         thisWeek,
         nextWeek
