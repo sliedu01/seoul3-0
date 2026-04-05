@@ -6,41 +6,37 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const now = new Date();
-    // KST 기준으로 현재 날짜 산출 (UTC + 9시간)
-    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
-    const kst = new Date(utc + (3600000 * 9));
-    const today = new Date(kst.getFullYear(), kst.getMonth(), kst.getDate());
-    
-    // Calculate Week ranges (Monday to Sunday)
-    const getMonday = (d: Date) => {
-      const date = new Date(d); // 기존 Date 객체 변형 방지
-      const day = date.getDay();
-      const diff = date.getDate() - day + (day === 0 ? -6 : 1);
-      return new Date(date.setDate(diff)).setHours(0, 0, 0, 0);
-    };
+    // KST 기준 오늘 날짜 계산 (UTC+9) — 서버 TZ와 무관하게 동작
+    const kstMs = now.getTime() + (9 * 3600000);
+    const kstDate = new Date(kstMs);
+    const todayYear = kstDate.getUTCFullYear();
+    const todayMonth = kstDate.getUTCMonth();
+    const todayDay = kstDate.getUTCDate();
+    const todayDow = kstDate.getUTCDay(); // 0=Sun, 1=Mon, ...
 
-    const thisMonday = new Date(getMonday(new Date(today)));
-    const thisSunday = new Date(thisMonday);
-    thisSunday.setDate(thisMonday.getDate() + 6);
-    thisSunday.setHours(23, 59, 59, 999);
+    // 이번주 월요일 (UTC midnight 기준) — DB 날짜가 UTC midnight으로 저장됨
+    const mondayOffset = todayDow === 0 ? -6 : 1 - todayDow;
+    const thisMondayMs = Date.UTC(todayYear, todayMonth, todayDay + mondayOffset);
 
-    const lastMonday = new Date(thisMonday);
-    lastMonday.setDate(thisMonday.getDate() - 7);
-    const lastSunday = new Date(lastMonday);
-    lastSunday.setDate(lastMonday.getDate() + 6);
-    lastSunday.setHours(23, 59, 59, 999);
+    // 각 주간 범위 계산 (월요일 00:00 UTC ~ 일요일 23:59:59.999 UTC)
+    const makeWeekRange = (mondayMs: number) => ({
+      start: new Date(mondayMs),
+      end: new Date(mondayMs + 6 * 86400000 + 86400000 - 1) // 일요일 23:59:59.999
+    });
 
-    const twoWeeksAgoMonday = new Date(thisMonday);
-    twoWeeksAgoMonday.setDate(thisMonday.getDate() - 14);
-    const twoWeeksAgoSunday = new Date(twoWeeksAgoMonday);
-    twoWeeksAgoSunday.setDate(twoWeeksAgoMonday.getDate() + 6);
-    twoWeeksAgoSunday.setHours(23, 59, 59, 999);
+    const twoWeeksAgoRange = makeWeekRange(thisMondayMs - 14 * 86400000);
+    const lastWeekRange = makeWeekRange(thisMondayMs - 7 * 86400000);
+    const thisWeekRange = makeWeekRange(thisMondayMs);
+    const nextWeekRange = makeWeekRange(thisMondayMs + 7 * 86400000);
 
-    const nextMonday = new Date(thisMonday);
-    nextMonday.setDate(thisMonday.getDate() + 7);
-    const nextSunday = new Date(nextMonday);
-    nextSunday.setDate(nextMonday.getDate() + 6);
-    nextSunday.setHours(23, 59, 59, 999);
+    const twoWeeksAgoMonday = twoWeeksAgoRange.start;
+    const twoWeeksAgoSunday = twoWeeksAgoRange.end;
+    const lastMonday = lastWeekRange.start;
+    const lastSunday = lastWeekRange.end;
+    const thisMonday = thisWeekRange.start;
+    const thisSunday = thisWeekRange.end;
+    const nextMonday = nextWeekRange.start;
+    const nextSunday = nextWeekRange.end;
 
     // 1. Stats
     const programCount = await prisma.program.count();
