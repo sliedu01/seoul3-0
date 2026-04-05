@@ -1,0 +1,40 @@
+
+> temp_app@0.1.0 build
+> prisma generate && next build
+
+Environment variables loaded from .env
+Prisma schema loaded from prisma\schema.prisma
+
+✔ Generated Prisma Client (v6.19.2) to .\node_modules\@prisma\client in 532ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Tip: Want to turn off tips and other hints? https://pris.ly/tip-4-nohints
+
+   ▲ Next.js 15.1.12
+   - Environments: .env
+
+   Creating an optimized production build ...
+Failed to compile.
+
+./src/app/budget/page.tsx
+Error:   [31mx[0m Unexpected token `div`. Expected jsx identifier
+     ,-[[36;1;4mC:\서울3.0\src\app\budget\page.tsx[0m:236:1]
+ [2m233[0m |   if (loading) return <div className="p-10 text-center font-bold text-slate-500 animate-pulse">예산 데이터를 불러오는 중...</div>;
+ [2m234[0m | 
+ [2m235[0m |   return (
+ [2m236[0m |     <div className="max-w-[1600px] mx-auto pb-20 space-y-6 animate-in fade-in duration-500">
+     : [35;1m     ^^^[0m
+ [2m237[0m |       <div className="flex justify-between items-end border-b border-slate-200 pb-4">
+ [2m238[0m |         <div>
+ [2m238[0m |           <h1 className="text-3xl font-black tracking-tight text-slate-900 flex items-center gap-3">
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/app/budget/page.tsx
+
+
+> Build failed because of webpack errors

@@ -3,6 +3,27 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+export async function PUT(req: Request, { params }: { params: { id: string } }) {
+  try {
+    const { id } = await params;
+    const body = await req.json();
+    const { name, budgetAmount } = body;
+
+    const updated = await prisma.budgetCategory.update({
+      where: { id },
+      data: {
+        name,
+        budgetAmount: budgetAmount !== undefined ? Number(budgetAmount) : undefined,
+      }
+    });
+
+    return NextResponse.json(updated);
+  } catch (error) {
+    console.error('Budget Category Update Error:', error);
+    return NextResponse.json({ error: '서버 오류로 항목을 수정하지 못했습니다.' }, { status: 500 });
+  }
+}
+
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
   try {
     const { id } = await params;
