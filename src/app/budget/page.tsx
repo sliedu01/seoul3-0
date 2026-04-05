@@ -48,6 +48,10 @@ export default function BudgetPage() {
   const [editCatBudget, setEditCatBudget] = useState('');
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
 
+  // 4. 집행 내역(Expenditure) 인라인 수정 상태
+  const [editingExpId, setEditingExpId] = useState<string | null>(null);
+  const [editSubDetailName, setEditSubDetailName] = useState('');
+
   // 데이터 로드
   const fetchData = async () => {
     setLoading(true);
@@ -176,6 +180,25 @@ export default function BudgetPage() {
       fetchData();
     } catch (e) {
       alert("삭제 실패");
+    }
+  };
+
+  const handleUpdateSubDetail = async (id: string) => {
+    if (!editSubDetailName) return alert("내용을 입력해주세요.");
+    try {
+      const res = await fetch(`/api/budget/expenditures/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subDetailName: editSubDetailName })
+      });
+      if (res.ok) {
+        setEditingExpId(null);
+        fetchData();
+      } else {
+        alert("수정 실패");
+      }
+    } catch (e) {
+      alert("서버 오류");
     }
   };
 

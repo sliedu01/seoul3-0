@@ -27,6 +27,7 @@ export async function PATCH(req: Request, context: any) {
       where: { id },
       data: {
         categoryId: data.categoryId,
+        subDetailName: data.subDetailName, // 추가
         executionDate: data.executionDate === null ? null : (data.executionDate ? new Date(data.executionDate) : undefined),
         purpose: data.purpose,
         supplyAmount,
