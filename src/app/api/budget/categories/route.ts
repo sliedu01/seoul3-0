@@ -56,11 +56,11 @@ export async function GET() {
         // 2. 집행 내역(Expenditures)을 세세목에 배분
         // L2에 직접 달린 집행 내역 처리
         l2.expenditures.forEach((exp: any) => {
-          const name = exp.subDetailName || '미지정';
+          const name = (exp.subDetailName || '미지정').trim(); // 공백 제거 추가
           if (!l3Map[name]) {
             l3Map[name] = { id: `virtual-l3-${l2.id}-${name}`, name: name, level: 3, budgetAmount: 0, totalUsed: BigInt(0), totalExpected: BigInt(0), order: 99 };
           }
-          const amount = BigInt(exp.totalAmount || 0); // 형변환 보강
+          const amount = BigInt(exp.totalAmount || 0);
           if (exp.executionDate) l3Map[name].totalUsed += amount;
           else l3Map[name].totalExpected += amount;
         });
@@ -68,11 +68,11 @@ export async function GET() {
         // L3 하위에 달린 집행 내역 처리
         l2.children.forEach(l3 => {
           l3.expenditures.forEach((exp: any) => {
-             const name = exp.subDetailName || l3.name || '미지정';
+             const name = (exp.subDetailName || l3.name || '미지정').trim(); // 공백 제거 및 trim 추가
              if (!l3Map[name]) {
                l3Map[name] = { id: `virtual-l3-${l2.id}-${name}`, name: name, level: 3, budgetAmount: 0, totalUsed: BigInt(0), totalExpected: BigInt(0), order: 99 };
              }
-             const amount = BigInt(exp.totalAmount || 0); // 형변환 보강
+             const amount = BigInt(exp.totalAmount || 0);
              if (exp.executionDate) l3Map[name].totalUsed += amount;
              else l3Map[name].totalExpected += amount;
           });

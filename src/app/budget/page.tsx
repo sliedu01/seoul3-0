@@ -953,23 +953,23 @@ export default function BudgetPage() {
                         </div>
                      </td>
                      <td className="px-3 py-3">
-                        <div className="flex justify-center items-center gap-1.5">
+                        <div className="flex justify-center items-center gap-1.5 min-w-[120px]">
                           {editingExpId === exp.id ? (
                             <>
-                              <button onClick={() => handleUpdateSubDetail(exp.id)} className="w-8 h-8 flex items-center justify-center bg-blue-600 text-white rounded-lg shadow-sm hover:bg-blue-700 transition-colors" title="저장">
-                                <CheckCircle2 className="w-4 h-4" />
+                              <button onClick={() => handleUpdateSubDetail(exp.id)} className="px-2.5 py-1.5 bg-blue-600 text-white rounded-lg shadow-sm hover:bg-blue-700 transition-colors flex items-center gap-1 text-[11px] font-black" title="저장">
+                                <CheckCircle2 className="w-3.5 h-3.5" /> 저장
                               </button>
-                              <button onClick={() => setEditingExpId(null)} className="w-8 h-8 flex items-center justify-center bg-slate-100 text-slate-500 rounded-lg hover:bg-slate-200 transition-colors" title="취소">
-                                <XIcon className="w-4 h-4" />
+                              <button onClick={() => setEditingExpId(null)} className="px-2.5 py-1.5 bg-slate-100 text-slate-500 rounded-lg hover:bg-slate-200 transition-colors flex items-center gap-1 text-[11px] font-bold" title="취소">
+                                <XIcon className="w-3.5 h-3.5" /> 취소
                               </button>
                             </>
                           ) : (
                             <>
-                              <button onClick={() => { setEditingExpId(exp.id); setEditSubDetailName(exp.subDetailName || ''); }} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="수정">
-                                <Edit className="w-4 h-4" />
+                              <button onClick={() => { setEditingExpId(exp.id); setEditSubDetailName(exp.subDetailName || ''); }} className="px-2.5 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors flex items-center gap-1 text-[11px] font-black border border-blue-100" title="수정">
+                                <Edit className="w-3.5 h-3.5" /> 수정
                               </button>
-                              <button onClick={()=>handleDelete(exp.id)} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="삭제">
-                                <Trash2 className="w-4 h-4" />
+                              <button onClick={()=>handleDelete(exp.id)} className="px-2.5 py-1.5 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition-colors flex items-center gap-1 text-[11px] font-black border border-red-100" title="삭제">
+                                <Trash2 className="w-3.5 h-3.5" /> 삭제
                               </button>
                             </>
                           )}
