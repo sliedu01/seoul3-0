@@ -132,3 +132,41 @@ export async function POST(req: Request) {
   }
 }
 
+export async function DELETE(req: Request) {
+  try {
+    const { ids } = await req.json();
+    if (!ids || !Array.isArray(ids)) {
+      return NextResponse.json({ error: '삭제할 항목 ID가 없습니다.' }, { status: 400 });
+    }
+
+    // 하위 항목이 있거나 집행 내역이 있는 항목이 있는지 사전 확인
+    const categoriesWithChildrenOrExpenditures = await prisma.budgetCategory.findMany({
+      where: {
+        id: { in: ids },
+        OR: [
+          { children: { some: {} } },
+          { expenditures: { some: {} } }
+        ]
+      },
+      select: { name: true }
+    });
+
+    if (categoriesWithChildrenOrExpenditures.length > 0) {
+      const names = categoriesWithChildrenOrExpenditures.map(c => c.name).join(', ');
+      return NextResponse.json({ 
+        error: `하위 항목이나 집행 내역이 포함된 항목(${names})이 있어 삭제할 수 없습니다. 개별적으로 먼저 정리해주세요.` 
+      }, { status: 400 });
+    }
+
+    const { count } = await prisma.budgetCategory.deleteMany({
+      where: { id: { in: ids } }
+    });
+
+    return NextResponse.json({ success: true, deletedCount: count });
+  } catch (error) {
+    console.error('Budget Category Bulk Delete Error:', error);
+    return NextResponse.json({ error: '서버 오류로 항목을 삭제하지 못했습니다.' }, { status: 500 });
+  }
+}
+
+

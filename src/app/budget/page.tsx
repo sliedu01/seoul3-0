@@ -41,10 +41,11 @@ export default function BudgetPage() {
   const [newCatBudget, setNewCatBudget] = useState('');
   const [newCatOrder, setNewCatOrder] = useState('1');
 
-  // 3. 항목/카테고리 수정 상태
+  // 3. 항목/카테고리 수정 및 선택 상태
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editCatName, setEditCatName] = useState('');
   const [editCatBudget, setEditCatBudget] = useState('');
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
 
   // 데이터 로드
   const fetchData = async () => {
@@ -257,6 +258,50 @@ export default function BudgetPage() {
     }
   };
 
+  const handleBulkDeleteCategory = async () => {
+    if (selectedCategoryIds.length === 0) return alert("삭제할 항목을 먼저 선택해주세요.");
+    if (!confirm(`선택한 ${selectedCategoryIds.length}개 항목을 삭제하시겠습니까?`)) return;
+    
+    try {
+      const res = await fetch('/api/budget/categories', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedCategoryIds })
+      });
+      const json = await res.json();
+      if (res.ok) {
+        alert(`${json.deletedCount}개 항목이 삭제되었습니다.`);
+        setSelectedCategoryIds([]);
+        fetchData();
+      } else {
+        alert(json.error || "삭제 실패");
+      }
+    } catch(e) {
+      alert("서버 연결 오류");
+    }
+  };
+
+  const toggleCategorySelection = (id: string) => {
+    setSelectedCategoryIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const currentLevelCategories = useMemo(() => {
+    if (settingsViewLevel === 1) return categories;
+    if (settingsViewLevel === 2) return categories.flatMap(l1 => l1.children || []);
+    if (settingsViewLevel === 3) return categories.flatMap(l1 => (l1.children || []).flatMap((l2: any) => l2.children || []));
+    return [];
+  }, [categories, settingsViewLevel]);
+
+  const handleSelectAllCategories = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelectedCategoryIds(currentLevelCategories.map((c: any) => c.id));
+    } else {
+      setSelectedCategoryIds([]);
+    }
+  };
+
 
   if (loading) return <div className="p-10 text-center font-bold text-slate-500 animate-pulse">예산 데이터를 불러오는 중...</div>;
 
@@ -390,41 +435,79 @@ export default function BudgetPage() {
         예산/정산 항목 관리
       </h2>
       <Card className="p-6 mb-12 border-indigo-200 shadow-md">
-         <div className="flex border-b border-slate-200 mb-4 bg-slate-50 p-1 rounded-lg w-fit">
-            {[1, 2, 3].map(lvl => (
-              <button key={lvl} onClick={() => {setSettingsViewLevel(lvl); setSettingParentId(null);}} className={`px-6 py-2 text-sm font-bold rounded-md transition ${settingsViewLevel === lvl ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:bg-slate-100'}`}>
-                {lvl===1 ? '1. 비목 관리' : lvl===2 ? '2. 관리세목 관리' : '3. 세세목 관리'}
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex border border-slate-200 bg-slate-50 p-1 rounded-lg w-fit">
+               {[1, 2, 3].map(lvl => (
+                 <button key={lvl} onClick={() => {setSettingsViewLevel(lvl); setSettingParentId(null); setSelectedCategoryIds([]);}} className={`px-6 py-2 text-sm font-bold rounded-md transition ${settingsViewLevel === lvl ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:bg-slate-100'}`}>
+                   {lvl===1 ? '1. 비목 관리' : lvl===2 ? '2. 관리세목 관리' : '3. 세세목 관리'}
+                 </button>
+               ))}
+            </div>
+            {selectedCategoryIds.length > 0 && (
+              <button 
+                onClick={handleBulkDeleteCategory}
+                className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg font-bold text-sm hover:bg-red-100 transition"
+              >
+                <Trash2 className="w-4 h-4" /> 선택 삭제 ({selectedCategoryIds.length})
               </button>
-            ))}
-         </div>
+            )}
+          </div>
 
-         <div className="flex gap-6">
+          <div className="flex gap-6">
             <div className="flex-1 overflow-y-auto max-h-[400px] border border-slate-200 rounded-lg custom-scrollbar">
               <table className="w-full text-sm">
-                <thead className="bg-slate-100/80 sticky top-0 text-slate-600 uppercase text-[11px] font-black tracking-wider">
-                  <tr><th className="p-3 text-left">항목명</th><th className="p-3 text-left">소속 상위항목</th><th className="p-3 text-right">기본예산</th><th className="p-3 text-center w-24">관리</th></tr>
+                <thead className="bg-slate-100/80 sticky top-0 text-slate-600 uppercase text-[11px] font-black tracking-wider z-10">
+                  <tr>
+                    <th className="p-3 text-center w-10">
+                      <input 
+                        type="checkbox" 
+                        onChange={handleSelectAllCategories}
+                        checked={currentLevelCategories.length > 0 && selectedCategoryIds.length === currentLevelCategories.length}
+                        className="w-4 h-4 rounded border-slate-300 transition cursor-pointer"
+                      />
+                    </th>
+                    <th className="p-3 text-left">항목명</th>
+                    <th className="p-3 text-left">소속 상위항목</th>
+                    <th className="p-3 text-right">기본예산</th>
+                    <th className="p-3 text-center w-40">관리</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {settingsViewLevel === 1 && categories.map(c => (
-                    <tr key={c.id} className="border-b border-slate-100">
-                      <td className="p-3 font-bold text-slate-800">
-                        {editingCategoryId === c.id ? <input className="w-full p-1 border rounded" value={editCatName} onChange={e=>setEditCatName(e.target.value)} /> : c.name}
+                    <tr key={c.id} className={`border-b border-slate-100 transition-colors ${selectedCategoryIds.includes(c.id) ? 'bg-blue-50/30' : 'hover:bg-slate-50/50'}`}>
+                      <td className="p-3 text-center">
+                        <input 
+                          type="checkbox" 
+                          checked={selectedCategoryIds.includes(c.id)} 
+                          onChange={() => toggleCategorySelection(c.id)}
+                          className="w-4 h-4 rounded border-slate-300 transition cursor-pointer"
+                        />
                       </td>
-                      <td className="p-3 text-slate-400">-</td>
-                      <td className="p-3 text-right font-black">
-                        {editingCategoryId === c.id ? <input type="number" className="w-full p-1 border rounded text-right" value={editCatBudget} onChange={e=>setEditCatBudget(e.target.value)} /> : c.budgetAmount.toLocaleString()}
+                      <td className="p-3 font-bold text-slate-800">
+                        {editingCategoryId === c.id ? <input className="w-full p-2 border-2 border-indigo-200 rounded bg-white shadow-sm font-bold text-slate-900" value={editCatName} onChange={e=>setEditCatName(e.target.value)} autoFocus /> : <span className="pl-1">{c.name}</span>}
+                      </td>
+                      <td className="p-3 text-slate-400 font-medium">-</td>
+                      <td className="p-3 text-right">
+                        {editingCategoryId === c.id ? (
+                          <div className="relative">
+                            <input type="number" className="w-full p-2 border-2 border-indigo-200 rounded text-right bg-white shadow-sm font-black text-indigo-700" value={editCatBudget} onChange={e=>setEditCatBudget(e.target.value)} />
+                            <span className="absolute right-3 top-2 text-xs text-slate-400">원</span>
+                          </div>
+                        ) : (
+                          <span className="font-black text-slate-700 px-2">{c.budgetAmount.toLocaleString()}원</span>
+                        )}
                       </td>
                       <td className="p-3 text-center">
-                        <div className="flex justify-center gap-1">
+                        <div className="flex justify-center gap-1.5">
                           {editingCategoryId === c.id ? (
                             <>
-                              <button onClick={() => handleUpdateCategory(c.id)} className="text-blue-500 hover:text-blue-700 p-1 bg-blue-50 hover:bg-blue-100 rounded"><CheckCircle2 className="w-4 h-4"/></button>
-                              <button onClick={() => setEditingCategoryId(null)} className="text-slate-400 hover:text-slate-600 p-1 bg-slate-50 hover:bg-slate-100 rounded"><XIcon className="w-4 h-4"/></button>
+                              <button onClick={() => handleUpdateCategory(c.id)} className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 text-white text-xs font-black rounded-md shadow-sm hover:bg-blue-700 transition"><CheckCircle2 className="w-3.5 h-3.5"/> 저장</button>
+                              <button onClick={() => setEditingCategoryId(null)} className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 text-slate-600 text-xs font-bold rounded-md hover:bg-slate-200 transition"><XIcon className="w-3.5 h-3.5"/> 취소</button>
                             </>
                           ) : (
                             <>
-                              <button onClick={() => { setEditingCategoryId(c.id); setEditCatName(c.name); setEditCatBudget(c.budgetAmount.toString()); }} className="text-slate-400 hover:text-indigo-600 p-1 hover:bg-indigo-50 rounded"><Edit className="w-4 h-4"/></button>
-                              <button onClick={()=>handleDeleteCategory(c.id)} className="text-red-400 hover:text-red-600 p-1 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4"/></button>
+                              <button onClick={() => { setEditingCategoryId(c.id); setEditCatName(c.name); setEditCatBudget(c.budgetAmount.toString()); }} className="flex items-center gap-1 px-2.5 py-1.5 bg-indigo-50 text-indigo-600 text-xs font-black rounded-md hover:bg-indigo-100 transition-all border border-indigo-100"><Edit className="w-3.5 h-3.5"/> 수정</button>
+                              <button onClick={()=>handleDeleteCategory(c.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition"><Trash2 className="w-4 h-4"/></button>
                             </>
                           )}
                         </div>
@@ -432,25 +515,40 @@ export default function BudgetPage() {
                     </tr>
                   ))}
                   {settingsViewLevel === 2 && categories.map(l1 => l1.children?.map((l2:any) => (
-                    <tr key={l2.id} className="border-b border-slate-100">
-                      <td className="p-3 font-bold text-slate-800">
-                        {editingCategoryId === l2.id ? <input className="w-full p-1 border rounded" value={editCatName} onChange={e=>setEditCatName(e.target.value)} /> : l2.name}
+                    <tr key={l2.id} className={`border-b border-slate-100 transition-colors ${selectedCategoryIds.includes(l2.id) ? 'bg-blue-50/30' : 'hover:bg-slate-50/50'}`}>
+                      <td className="p-3 text-center">
+                        <input 
+                          type="checkbox" 
+                          checked={selectedCategoryIds.includes(l2.id)} 
+                          onChange={() => toggleCategorySelection(l2.id)}
+                          className="w-4 h-4 rounded border-slate-300 transition cursor-pointer"
+                        />
                       </td>
-                      <td className="p-3 text-xs font-bold text-slate-500 bg-slate-50 rounded px-2">{l1.name}</td>
-                      <td className="p-3 text-right font-black">
-                        {editingCategoryId === l2.id ? <input type="number" className="w-full p-1 border rounded text-right" value={editCatBudget} onChange={e=>setEditCatBudget(e.target.value)} /> : l2.budgetAmount.toLocaleString()}
+                      <td className="p-3 font-bold text-slate-800">
+                        {editingCategoryId === l2.id ? <input className="w-full p-2 border-2 border-indigo-200 rounded bg-white shadow-sm font-bold text-slate-900" value={editCatName} onChange={e=>setEditCatName(e.target.value)} autoFocus /> : <span className="pl-1">{l2.name}</span>}
+                      </td>
+                      <td className="p-3"><span className="text-[11px] font-black text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full ring-1 ring-slate-200">{l1.name}</span></td>
+                      <td className="p-3 text-right">
+                        {editingCategoryId === l2.id ? (
+                          <div className="relative">
+                            <input type="number" className="w-full p-2 border-2 border-indigo-200 rounded text-right bg-white shadow-sm font-black text-indigo-700" value={editCatBudget} onChange={e=>setEditCatBudget(e.target.value)} />
+                            <span className="absolute right-3 top-2 text-xs text-slate-400">원</span>
+                          </div>
+                        ) : (
+                          <span className="font-black text-slate-700 px-2">{l2.budgetAmount.toLocaleString()}원</span>
+                        )}
                       </td>
                       <td className="p-3 text-center">
-                        <div className="flex justify-center gap-1">
+                        <div className="flex justify-center gap-1.5">
                           {editingCategoryId === l2.id ? (
                             <>
-                              <button onClick={() => handleUpdateCategory(l2.id)} className="text-blue-500 hover:text-blue-700 p-1 bg-blue-50 hover:bg-blue-100 rounded"><CheckCircle2 className="w-4 h-4"/></button>
-                              <button onClick={() => setEditingCategoryId(null)} className="text-slate-400 hover:text-slate-600 p-1 bg-slate-50 hover:bg-slate-100 rounded"><XIcon className="w-4 h-4"/></button>
+                              <button onClick={() => handleUpdateCategory(l2.id)} className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 text-white text-xs font-black rounded-md shadow-sm hover:bg-blue-700 transition"><CheckCircle2 className="w-3.5 h-3.5"/> 저장</button>
+                              <button onClick={() => setEditingCategoryId(null)} className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 text-slate-600 text-xs font-bold rounded-md hover:bg-slate-200 transition"><XIcon className="w-3.5 h-3.5"/> 취소</button>
                             </>
                           ) : (
                             <>
-                              <button onClick={() => { setEditingCategoryId(l2.id); setEditCatName(l2.name); setEditCatBudget(l2.budgetAmount.toString()); }} className="text-slate-400 hover:text-indigo-600 p-1 hover:bg-indigo-50 rounded"><Edit className="w-4 h-4"/></button>
-                              <button onClick={()=>handleDeleteCategory(l2.id)} className="text-red-400 hover:text-red-600 p-1 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4"/></button>
+                              <button onClick={() => { setEditingCategoryId(l2.id); setEditCatName(l2.name); setEditCatBudget(l2.budgetAmount.toString()); }} className="flex items-center gap-1 px-2.5 py-1.5 bg-indigo-50 text-indigo-600 text-xs font-black rounded-md hover:bg-indigo-100 transition-all border border-indigo-100"><Edit className="w-3.5 h-3.5"/> 수정</button>
+                              <button onClick={()=>handleDeleteCategory(l2.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition"><Trash2 className="w-4 h-4"/></button>
                             </>
                           )}
                         </div>
@@ -458,25 +556,40 @@ export default function BudgetPage() {
                     </tr>
                   )))}
                   {settingsViewLevel === 3 && categories.map(l1 => l1.children?.map((l2:any) => l2.children?.map((l3:any) => (
-                    <tr key={l3.id} className="border-b border-slate-100">
-                      <td className="p-3 font-bold text-slate-800">
-                        {editingCategoryId === l3.id ? <input className="w-full p-1 border rounded" value={editCatName} onChange={e=>setEditCatName(e.target.value)} /> : l3.name}
+                    <tr key={l3.id} className={`border-b border-slate-100 transition-colors ${selectedCategoryIds.includes(l3.id) ? 'bg-blue-50/30' : 'hover:bg-slate-50/50'}`}>
+                      <td className="p-3 text-center">
+                        <input 
+                          type="checkbox" 
+                          checked={selectedCategoryIds.includes(l3.id)} 
+                          onChange={() => toggleCategorySelection(l3.id)}
+                          className="w-4 h-4 rounded border-slate-300 transition cursor-pointer"
+                        />
                       </td>
-                      <td className="p-3 text-[10px] font-bold tracking-tighter text-slate-500 break-words">{l1.name} <span className="text-slate-300 mx-1">&gt;</span> {l2.name}</td>
-                      <td className="p-3 text-right text-indigo-600 font-black">
-                        {editingCategoryId === l3.id ? <input type="number" className="w-full p-1 border rounded text-right" value={editCatBudget} onChange={e=>setEditCatBudget(e.target.value)} /> : l3.budgetAmount.toLocaleString()}
+                      <td className="p-3 font-bold text-slate-800">
+                        {editingCategoryId === l3.id ? <input className="w-full p-2 border-2 border-indigo-200 rounded bg-white shadow-sm font-bold text-slate-900" value={editCatName} onChange={e=>setEditCatName(e.target.value)} autoFocus /> : <span className="pl-1">{l3.name}</span>}
+                      </td>
+                      <td className="p-3"><span className="text-[10px] font-black text-slate-400 tracking-tight uppercase leading-none">{l1.name} <span className="text-slate-300 text-[8px] mx-1">/</span> {l2.name}</span></td>
+                      <td className="p-3 text-right">
+                        {editingCategoryId === l3.id ? (
+                          <div className="relative">
+                            <input type="number" className="w-full p-2 border-2 border-indigo-200 rounded text-right bg-white shadow-sm font-black text-indigo-700" value={editCatBudget} onChange={e=>setEditCatBudget(e.target.value)} />
+                            <span className="absolute right-3 top-2 text-xs text-slate-400">원</span>
+                          </div>
+                        ) : (
+                          <span className="font-black text-indigo-600 px-2">{l3.budgetAmount.toLocaleString()}원</span>
+                        )}
                       </td>
                       <td className="p-3 text-center">
-                        <div className="flex justify-center gap-1">
+                        <div className="flex justify-center gap-1.5">
                           {editingCategoryId === l3.id ? (
                             <>
-                              <button onClick={() => handleUpdateCategory(l3.id)} className="text-blue-500 hover:text-blue-700 p-1 bg-blue-50 hover:bg-blue-100 rounded"><CheckCircle2 className="w-4 h-4"/></button>
-                              <button onClick={() => setEditingCategoryId(null)} className="text-slate-400 hover:text-slate-600 p-1 bg-slate-50 hover:bg-slate-100 rounded"><XIcon className="w-4 h-4"/></button>
+                              <button onClick={() => handleUpdateCategory(l3.id)} className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 text-white text-xs font-black rounded-md shadow-sm hover:bg-blue-700 transition"><CheckCircle2 className="w-3.5 h-3.5"/> 저장</button>
+                              <button onClick={() => setEditingCategoryId(null)} className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 text-slate-600 text-xs font-bold rounded-md hover:bg-slate-200 transition"><XIcon className="w-3.5 h-3.5"/> 취소</button>
                             </>
                           ) : (
                             <>
-                              <button onClick={() => { setEditingCategoryId(l3.id); setEditCatName(l3.name); setEditCatBudget(l3.budgetAmount.toString()); }} className="text-slate-400 hover:text-indigo-600 p-1 hover:bg-indigo-50 rounded"><Edit className="w-4 h-4"/></button>
-                              <button onClick={()=>handleDeleteCategory(l3.id)} className="text-red-400 hover:text-red-600 p-1 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4"/></button>
+                              <button onClick={() => { setEditingCategoryId(l3.id); setEditCatName(l3.name); setEditCatBudget(l3.budgetAmount.toString()); }} className="flex items-center gap-1 px-2.5 py-1.5 bg-indigo-50 text-indigo-600 text-xs font-black rounded-md hover:bg-indigo-100 transition-all border border-indigo-100"><Edit className="w-3.5 h-3.5"/> 수정</button>
+                              <button onClick={()=>handleDeleteCategory(l3.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition"><Trash2 className="w-4 h-4"/></button>
                             </>
                           )}
                         </div>
@@ -487,8 +600,10 @@ export default function BudgetPage() {
               </table>
             </div>
 
-            <div className="w-[320px] bg-slate-50 p-5 rounded-xl border border-slate-200 self-start">
-              <h3 className="text-xs font-black text-slate-800 mb-4 uppercase tracking-widest flex items-center gap-2"><Plus className="w-4 h-4 text-indigo-500"/> 신규 등록</h3>
+            <div className="w-[320px] bg-white p-5 rounded-xl border border-indigo-100 self-start shadow-sm ring-1 ring-slate-200/50">
+              <h3 className="text-xs font-black text-slate-800 mb-4 uppercase tracking-widest flex items-center gap-2">
+                <Plus className="w-4 h-4 text-indigo-500"/> 신규 항목 등록
+              </h3>
               <form onSubmit={handleAddCategory} className="flex flex-col gap-4">
                 {settingsViewLevel > 1 && (
                   <div>
