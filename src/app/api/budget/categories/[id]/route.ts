@@ -3,6 +3,11 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+// BigInt JSON 직렬화 지원을 위한 패치
+(BigInt.prototype as any).toJSON = function () {
+  return this.toString();
+};
+
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
   try {
     const { id } = await params;

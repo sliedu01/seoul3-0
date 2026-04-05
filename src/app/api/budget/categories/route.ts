@@ -3,6 +3,11 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+// BigInt JSON 직렬화 지원을 위한 패치
+(BigInt.prototype as any).toJSON = function () {
+  return this.toString();
+};
+
 export async function GET() {
   try {
     // 1. 트리 구조 최상위(L1)부터 하위(L2), 세세목(L3) 및 그 안의 집행내역(expenditures)까지 3단계 동시 조회
@@ -127,8 +132,8 @@ export async function POST(req: Request) {
        return NextResponse.json(created);
     }
   } catch (error) {
-    console.error('Budget Category Modify Error:', error);
-    return NextResponse.json({ error: 'Failed to modify budget category' }, { status: 500 });
+    console.error('Budget Category Create/Update Error:', error);
+    return NextResponse.json({ error: 'Failed to create or modify budget category' }, { status: 500 });
   }
 }
 
