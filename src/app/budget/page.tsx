@@ -869,18 +869,20 @@ export default function BudgetPage() {
                <tr>
                  <th className="px-3 py-3 w-12 text-center">No</th>
                  <th className="px-3 py-3 w-32">상태 / 일자</th>
-                 <th className="px-3 py-3 w-64">집행 항목 (비목 → 세목 → 세세목)</th>
+                 <th className="px-3 py-3 w-28">비목</th>
+                 <th className="px-3 py-3 w-40">관리세목</th>
+                 <th className="px-3 py-3 w-40">세세목</th>
                  <th className="px-4 py-3">집행 용도 / 적요</th>
                  <th className="px-3 py-3 w-32 text-right text-blue-700">금액(합계)</th>
-                 <th className="px-3 py-3 w-28 text-right">공급가액</th>
-                 <th className="px-3 py-3 w-28 text-right">부가세</th>
+                 <th className="px-3 py-3 w-28 text-right font-medium">공급가액</th>
+                 <th className="px-3 py-3 w-28 text-right font-medium">부가세</th>
                  <th className="px-4 py-3 w-40">증빙 / 비고</th>
                  <th className="px-3 py-3 w-24 text-center">관리</th>
                </tr>
              </thead>
              <tbody>
                {filteredExpenditures.length === 0 ? (
-                 <tr><td colSpan={9} className="py-20 text-center font-bold text-slate-400">등록된 집행 데이터가 없습니다.</td></tr>
+                 <tr><td colSpan={11} className="py-20 text-center font-bold text-slate-400">등록된 집행 데이터가 없습니다.</td></tr>
                ) : (
                  filteredExpenditures.map((exp: any, idx: number) => (
                    <tr key={exp.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
