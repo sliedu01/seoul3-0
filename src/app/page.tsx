@@ -28,7 +28,7 @@ export default function Dashboard() {
 
   const fetchData = () => {
     setLoading(true)
-    fetch("/api/dashboard")
+    fetch("/api/dashboard", { cache: "no-store" })
       .then(res => res.json())
       .then(json => {
         setData(json)
