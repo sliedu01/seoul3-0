@@ -51,9 +51,10 @@ model ProgramSession {
   courseName     String?   // 강의명
   instructorName String?   // 강사명
   
-  classDays      ClassDay[]
-  facilityCheck  FacilityChecklist?
-  responses      SurveyResponse[]
+  classDays        ClassDay[]
+  facilityCheck    FacilityChecklist?
+  responses        SurveyResponse[]
+  surveyDocuments  SurveyDocument[]
   
   capacity        Int      @default(0)
   participantCount Int     @default(0)
@@ -196,5 +197,62 @@ model FileStorage {
   fileName  String   @unique
   data      Bytes
   mimeType  String
+  fileSize  Int?             // 원본 파일 크기 (bytes)
+  sha256    String?          // SHA-256 해시값 (무결성 검증용)
   createdAt DateTime @default(now())
+}
+
+// 설문 증빙 문서 (PDF/이미지) & 데이터 소스 매핑
+model SurveyDocument {
+  id               String   @id @default(cuid())
+  programSessionId String
+  session          ProgramSession @relation(fields: [programSessionId], references: [id], onDelete: Cascade)
+  type             String   // COMPETENCY_PRE, COMPETENCY_POST, SATISFACTION, RESULT_REPORT, DATA_SOURCE
+  category         String   // PDF_EVIDENCE, EXCEL_DATA, GOOGLE_FORM
+  fileName         String?  // FileStorage.fileName 참조 (PDF/Excel 파일명)
+  googleFormUrl    String?  // 구글폼 URL (데이터 소스 참조용)
+  description      String?  // 설명 메모
+  uploadedAt       DateTime @default(now())
+}
+
+model BudgetCategory {
+  id           String   @id @default(cuid())
+  parentId     String?  // NULL = 최상위 비목
+  parent       BudgetCategory?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children     BudgetCategory[] @relation("CategoryTree")
+  
+  level        Int      // 1=비목, 2=관리세목, 3=세세목
+  name         String   // "인건비", "사업관리자", "1. 진로캠퍼스" 등
+  budgetAmount BigInt   @default(0)  // 배정예산 (원)
+  order        Int      @default(0)
+  
+  isRate       Boolean  @default(false) // 일반관리비/이윤 등 %계산 항목 여부
+  ratePercent  Float?   // 6.0% 등
+  
+  expenditures Expenditure[]
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Expenditure {
+  id              String    @id @default(cuid())
+  categoryId      String
+  category        BudgetCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  
+  executionDate   DateTime? // NULL = 미정 → 사용예정액
+  supplyAmount    BigInt    @default(0)  // 공급가액
+  taxAmount       BigInt    @default(0)  // 부가세액
+  totalAmount     BigInt    @default(0)  // 합계 (공급가+부가세)
+  
+  purpose         String?   // 집행 용도
+  evidenceType    String?   // 세금계산서, 입금증, 영수증, 기타증빙
+  evidenceFileId  String?   // 증빙 파일 고유번호 (예: 20260405_세금계산서_001)
+  evidenceFileName String?  // 물리적 저장 파일명
+  originalFileName String?  // 원본 파일명
+  
+  memo            String?   // 비고
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 }

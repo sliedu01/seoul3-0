@@ -102,8 +102,13 @@ export default function PartnersPage() {
         if (res.ok) {
           const result = await res.json();
           setFormData({ ...formData, [field]: result.fileName });
+          // SHA-256 해시 피드백
+          if (result.sha256) {
+            console.log(`[무결성] ${result.fileName} — SHA-256: ${result.sha256}`);
+          }
         } else {
-          alert("파일 업로드에 실패했습니다.");
+          const err = await res.json();
+          alert(err.error || "파일 업로드에 실패했습니다.");
         }
       } catch (err) {
         console.error(err);
@@ -357,22 +362,42 @@ export default function PartnersPage() {
               </div>
               
               <div className="grid grid-cols-1 gap-2 pt-4">
-                {/* v1.0.3-force: Explicit anchor tag for binary safety */}
+                {/* v2.0: 원본 다운로드 + 무결성 검증 */}
                 <a 
                   href={`/api/download?file=${encodeURIComponent(pdfModal.fileName)}`}
                   download={pdfModal.fileName}
-                  data-version="v1.0.3-force"
+                  data-version="v2.0-integrity"
                   className="w-full h-12 bg-slate-900 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors"
                   onClick={() => setPdfModal(null)}
                 >
-                  <FileDown className="w-4 h-4" /> 원본 다운로드
+                  <FileDown className="w-4 h-4" /> 원본 다운로드 (무결성 검증)
                 </a>
+                
+                {/* 무결성 검증 버튼 */}
+                <button
+                  className="w-full h-12 border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-50 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors"
+                  onClick={async () => {
+                    try {
+                      const res = await fetch(`/api/files/verify?file=${encodeURIComponent(pdfModal.fileName)}`);
+                      const result = await res.json();
+                      if (result.isValid) {
+                        alert(`✅ 무결성 검증 통과\n\nSHA-256: ${result.computedHash}\n파일 크기: ${(result.actualSize / 1024).toFixed(1)}KB`);
+                      } else {
+                        alert(`❌ 무결성 검증 실패!\n\n저장 해시: ${result.storedHash}\n현재 해시: ${result.computedHash}`);
+                      }
+                    } catch {
+                      alert("검증 중 오류가 발생했습니다.");
+                    }
+                  }}
+                >
+                  🔒 파일 무결성 검증
+                </button>
                 
                 <label className="w-full h-12 border-2 border-blue-600 text-blue-600 hover:bg-blue-50 cursor-pointer rounded-xl font-bold flex items-center justify-center gap-2 transition-colors">
                   <Pencil className="w-4 h-4" /> 수정 (교체)
                   <input 
                     type="file" 
-                    accept=".pdf" 
+                    accept=".pdf,.jpg,.jpeg,.png" 
                     className="hidden" 
                     onChange={async (e) => {
                       const file = e.target.files?.[0];
@@ -392,7 +417,7 @@ export default function PartnersPage() {
                             });
                             if (res.ok) {
                               setPartners(partners.map(p => p.id === pdfModal.partnerId ? updatedPartner : p));
-                              alert("문서가 성공적으로 교체되었습니다.");
+                              alert(`문서가 성공적으로 교체되었습니다.\nSHA-256: ${result.sha256}`);
                             }
                           }
                         }
@@ -427,10 +452,10 @@ function FileField({ label, field, value, isUploading, onUpload }: any) {
           {isUploading ? (
             <span className="flex items-center gap-2 text-blue-600 animate-pulse"><UploadCloud className="w-5 h-5"/> 업로드 중...</span>
           ) : (
-            <><UploadCloud className="w-5 h-5 mr-2 text-slate-400"/> {value ? <span className="truncate max-w-[120px] text-blue-600">{value}</span> : "파일 선택"}</>
+            <><UploadCloud className="w-5 h-5 mr-2 text-slate-400"/> {value ? <span className="truncate max-w-[120px] text-blue-600">{value}</span> : "파일 선택 (PDF/이미지)"}</>
           )}
         </span>
-        <input type="file" accept=".pdf" className="hidden" disabled={isUploading} onChange={(e) => onUpload(e, field)} />
+        <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden" disabled={isUploading} onChange={(e) => onUpload(e, field)} />
       </label>
     </div>
   );

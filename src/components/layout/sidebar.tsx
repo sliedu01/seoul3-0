@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { LayoutDashboard, Folder, FileText, Calendar, Building, BarChart3, Menu, X, LogOut, User, Users, LogIn } from "lucide-react"
+import { LayoutDashboard, Folder, FileText, Calendar, Building, BarChart3, Menu, X, LogOut, User, Users, LogIn, Wallet } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 const routes = [
@@ -13,6 +13,7 @@ const routes = [
   { label: "설문 결과", icon: FileText, href: "/surveys" },
   { label: "AI 컨설턴트 리포트", icon: BarChart3, href: "/reports" },
   { label: "회의록", icon: FileText, href: "/meetings" },
+  { label: "예산/정산 관리", icon: Wallet, href: "/budget" },
   { label: "캘린더", icon: Calendar, href: "/calendar" },
   { label: "사용자 관리", icon: Users, href: "/admin/users" },
 ]

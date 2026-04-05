@@ -1,0 +1,13 @@
+src/app/api/budget/categories/route.ts(27,25): error TS2737: BigInt literals are not available when targeting lower than ES2020.
+src/app/api/budget/categories/route.ts(28,29): error TS2737: BigInt literals are not available when targeting lower than ES2020.
+src/app/api/budget/export/route.ts(57,11): error TS2322: Type 'number' is not assignable to type 'string'.
+src/app/api/budget/export/route.ts(58,11): error TS2322: Type 'number' is not assignable to type 'string'.
+src/app/api/budget/export/route.ts(59,11): error TS2322: Type 'number' is not assignable to type 'string'.
+src/app/api/budget/export/route.ts(60,11): error TS2322: Type 'number' is not assignable to type 'string'.
+src/app/api/budget/export/route.ts(72,9): error TS2322: Type 'number' is not assignable to type 'string'.
+src/app/api/budget/export/route.ts(73,9): error TS2322: Type 'number' is not assignable to type 'string'.
+src/app/api/budget/export/route.ts(74,9): error TS2322: Type 'number' is not assignable to type 'string'.
+src/app/api/budget/export/route.ts(75,9): error TS2322: Type 'number' is not assignable to type 'string'.
+src/app/api/budget/export/route.ts(95,9): error TS2322: Type 'number' is not assignable to type 'string'.
+src/app/api/budget/export/route.ts(96,9): error TS2322: Type 'number' is not assignable to type 'string'.
+src/app/api/budget/export/route.ts(97,9): error TS2322: Type 'number' is not assignable to type 'string'.

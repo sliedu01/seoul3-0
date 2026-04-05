@@ -1,0 +1,42 @@
+// prisma/schema.prisma 하단에 추가될 코드
+model BudgetCategory {
+  id           String   @id @default(cuid())
+  parentId     String?  // NULL = 최상위 비목
+  parent       BudgetCategory?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children     BudgetCategory[] @relation("CategoryTree")
+  
+  level        Int      // 1=비목, 2=관리세목, 3=세세목
+  name         String   // "인건비", "사업관리자", "1. 진로캠퍼스" 등
+  budgetAmount BigInt   @default(0)  // 배정예산 (원)
+  order        Int      @default(0)
+  
+  isRate       Boolean  @default(false) // 일반관리비/이윤 등 %계산 항목 여부
+  ratePercent  Float?   // 6.00% 등
+  
+  expenditures Expenditure[]
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Expenditure {
+  id              String    @id @default(cuid())
+  categoryId      String
+  category        BudgetCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  
+  executionDate   DateTime? // NULL = 미정 → 사용예정액
+  supplyAmount    BigInt    @default(0)  // 공급가액
+  taxAmount       BigInt    @default(0)  // 부가세액
+  totalAmount     BigInt    @default(0)  // 합계 (공급가+부가세)
+  
+  purpose         String?   // 집행 용도
+  evidenceType    String?   // 세금계산서, 입금증, 영수증, 기타증빙
+  evidenceFileId  String?   // 증빙 파일 고유번호 (예: 20260405_세금계산서_001)
+  evidenceFileName String?  // 물리적 저장 파일명
+  originalFileName String?  // 원본 파일명
+  
+  memo            String?   // 비고
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}

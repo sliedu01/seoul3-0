@@ -378,6 +378,59 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
         })
       })
 
+      // === 증빙 문서 자동 등록 (SurveyDocument 매핑) ===
+      const matchedTemplate = templates.find((t: any) => t.id === surveyFormData.templateId);
+      const docType = matchedTemplate?.type?.includes('만족') ? 'SATISFACTION' : 'COMPETENCY';
+
+      // PDF 증빙 파일 등록
+      if (inputMethod === "PDF" && surveyFormData.pdfPath) {
+        // PDF를 FileStorage에 업로드 (이미 업로드된 경우 메타데이터만 등록)
+        await fetch(`/api/sessions/${activeSession.id}/documents`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: docType,
+            category: "PDF_EVIDENCE",
+            fileName: surveyFormData.pdfPath,
+            description: `${inputMethod} 방식 증빙 문서`
+          })
+        });
+      }
+
+      // 엑셀 데이터 파일 증빙 등록
+      if (inputMethod === "EXCEL" && surveyFormData.excelFile) {
+        const uploadData = new FormData();
+        uploadData.append("file", surveyFormData.excelFile);
+        const uploadRes = await fetch("/api/upload", { method: "POST", body: uploadData });
+        if (uploadRes.ok) {
+          const { fileName, sha256 } = await uploadRes.json();
+          await fetch(`/api/sessions/${activeSession.id}/documents`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              type: "DATA_SOURCE",
+              category: "EXCEL_DATA",
+              fileName,
+              description: `엑셀 데이터 원본 (SHA-256: ${sha256?.substring(0, 16)}...)`
+            })
+          });
+        }
+      }
+
+      // 구글폼 URL 메타데이터 등록
+      if (inputMethod === "GOOGLE" && surveyFormData.googleUrl) {
+        await fetch(`/api/sessions/${activeSession.id}/documents`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: docType,
+            category: "GOOGLE_FORM",
+            googleFormUrl: surveyFormData.googleUrl,
+            description: "구글폼 데이터 소스"
+          })
+        });
+      }
+
       alert(`${inputMethod} 방식을 통해 ${mockResponses.length}건의 데이터가 등록되었습니다.`);
       setShowSurveyModal(false);
       fetchData();
