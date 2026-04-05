@@ -819,9 +819,9 @@ export default function BudgetPage() {
 
       {/* 명세 그리드 */}
       <Card className="border-none shadow-sm overflow-hidden bg-white">
-        <div className="overflow-x-auto min-h-[400px]">
+        <div className="overflow-auto max-h-[520px]">
           <table className="w-full text-[13px] text-left border-collapse min-w-[1400px]">
-             <thead className="bg-slate-50/80 text-slate-500 font-bold text-[11px] uppercase tracking-widest border-b border-slate-100">
+             <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500 font-bold text-[11px] uppercase tracking-widest border-b border-slate-100">
                <tr>
                  <th className="px-3 py-3 w-12 text-center">No</th>
                  <th className="px-3 py-3 w-32">상태 / 일자</th>
