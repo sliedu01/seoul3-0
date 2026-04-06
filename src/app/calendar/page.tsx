@@ -31,8 +31,13 @@ export default function CalendarPage() {
     try {
       const res = await fetch(`/api/schedules/${id.replace('other-', '')}`, { method: "DELETE" });
       if (res.ok) window.location.reload();
-      else alert("삭제 실패");
-    } catch { alert("오류 발생"); }
+      else {
+        const errorData = await res.json();
+        alert(`삭제 실패: ${errorData.error || "알 수 없는 오류"}`);
+      }
+    } catch { 
+      alert("네트워크 오류가 발생했습니다."); 
+    }
   };
 
   const handleUpdateSchedule = async (id: string) => {
@@ -45,8 +50,13 @@ export default function CalendarPage() {
         body: JSON.stringify({ title: editTitle, startDate: editStartDate, endDate: editEndDate || editStartDate })
       });
       if (res.ok) window.location.reload();
-      else alert("수정 실패");
-    } catch { alert("오류 발생"); }
+      else {
+        const errorData = await res.json();
+        alert(`수정 실패: ${errorData.error || "알 수 없는 오류"}`);
+      }
+    } catch { 
+      alert("네트워크 오류가 발생했습니다."); 
+    }
     setIsUpdating(false);
   };
 
@@ -423,8 +433,13 @@ export default function CalendarPage() {
                     body: JSON.stringify({ title: newTitle, startDate: newStartDate, endDate: newEndDate || newStartDate })
                   });
                   if (res.ok) window.location.reload();
-                  else alert("등록 실패");
-                } catch { alert("오류 발생"); }
+                  else {
+                    const errorData = await res.json();
+                    alert(`등록 실패: ${errorData.error || "알 수 없는 오류"}`);
+                  }
+                } catch { 
+                  alert("네트워크 오류가 발생했습니다."); 
+                }
                 setIsAdding(false);
               }}>{isAdding ? "등록 중..." : "일정 등록"}</Button>
             </div>

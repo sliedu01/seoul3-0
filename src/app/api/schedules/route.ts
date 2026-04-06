@@ -38,17 +38,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Title and startDate are required" }, { status: 400 });
     }
 
+    const start = new Date(startDate);
+    const end = endDate ? new Date(endDate) : null;
+
+    if (isNaN(start.getTime()) || (end && isNaN(end.getTime()))) {
+      return NextResponse.json({ error: "Invalid date format" }, { status: 400 });
+    }
+
     const schedule = await prisma.otherSchedule.create({
       data: {
         title,
-        startDate: new Date(startDate),
-        endDate: endDate ? new Date(endDate) : null,
+        startDate: start,
+        endDate: end,
       },
     });
 
     return NextResponse.json(schedule, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Failed to create schedule:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json({ 
+       error: "Internal Server Error", 
+       details: error.message 
+    }, { status: 500 });
   }
 }
