@@ -8,6 +8,14 @@ import {
 } from "lucide-react";
 import * as XLSX from "xlsx";
 
+// 숫자 포맷팅 유틸리티
+const formatWithCommas = (value: string | number) => {
+  if (value === undefined || value === null || value === "") return "";
+  const numStr = value.toString().replace(/[^0-9]/g, "");
+  if (!numStr) return "";
+  return Number(numStr).toLocaleString();
+};
+
 export default function BudgetPage() {
   const [categories, setCategories] = useState<any[]>([]);
   const [expenditures, setExpenditures] = useState<any[]>([]);
@@ -122,7 +130,9 @@ export default function BudgetPage() {
   
   // 금액 입력 시 양방향 자동 계산
   const handleAmountChange = (field: 'supply' | 'tax' | 'total', valueStr: string) => {
+    // 콤마 제거 후 숫자만 추출
     const raw = Number(valueStr.replace(/[^0-9]/g, ''));
+    
     if (field === 'total') {
       const supply = Math.round(raw / 1.1);
       const tax = raw - supply;
@@ -678,7 +688,7 @@ export default function BudgetPage() {
                       <td className="p-3 text-right">
                         {editingCategoryId === l2.id ? (
                           <div className="relative">
-                            <input type="number" className="w-full p-2 border-2 border-indigo-200 rounded text-right bg-white shadow-sm font-black text-indigo-700" value={editCatBudget} onChange={e=>setEditCatBudget(e.target.value)} />
+                            <input type="text" className="w-full p-2 border-2 border-indigo-200 rounded text-right bg-white shadow-sm font-black text-indigo-700" value={formatWithCommas(editCatBudget)} onChange={e=>setEditCatBudget(e.target.value.replace(/[^0-9]/g, ""))} />
                             <span className="absolute right-3 top-2 text-xs text-slate-400">원</span>
                           </div>
                         ) : (
@@ -771,7 +781,7 @@ export default function BudgetPage() {
                 </div>
                 <div>
                   <label className="block text-[11px] font-black text-slate-500 mb-1.5"><span className="text-red-500">*</span> 초기 배정 금액 (원)</label>
-                  <input type="number" required placeholder="0" className="w-full p-2 text-sm font-black text-indigo-700 bg-white border border-slate-300 shadow-sm rounded text-right" value={newCatBudget} onChange={e=>setNewCatBudget(e.target.value)} />
+                  <input type="text" required placeholder="0" className="w-full p-2 text-sm font-black text-indigo-700 bg-white border border-slate-300 shadow-sm rounded text-right" value={formatWithCommas(newCatBudget)} onChange={e=>setNewCatBudget(e.target.value.replace(/[^0-9]/g, ""))} />
                 </div>
                 <button type="submit" className="w-full mt-2 bg-indigo-600 text-white px-4 py-3 text-sm rounded-lg font-black tracking-wide shadow-md hover:bg-indigo-700 transition">
                   {settingsViewLevel === 1 ? '비목 등록' : settingsViewLevel === 2 ? '관리세목 등록' : '세세목 등록'}
@@ -962,15 +972,15 @@ export default function BudgetPage() {
                 <div className="col-span-3 grid grid-cols-3 gap-4">
                   <div>
                     <label className="block text-[11px] font-black uppercase text-blue-600 mb-2 tracking-wider flex items-center justify-between">금액 (합계) <span className="text-[9px] text-slate-400 font-bold lowercase">*입력시 자동분리</span></label>
-                    <input type="text" placeholder="예: 110,000" required className="w-full p-2.5 border-2 border-blue-300 rounded-lg text-base font-black text-slate-900 text-right bg-blue-50/30 focus:bg-white focus:border-blue-500 outline-none transition-colors" value={formData.totalAmount} onChange={e => handleAmountChange('total', e.target.value)} />
+                    <input type="text" placeholder="예: 110,000" required className="w-full p-2.5 border-2 border-blue-300 rounded-lg text-base font-black text-slate-900 text-right bg-blue-50/30 focus:bg-white focus:border-blue-500 outline-none transition-colors" value={formatWithCommas(formData.totalAmount)} onChange={e => handleAmountChange('total', e.target.value)} />
                   </div>
                   <div>
                     <label className="block text-[11px] font-black uppercase text-slate-500 mb-2 tracking-wider">공급가액</label>
-                    <input type="text" placeholder="0" className="w-full p-2.5 border-2 border-slate-200 rounded-lg text-sm font-bold text-slate-700 text-right bg-white focus:border-slate-400 outline-none transition-colors" value={formData.supplyAmount} onChange={e => handleAmountChange('supply', e.target.value)} />
+                    <input type="text" placeholder="0" className="w-full p-2.5 border-2 border-slate-200 rounded-lg text-sm font-bold text-slate-700 text-right bg-white focus:border-slate-400 outline-none transition-colors" value={formatWithCommas(formData.supplyAmount)} onChange={e => handleAmountChange('supply', e.target.value)} />
                   </div>
                   <div>
                     <label className="block text-[11px] font-black uppercase text-slate-500 mb-2 tracking-wider">부가세</label>
-                    <input type="text" placeholder="0" className="w-full p-2.5 border-2 border-slate-200 rounded-lg text-sm font-bold text-slate-700 text-right bg-white focus:border-slate-400 outline-none transition-colors" value={formData.taxAmount} onChange={e => handleAmountChange('tax', e.target.value)} />
+                    <input type="text" placeholder="0" className="w-full p-2.5 border-2 border-slate-200 rounded-lg text-sm font-bold text-slate-700 text-right bg-white focus:border-slate-400 outline-none transition-colors" value={formatWithCommas(formData.taxAmount)} onChange={e => handleAmountChange('tax', e.target.value)} />
                   </div>
                 </div>
 

@@ -108,7 +108,24 @@ export async function GET() {
       });
     };
 
-    const [twoWeeksAgoSessions, lastWeekSessions, thisWeekSessions, nextWeekSessions, twoWeeksAgoM, lastWeekM, thisWeekM, nextWeekM] = await Promise.all([
+    const fetchOtherSchedules = (start: Date, end: Date) => {
+      return prisma.otherSchedule.findMany({
+        where: {
+          OR: [
+            { startDate: { gte: start, lte: end } },
+            { endDate: { gte: start, lte: end } },
+            { AND: [ { startDate: { lte: start } }, { endDate: { gte: end } } ] }
+          ]
+        },
+        orderBy: { startDate: "asc" }
+      });
+    };
+
+    const [
+      twoWeeksAgoSessions, lastWeekSessions, thisWeekSessions, nextWeekSessions, 
+      twoWeeksAgoM, lastWeekM, thisWeekM, nextWeekM,
+      twoWeeksAgoO, lastWeekO, thisWeekO, nextWeekO
+    ] = await Promise.all([
       fetchSessions(twoWeeksAgoMonday, twoWeeksAgoSunday),
       fetchSessions(lastMonday, lastSunday),
       fetchSessions(thisMonday, thisSunday),
@@ -116,7 +133,11 @@ export async function GET() {
       fetchMeetings(twoWeeksAgoMonday, twoWeeksAgoSunday),
       fetchMeetings(lastMonday, lastSunday),
       fetchMeetings(thisMonday, thisSunday),
-      fetchMeetings(nextMonday, nextSunday)
+      fetchMeetings(nextMonday, nextSunday),
+      fetchOtherSchedules(twoWeeksAgoMonday, twoWeeksAgoSunday),
+      fetchOtherSchedules(lastMonday, lastSunday),
+      fetchOtherSchedules(thisMonday, thisSunday),
+      fetchOtherSchedules(nextMonday, nextSunday)
     ]);
 
     const formatMeetings = (meetings: any[]) => meetings.map(m => ({
@@ -130,10 +151,22 @@ export async function GET() {
       partner: { name: m.title || "회의" }
     }));
 
-    const twoWeeksAgo = [...twoWeeksAgoSessions, ...formatMeetings(twoWeeksAgoM)].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    const lastWeek = [...lastWeekSessions, ...formatMeetings(lastWeekM)].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    const thisWeek = [...thisWeekSessions, ...formatMeetings(thisWeekM)].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    const nextWeek = [...nextWeekSessions, ...formatMeetings(nextWeekM)].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const formatOtherSchedules = (others: any[]) => others.map(s => ({
+      ...s,
+      id: `other-${s.id}`,
+      date: s.startDate,
+      sessionNumber: 1,
+      capacity: 0,
+      participantCount: 0,
+      completerCount: 0,
+      program: { order: 100, name: "기타 운영 일정" },
+      partner: { name: s.title }
+    }));
+
+    const twoWeeksAgo = [...twoWeeksAgoSessions, ...formatMeetings(twoWeeksAgoM), ...formatOtherSchedules(twoWeeksAgoO)].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const lastWeek = [...lastWeekSessions, ...formatMeetings(lastWeekM), ...formatOtherSchedules(lastWeekO)].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const thisWeek = [...thisWeekSessions, ...formatMeetings(thisWeekM), ...formatOtherSchedules(thisWeekO)].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const nextWeek = [...nextWeekSessions, ...formatMeetings(nextWeekM), ...formatOtherSchedules(nextWeekO)].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     return NextResponse.json({
       stats: {

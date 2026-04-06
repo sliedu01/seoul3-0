@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifySession } from "@/lib/auth";
 
+export const dynamic = 'force-dynamic';
+
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -58,12 +60,15 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
+    console.log(`[API] Attempting to DELETE schedule ID: ${id}`);
     const user = await verifySession();
     if (!user) {
+      console.error("[API] DELETE unauthorized");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     if (user.role !== "ADMIN" && user.role !== "OPERATOR") {
+      console.error(`[API] DELETE forbidden for role: ${user.role}`);
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -71,6 +76,8 @@ export async function DELETE(
     const result = await prisma.otherSchedule.deleteMany({
       where: { id },
     });
+
+    console.log(`[API] DELETE result count for ${id}: ${result.count}`);
 
     if (result.count === 0) {
       return NextResponse.json({ error: "Schedule not found or already deleted" }, { status: 404 });

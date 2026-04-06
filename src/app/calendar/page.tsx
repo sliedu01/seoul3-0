@@ -5,8 +5,10 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft, ChevronRight, UploadCloud, FileText, Plus, Calendar as CalendarIcon, Edit, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useRouter } from "next/navigation";
 
 export default function CalendarPage() {
+  const router = useRouter();
   const [currentDate, setCurrentDate] = useState(new Date()) 
   const [events, setEvents] = useState<any[]>([])
   const [programs, setPrograms] = useState<any[]>([])
@@ -28,9 +30,14 @@ export default function CalendarPage() {
 
   const handleDeleteSchedule = async (id: string) => {
     if (!confirm("이 일정을 삭제하시겠습니까?")) return;
+    const cleanId = id.replace('other-', '').trim();
     try {
-      const res = await fetch(`/api/schedules/${id.replace('other-', '')}`, { method: "DELETE" });
-      if (res.ok) window.location.reload();
+      const res = await fetch(`/api/schedules/${cleanId}`, { method: "DELETE" });
+      if (res.ok) {
+        setShowEventModal(false);
+        router.refresh();
+        await fetchSchedules();
+      }
       else {
         const errorData = await res.json();
         alert(`삭제 실패: ${errorData.error || "알 수 없는 오류"}`);
@@ -42,14 +49,19 @@ export default function CalendarPage() {
 
   const handleUpdateSchedule = async (id: string) => {
     if (!editTitle || !editStartDate) return alert("제목과 시작일자를 입력해주세요.");
+    const cleanId = id.replace('other-', '').trim();
     setIsUpdating(true);
     try {
-      const res = await fetch(`/api/schedules/${id.replace('other-', '')}`, {
+      const res = await fetch(`/api/schedules/${cleanId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: editTitle, startDate: editStartDate, endDate: editEndDate || editStartDate })
       });
-      if (res.ok) window.location.reload();
+      if (res.ok) {
+        setShowEventModal(false);
+        router.refresh();
+        await fetchSchedules();
+      }
       else {
         const errorData = await res.json();
         alert(`수정 실패: ${errorData.error || "알 수 없는 오류"}`);
@@ -60,28 +72,27 @@ export default function CalendarPage() {
     setIsUpdating(false);
   };
 
-  useEffect(() => {
-    Promise.all([
-      fetch("/api/meetings").then(res => res.json()),
-      fetch("/api/sessions").then(res => res.json()),
-      fetch("/api/programs").then(res => res.json()),
-      fetch("/api/schedules").then(res => res.json().catch(() => []))
-    ]).then(([meetingsData, sessionsData, programsData, schedulesData]) => {
-      if (Array.isArray(programsData)) setPrograms(programsData)
-      
-      let allEvents: any[] = []
-      
-      if (Array.isArray(sessionsData)) {
-        const parsedSessions: any[] = []
-        sessionsData.forEach((s: any) => {
-          // DB에 KST 값이 UTC로 저장되어 있으므로 UTC 그대로 파싱
-          const getUTCDate = (isoStr: string | null) => {
-            if (!isoStr) return null;
-            const d = new Date(isoStr);
-            return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
-          };
+  const fetchSchedules = async () => {
+    try {
+      const [meetingsData, sessionsData, programsData, schedulesData] = await Promise.all([
+        fetch("/api/meetings").then(res => res.json()),
+        fetch("/api/sessions").then(res => res.json()),
+        fetch("/api/programs").then(res => res.json()),
+        fetch("/api/schedules", { cache: 'no-store' }).then(res => res.json().catch(() => []))
+      ]);
 
-          // classDays가 있으면 각 교육일을 개별 이벤트로
+      if (Array.isArray(programsData)) setPrograms(programsData);
+      
+      let allEvents: any[] = [];
+      const getUTCDate = (isoStr: string | null) => {
+        if (!isoStr) return null;
+        const d = new Date(isoStr);
+        return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+      };
+
+      if (Array.isArray(sessionsData)) {
+        const parsedSessions: any[] = [];
+        sessionsData.forEach((s: any) => {
           if (s.classDays && s.classDays.length > 0) {
             s.classDays.forEach((cd: any, idx: number) => {
               const cdDate = getUTCDate(cd.date);
@@ -93,14 +104,12 @@ export default function CalendarPage() {
                 startDate: cdDate,
                 endDate: cdDate,
                 type: 'session'
-              })
-            })
+              });
+            });
           } else {
-            // classDays가 없으면 기존 방식 (교육기간)
             const sDate = getUTCDate(s.date);
             const sStart = getUTCDate(s.startTime) || sDate;
             const sEnd = getUTCDate(s.endTime) || sStart;
-
             parsedSessions.push({ 
               id: `session-${s.id}`,
               program: s.program.name,
@@ -109,16 +118,15 @@ export default function CalendarPage() {
               startDate: sStart, 
               endDate: (sEnd && sStart && sEnd < sStart) ? sStart : sEnd,
               type: 'session'
-            })
+            });
           }
-        })
-        allEvents = [...allEvents, ...parsedSessions]
+        });
+        allEvents = [...allEvents, ...parsedSessions];
       }
 
       if (Array.isArray(meetingsData)) {
         const parsedMeetings = meetingsData.map((m: any) => {
-          const d = new Date(m.date);
-          const mDate = new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+          const mDate = getUTCDate(m.date);
           return {
             id: `meeting-${m.id}`,
             program: "회의",
@@ -127,19 +135,15 @@ export default function CalendarPage() {
             startDate: mDate,
             endDate: mDate,
             type: 'meeting'
-          }
-        })
-        allEvents = [...allEvents, ...parsedMeetings]
+          };
+        });
+        allEvents = [...allEvents, ...parsedMeetings];
       }
 
       if (Array.isArray(schedulesData)) {
         const parsedSchedules = schedulesData.map((s: any) => {
-          const getUTCDate = (isoStr: string) => {
-            const d = new Date(isoStr);
-            return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
-          };
-          const sStart = getUTCDate(s.startDate)
-          const sEnd = s.endDate ? getUTCDate(s.endDate) : sStart
+          const sStart = getUTCDate(s.startDate);
+          const sEnd = s.endDate ? getUTCDate(s.endDate) : sStart;
           return {
             id: `other-${s.id}`,
             program: "기타일정",
@@ -148,18 +152,21 @@ export default function CalendarPage() {
             startDate: sStart,
             endDate: sEnd,
             type: 'other'
-          }
-        })
-        allEvents = [...allEvents, ...parsedSchedules]
+          };
+        });
+        allEvents = [...allEvents, ...parsedSchedules];
       }
+      setEvents(allEvents);
+      setLoading(false);
+    } catch (err) {
+      console.error(err);
+      setLoading(false);
+    }
+  };
 
-      setEvents(allEvents)
-      setLoading(false)
-    }).catch(err => {
-      console.error(err)
-      setLoading(false)
-    })
-  }, [])
+  useEffect(() => {
+    fetchSchedules();
+  }, []);
 
   const programColors: Record<string, string> = {
     "기타일정": "bg-slate-700/90 text-white border-slate-800 shadow-sm",

@@ -248,70 +248,101 @@ function ScheduleRow({ sessions, color, isHighlight, hideCompleters }: any) {
     )
   }
 
-  // Group by Program Name
+  // Group by Program Name and Order
   const grouped = sessions.reduce((acc: any, s: any) => {
-    const pName = s.program ? `${s.program.order}. ${s.program.name}` : "0. 미정 사업";
-    if (!acc[pName]) acc[pName] = [];
-    acc[pName].push(s);
+    const pOrder = s.program?.order ?? 999;
+    const pName = s.program?.name || "미정 사업";
+    const key = `${pOrder}:::${pName}`;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(s);
     return acc;
   }, {});
 
-  // Sort Program Names by the numeric prefix
-  const sortedProgramNames = Object.keys(grouped).sort((a, b) => {
-    const numA = parseInt(a.split('.')[0]) || 0;
-    const numB = parseInt(b.split('.')[0]) || 0;
-    return numA - numB;
+  const sortedKeys = Object.keys(grouped).sort((a, b) => {
+    const orderA = parseInt(a.split(':::')[0]);
+    const orderB = parseInt(b.split(':::')[0]);
+    return orderA - orderB;
   });
 
   return (
     <div className="space-y-8">
-      {sortedProgramNames.map((pName) => (
-        <Card key={pName} className={`border-none shadow-sm overflow-hidden bg-white ${isHighlight ? 'ring-1 ring-orange-200' : ''}`}>
-          <div className={`px-5 py-3 border-b border-slate-100 flex items-center justify-between ${isHighlight ? 'bg-orange-50/50' : 'bg-slate-50/50'}`}>
-            <h4 className="font-black text-slate-800 flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${isHighlight ? 'bg-orange-500' : 'bg-slate-400'}`}></div>
-              {pName}
-            </h4>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{grouped[pName].length}개 세션</span>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50/30 text-[11px] font-black text-slate-400 uppercase tracking-tighter border-b border-slate-100">
-                  <th className="px-5 py-3 font-black whitespace-nowrap">일자</th>
-                  <th className="px-5 py-3 font-black whitespace-nowrap">회차</th>
-                  <th className="px-5 py-3 font-black whitespace-nowrap">협력업체</th>
-                  <th className="px-5 py-3 font-black text-center whitespace-nowrap">정원</th>
-                  <th className="px-5 py-3 font-black text-center whitespace-nowrap">신청인원</th>
-                  {!hideCompleters && <th className="px-5 py-3 font-black text-center border-l border-slate-50 whitespace-nowrap">출석인원</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {grouped[pName].map((s: any, idx: number) => (
-                  <tr key={s.id} className={`text-sm border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors group`}>
-                    <td className="px-5 py-4 font-bold text-slate-700">
-                      {new Date(s.date).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric', weekday: 'short' })}
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-[10px] font-bold">{s.sessionNumber}회차</span>
-                    </td>
-                    <td className="px-5 py-4 font-bold text-slate-600">
-                      {s.partner?.name || '-'}
-                    </td>
-                    <td className="px-5 py-4 text-center font-black text-slate-800">{s.capacity || 0}</td>
-                    <td className="px-5 py-4 text-center font-black text-blue-600">{s.participantCount || 0}</td>
-                    {!hideCompleters && (
-                      <td className="px-5 py-4 text-center font-black text-emerald-600 border-l border-slate-50">
-                        {s.completerCount || 0}
-                      </td>
-                    )}
+      {sortedKeys.map((key) => {
+        const [_, pName] = key.split(':::');
+        const items = grouped[key];
+        const isSpecial = pName === "기타 운영 일정" || pName === "회의";
+        
+        return (
+          <Card key={key} className={`border-none shadow-sm overflow-hidden bg-white ${isHighlight ? 'ring-1 ring-orange-200' : ''}`}>
+            <div className={cn(
+              "px-5 py-3 border-b border-slate-100 flex items-center justify-between",
+              isHighlight ? 'bg-orange-50/50' : isSpecial ? 'bg-slate-100/50' : 'bg-slate-50/50'
+            )}>
+              <h4 className="font-black text-slate-800 flex items-center gap-2">
+                <div className={cn(
+                  "w-2.5 h-2.5 rounded-full shadow-sm",
+                  isHighlight ? 'bg-orange-500' : isSpecial ? 'bg-slate-400' : 'bg-blue-500'
+                )}></div>
+                {pName}
+              </h4>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{items.length}개 항목</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/30 text-[11px] font-black text-slate-400 uppercase tracking-tighter border-b border-slate-100">
+                    <th className="px-5 py-3 font-black whitespace-nowrap">일자</th>
+                    <th className="px-5 py-3 font-black whitespace-nowrap">회차/구분</th>
+                    <th className="px-5 py-3 font-black whitespace-nowrap">파트너/내용</th>
+                    <th className="px-5 py-3 font-black text-center whitespace-nowrap">정원</th>
+                    <th className="px-5 py-3 font-black text-center whitespace-nowrap">신청</th>
+                    {!hideCompleters && <th className="px-5 py-3 font-black text-center border-l border-slate-100 whitespace-nowrap">출석</th>}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      ))}
+                </thead>
+                <tbody>
+                  {items.map((s: any) => (
+                    <tr key={s.id} className="text-sm border-b border-slate-50 last:border-0 hover:bg-slate-50/40 transition-colors group">
+                      <td className={cn(
+                        "px-5 py-4 font-bold text-slate-700",
+                        isHighlight && "text-orange-700"
+                      )}>
+                        {new Date(s.date).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric', weekday: 'short' })}
+                      </td>
+                      <td className="px-5 py-4">
+                        <span className={cn(
+                          "px-2 py-0.5 rounded text-[10px] font-black",
+                          isSpecial ? "bg-slate-200 text-slate-600" : "bg-blue-50 text-blue-600"
+                        )}>
+                          {isSpecial ? "기본" : `${s.sessionNumber}회차`}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 font-bold text-slate-600 max-w-[200px] truncate">
+                        {s.partner?.name || (pName === '회의' ? s.title : '-')}
+                      </td>
+                      <td className="px-5 py-4 text-center font-black text-slate-400">
+                        {s.capacity > 0 ? s.capacity : '-'}
+                      </td>
+                      <td className={cn(
+                        "px-5 py-4 text-center font-black",
+                        s.participantCount > 0 ? "text-blue-600" : "text-slate-400"
+                      )}>
+                        {s.participantCount > 0 ? s.participantCount : '-'}
+                      </td>
+                      {!hideCompleters && (
+                        <td className={cn(
+                          "px-5 py-4 text-center font-black border-l border-slate-50",
+                          s.completerCount > 0 ? "text-emerald-600" : "text-slate-400"
+                        )}>
+                          {s.completerCount > 0 ? s.completerCount : '-'}
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )
+      })}
     </div>
   )
 }
