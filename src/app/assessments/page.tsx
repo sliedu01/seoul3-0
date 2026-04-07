@@ -664,56 +664,91 @@ export default function AssessmentsPage() {
 
       {/* Add Template Modal */}
       {isAddTemplateOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-              <h3 className="text-lg font-bold text-slate-900">새 평가 템플릿 추가</h3>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsAddTemplateOpen(false)}><X className="h-4 w-4"/></Button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <Card className="w-full max-w-md max-h-[90vh] flex flex-col border-none shadow-2xl rounded-[2.5rem] bg-white overflow-hidden p-0 shadow-blue-900/10">
+            <div className="flex-shrink-0 bg-blue-600 px-8 py-6 text-white flex justify-between items-center">
+              <div>
+                <h3 className="text-xl font-black">새 평가 템플릿 추가</h3>
+                <p className="text-xs font-bold opacity-80 mt-1">평가 대상과 문항 구성을 시작합니다.</p>
+              </div>
+              <button 
+                onClick={() => setIsAddTemplateOpen(false)} 
+                className="hover:rotate-90 transition-all p-2 bg-white/10 rounded-full hover:bg-white/20"
+              >
+                <X className="w-6 h-6" />
+              </button>
             </div>
-            <form onSubmit={(e) => { e.preventDefault(); handleSaveTemplateMetadata(true); }} className="p-6 space-y-5">
-              <div className="space-y-4">
-                <label className="text-sm font-bold text-slate-800 tracking-tight">템플릿 설정 정보</label>
-                <div className="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1">템플릿 이름</label>
-                    <input name="name" required className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-blue-600" value={templateFormData.name} onChange={e => setTemplateFormData({...templateFormData, name: e.target.value})} placeholder="예: 상반기 STEM 캠프 통합 설문" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1 col-span-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase ml-1">사용 범위 (선택)</label>
-                        <select 
-                            name="scope" 
-                            className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-blue-600 font-bold" 
-                            value={templateFormData.programId || "GLOBAL"} 
-                            onChange={e => {
-                                const val = e.target.value;
-                                if (val === "GLOBAL") {
-                                    setTemplateFormData({...templateFormData, scope: "GLOBAL", programId: null});
-                                } else {
-                                    setTemplateFormData({...templateFormData, scope: "PROGRAM", programId: val});
-                                }
-                            }}
-                        >
-                          <option value="GLOBAL">공통양식 (전체사업공통)</option>
-                          <optgroup label="특정 사업 전용">
-                            {programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                          </optgroup>
-                        </select>
+
+            <form onSubmit={(e) => { e.preventDefault(); handleSaveTemplateMetadata(true); }} className="flex-1 flex flex-col min-h-0">
+              <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
+                <div className="space-y-4">
+                  <label className="text-sm font-black text-slate-800 tracking-tight flex items-center gap-2">
+                    <Settings className="w-4 h-4 text-blue-600" /> 템플릿 설정 정보
+                  </label>
+                  <div className="space-y-3 bg-slate-50 p-5 rounded-3xl border border-slate-100">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase ml-1">템플릿 이름 *</label>
+                      <input 
+                        name="name" 
+                        required 
+                        className="w-full h-12 bg-white border border-slate-200 rounded-2xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none" 
+                        value={templateFormData.name} 
+                        onChange={e => setTemplateFormData({...templateFormData, name: e.target.value})} 
+                        placeholder="예: 상반기 STEM 캠프 통합 설문" 
+                      />
                     </div>
-                    <div className="space-y-1 col-span-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase ml-1">구글폼 URL (선택)</label>
-                        <input name="googleFormUrl" className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-blue-600" value={templateFormData.googleFormUrl} onChange={e => setTemplateFormData({...templateFormData, googleFormUrl: e.target.value})} placeholder="https://..." />
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase ml-1">사용 범위 (선택)</label>
+                      <select 
+                        name="scope" 
+                        className="w-full h-12 bg-white border border-slate-200 rounded-2xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none" 
+                        value={templateFormData.programId || "GLOBAL"} 
+                        onChange={e => {
+                          const val = e.target.value;
+                          if (val === "GLOBAL") {
+                            setTemplateFormData({...templateFormData, scope: "GLOBAL", programId: null});
+                          } else {
+                            setTemplateFormData({...templateFormData, scope: "PROGRAM", programId: val});
+                          }
+                        }}
+                      >
+                        <option value="GLOBAL">공통양식 (전체사업공통)</option>
+                        <optgroup label="특정 사업 전용">
+                          {programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </optgroup>
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase ml-1">구글폼 URL (선택)</label>
+                      <input 
+                        name="googleFormUrl" 
+                        className="w-full h-12 bg-white border border-slate-200 rounded-2xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none" 
+                        value={templateFormData.googleFormUrl} 
+                        onChange={e => setTemplateFormData({...templateFormData, googleFormUrl: e.target.value})} 
+                        placeholder="https://forms.gle/..." 
+                      />
                     </div>
                   </div>
                 </div>
               </div>
               
-              <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
-                <Button type="button" variant="ghost" onClick={() => setIsAddTemplateOpen(false)} className="text-slate-400 font-bold">취소</Button>
-                <Button type="submit" className="bg-slate-900 hover:bg-slate-800 text-white font-black px-8 rounded-xl h-11 shadow-lg shadow-slate-200 transition-all active:scale-95">템플릿 생성 및 필수문항 자동구성</Button>
+              <div className="flex-shrink-0 p-8 border-t border-slate-100 flex flex-col gap-3 bg-slate-50/50">
+                <Button 
+                  type="submit" 
+                  className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl shadow-lg shadow-blue-100 transition-all active:scale-[0.98]"
+                >
+                  템플릿 생성 및 기초 문항 자동구성
+                </Button>
+                <button 
+                  type="button" 
+                  onClick={() => setIsAddTemplateOpen(false)} 
+                  className="text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  취소하고 돌아가기
+                </button>
               </div>
             </form>
-          </div>
+          </Card>
         </div>
       )}
 
@@ -954,36 +989,87 @@ export default function AssessmentsPage() {
 
       {/* Settings Modal */}
       {isSettingsOpen && selectedTemplate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in zoom-in-95">
-            <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center">
-              <h3 className="text-base font-bold text-slate-900">템플릿 설정</h3>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsSettingsOpen(false)}><X className="h-4 w-4"/></Button>
-            </div>
-            <div className="p-5 space-y-4">
-              <div className="space-y-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">템플릿 이름</label>
-                  <input className="w-full border border-slate-200 rounded px-3 py-2 text-sm" value={templateFormData.name} onChange={e => setTemplateFormData({...templateFormData, name: e.target.value})} />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">구글폼 URL</label>
-                  <input className="w-full border border-slate-200 rounded px-3 py-2 text-sm" value={templateFormData.googleFormUrl} onChange={e => setTemplateFormData({...templateFormData, googleFormUrl: e.target.value})} placeholder="https://forms.gle/..." />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">설명 (OCR 분석 힌트)</label>
-                  <textarea className="w-full border border-slate-200 rounded px-3 py-2 text-sm h-20 resize-none" value={templateFormData.description} onChange={e => setTemplateFormData({...templateFormData, description: e.target.value})} />
-                </div>
-                <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={() => handleSaveTemplateMetadata(false)}>설정 저장하기</Button>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <Card className="w-full max-w-md max-h-[90vh] flex flex-col border-none shadow-2xl rounded-[2.5rem] bg-white overflow-hidden p-0 shadow-blue-900/10">
+            <div className="flex-shrink-0 bg-slate-800 px-8 py-6 text-white flex justify-between items-center">
+              <div>
+                <h3 className="text-xl font-black">템플릿 상세 설정</h3>
+                <p className="text-xs font-bold opacity-60 mt-1">이름, URL 및 분석 힌트를 수정합니다.</p>
               </div>
-              <hr className="border-slate-100 border-dashed" />
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-red-600">위험 구역 (Danger Zone)</label>
-                <p className="text-xs text-slate-500">이 템플릿을 삭제하면 연관된 모든 문항과 조사 결과가 영구 삭제됩니다.</p>
-                <Button variant="outline" size="sm" className="w-full text-red-600 hover:bg-red-50 border-red-200" onClick={handleDeleteTemplate}>템플릿 및 모든 데이터 삭제</Button>
+              <button 
+                onClick={() => setIsSettingsOpen(false)} 
+                className="hover:rotate-90 transition-all p-2 bg-white/10 rounded-full hover:bg-white/20"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase ml-1">템플릿 이름</label>
+                  <input 
+                    className="w-full h-12 bg-slate-50 border-none rounded-2xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none" 
+                    value={templateFormData.name} 
+                    onChange={e => setTemplateFormData({...templateFormData, name: e.target.value})} 
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase ml-1">구글폼 URL</label>
+                  <input 
+                    className="w-full h-12 bg-slate-50 border-none rounded-2xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none" 
+                    value={templateFormData.googleFormUrl} 
+                    onChange={e => setTemplateFormData({...templateFormData, googleFormUrl: e.target.value})} 
+                    placeholder="https://forms.gle/..." 
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase ml-1">설명 (OCR 분석 힌트)</label>
+                  <textarea 
+                    className="w-full bg-slate-50 border-none rounded-2xl px-4 py-4 text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none min-h-[100px] resize-none" 
+                    value={templateFormData.description} 
+                    onChange={e => setTemplateFormData({...templateFormData, description: e.target.value})} 
+                  />
+                </div>
+              </div>
+
+              <div className="pt-6 border-t border-slate-100 space-y-4">
+                <div className="flex items-center gap-2 text-rose-600">
+                  <AlertCircle className="w-4 h-4" />
+                  <span className="text-xs font-black uppercase tracking-tight text-red-600">위험 구역 (Danger Zone)</span>
+                </div>
+                <div className="p-5 bg-rose-50 rounded-3xl border border-rose-100 space-y-3">
+                  <p className="text-[11px] text-rose-600 font-bold leading-relaxed">
+                    이 템플릿을 삭제하면 연관된 모든 문항과 조사 결과가 영구적으로 삭제되며 복구할 수 없습니다.
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full h-10 border-rose-200 text-rose-600 hover:bg-rose-100 bg-white font-black rounded-xl" 
+                    onClick={handleDeleteTemplate}
+                  >
+                    템플릿 및 모든 데이터 영구 삭제
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
+
+            <div className="flex-shrink-0 p-8 border-t border-slate-100 flex gap-3 bg-slate-50/50">
+              <button 
+                type="button" 
+                onClick={() => setIsSettingsOpen(false)} 
+                className="flex-1 h-14 bg-white border border-slate-200 text-slate-600 rounded-2xl font-bold hover:bg-slate-50 transition-colors shadow-sm"
+              >
+                취소
+              </button>
+              <Button 
+                className="flex-[2] h-14 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl shadow-lg shadow-blue-100 transition-all active:scale-[0.98]" 
+                onClick={() => handleSaveTemplateMetadata(false)}
+              >
+                설정 저장 완료
+              </Button>
+            </div>
+          </Card>
         </div>
       )}
     </div>

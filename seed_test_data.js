@@ -1,4 +1,4 @@
-const { PrismaClient } = require('./src/generated/client')
+const { PrismaClient } = require('@prisma/client')
 const prisma = new PrismaClient()
 
 async function main() {
@@ -95,7 +95,7 @@ async function main() {
           programSessionId: session.id,
           templateId: template.id,
           respondentId: `S${session.sessionNumber}-${1000 + j}`,
-          targetLevel: j % 3 === 0 ? "high" : j % 3 === 1 ? "elementary" : "middle",
+          researchTarget: j % 3 === 0 ? "high" : j % 3 === 1 ? "elementary" : "middle",
           type: "NORMAL",
           answers: {
             create: template.questions.map(q => {

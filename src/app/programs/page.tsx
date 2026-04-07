@@ -1014,275 +1014,326 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
       {/* Session Modal (Course Creation/Edit) */}
       {isSessionModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <Card className="w-full max-w-xl border-none shadow-2xl rounded-[2.5rem] bg-white overflow-hidden p-0">
-            <div className="bg-blue-600 px-8 py-6 text-white flex justify-between items-center">
+          <Card className="w-full max-w-2xl max-h-[90vh] flex flex-col border-none shadow-2xl rounded-[2.5rem] bg-white overflow-hidden p-0 shadow-blue-900/10">
+            <div className="flex-shrink-0 bg-blue-600 px-8 py-6 text-white flex justify-between items-center">
               <div>
                 <h3 className="text-xl font-black">{editingSessionId ? "교육과정 수정" : "새 교육과정 추가"}</h3>
-                <p className="text-xs font-bold opacity-80 mt-1">세션 정보 일정을 등록합니다.</p>
+                <p className="text-xs font-bold opacity-80 mt-1">세션 정보와 일정을 등록합니다.</p>
               </div>
-              <button onClick={() => setIsSessionModalOpen(false)} className="hover:rotate-90 transition-transform"><X className="w-6 h-6" /></button>
+              <button 
+                onClick={() => {setIsSessionModalOpen(false); setEditingSessionId(null);}} 
+                className="hover:rotate-90 transition-all p-2 bg-white/10 rounded-full hover:bg-white/20"
+              >
+                <X className="w-6 h-6" />
+              </button>
             </div>
-            <form onSubmit={handleSessionSubmit} className="p-8 space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-400 ml-1 uppercase flex gap-2 items-center"><Calendar className="w-3 h-3" /> 시작 일자 *</label>
-                  <input 
-                    type="date" 
-                    required 
-                    value={sessionFormData.startDate} 
-                    onChange={e => {
-                      const newDate = e.target.value;
-                      // 신규 등록이거나 종료일자가 비어있는 경우 시작일자와 맞춤
-                      setSessionFormData({
-                        ...sessionFormData, 
-                        startDate: newDate,
-                        endDate: (!sessionFormData.endDate || !editingSessionId) ? newDate : sessionFormData.endDate
-                      });
-                    }} 
-                    className="w-full h-12 px-4 bg-slate-50 border-none rounded-2xl text-[13px] font-bold focus:ring-2 focus:ring-blue-500" 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-400 ml-1 uppercase flex gap-2 items-center"><Clock className="w-3 h-3" /> 시작 시간</label>
-                  <input type="time" value={sessionFormData.startTime} onChange={e => setSessionFormData({...sessionFormData, startTime: e.target.value})} className="w-full h-12 px-4 bg-slate-50 border-none rounded-2xl text-[13px] font-bold focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-400 ml-1 uppercase flex gap-2 items-center"><Calendar className="w-3 h-3" /> 종료 일자 *</label>
-                  <input type="date" required value={sessionFormData.endDate} onChange={e => setSessionFormData({...sessionFormData, endDate: e.target.value})} className="w-full h-12 px-4 bg-slate-50 border-none rounded-2xl text-[13px] font-bold focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-400 ml-1 uppercase flex gap-2 items-center"><Clock className="w-3 h-3" /> 종료 시간</label>
-                  <input type="time" value={sessionFormData.endTime} onChange={e => setSessionFormData({...sessionFormData, endTime: e.target.value})} className="w-full h-12 px-4 bg-slate-50 border-none rounded-2xl text-[13px] font-bold focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div className="space-y-2 col-span-2">
-                  <label className="text-xs font-black text-slate-400 ml-1 uppercase flex gap-2 items-center"><Building2 className="w-3 h-3" /> 협력업체 선택 *</label>
-                  <select required value={sessionFormData.partnerId} onChange={e => setSessionFormData({...sessionFormData, partnerId: e.target.value})} className="w-full h-12 px-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500">
-                    <option value="">협력업체 선택</option>
-                    {partners.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
-                </div>
-                <div className="space-y-2 col-span-2">
-                  <label className="text-xs font-black text-slate-400 ml-1 uppercase flex gap-2 items-center"><BookOpen className="w-3 h-3" /> 강의명 *</label>
-                  <input required value={sessionFormData.courseName} onChange={e => setSessionFormData({...sessionFormData, courseName: e.target.value})} className="w-full h-12 px-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500" placeholder="예: 나만의 브랜드 찾기" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-400 ml-1 uppercase flex gap-2 items-center"><User className="w-3 h-3" /> 강사명</label>
-                  <input value={sessionFormData.instructorName} onChange={e => setSessionFormData({...sessionFormData, instructorName: e.target.value})} className="w-full h-12 px-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500" placeholder="강사 성함" />
-                </div>
-                <div className="col-span-2 mt-4 space-y-4 pt-6 border-t border-slate-100">
-                  <div className="flex items-center justify-between">
+
+            <form onSubmit={handleSessionSubmit} className="flex-1 flex flex-col min-h-0">
+              <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
+                <div className="grid grid-cols-2 gap-5">
+                  <div className="space-y-2 col-span-2">
                     <label className="text-xs font-black text-slate-400 ml-1 uppercase flex gap-2 items-center">
-                      <CalendarDays className="w-3 h-3 text-blue-600" /> 상세 교육일 (수업날짜/시간)
+                      <BookOpen className="w-3.5 h-3.5 text-blue-500" /> 강의명 *
                     </label>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => {
-                        const newClassDays = [...(sessionFormData.classDays || [])];
-                        // Default to next day after the last class day, or the start date
-                        const lastDate = newClassDays.length > 0 ? new Date(newClassDays[newClassDays.length - 1].date) : new Date(sessionFormData.startDate || new Date());
-                        if (newClassDays.length > 0) lastDate.setDate(lastDate.getDate() + 1);
-                        
-                        newClassDays.push({
-                          date: lastDate.toISOString().split('T')[0],
-                          startTime: sessionFormData.startTime || "09:00",
-                          endTime: sessionFormData.endTime || "12:00",
-                          title: `${sessionFormData.courseName || ""} ${newClassDays.length + 1}차시`,
-                          capacity: sessionFormData.capacity || "30",
-                          participantCount: "0"
-                        });
-                        setSessionFormData({...sessionFormData, classDays: newClassDays});
-                      }}
-                      className="h-8 px-3 text-[10px] font-black border-blue-200 text-blue-600 hover:bg-blue-50 rounded-xl whitespace-nowrap"
-                    >
-                      <Plus className="w-3 h-3 mr-1" /> 교육일 추가
-                    </Button>
+                    <input 
+                      required 
+                      value={sessionFormData.courseName} 
+                      onChange={e => setSessionFormData({...sessionFormData, courseName: e.target.value})} 
+                      className="w-full h-12 px-4 bg-slate-50 border-2 border-transparent rounded-2xl text-sm font-bold focus:bg-white focus:border-blue-500 transition-all" 
+                      placeholder="예: 나만의 브랜드 찾기" 
+                    />
                   </div>
                   
-                  <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                    {sessionFormData.classDays?.map((cd: any, idx: number) => (
-                      <div key={idx} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-3 relative group/cd">
-                        <button 
-                          type="button"
-                          onClick={() => {
-                            const newClassDays = sessionFormData.classDays.filter((_: any, i: number) => i !== idx);
-                            setSessionFormData({...sessionFormData, classDays: newClassDays});
-                          }}
-                          className="absolute top-2 right-2 p-1 text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover/cd:opacity-100"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-black text-slate-400">날짜</label>
-                            <input 
-                              type="date" 
-                              value={cd.date} 
-                              onChange={e => {
-                                const newClassDays = [...sessionFormData.classDays];
-                                newClassDays[idx].date = e.target.value;
-                                setSessionFormData({...sessionFormData, classDays: newClassDays});
-                              }}
-                              className="w-full h-8 px-2 bg-white border-none rounded-lg text-[11px] font-bold focus:ring-1 focus:ring-blue-500" 
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-black text-slate-400">수업명</label>
-                            <input 
-                              type="text" 
-                              value={cd.title} 
-                              onChange={e => {
-                                const newClassDays = [...sessionFormData.classDays];
-                                newClassDays[idx].title = e.target.value;
-                                setSessionFormData({...sessionFormData, classDays: newClassDays});
-                              }}
-                              className="w-full h-8 px-2 bg-white border-none rounded-lg text-[11px] font-bold focus:ring-1 focus:ring-blue-500" 
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-black text-slate-400">시작 시간</label>
-                            <input 
-                              type="time" 
-                              value={cd.startTime} 
-                              onChange={e => {
-                                const newClassDays = [...sessionFormData.classDays];
-                                newClassDays[idx].startTime = e.target.value;
-                                setSessionFormData({...sessionFormData, classDays: newClassDays});
-                              }}
-                              className="w-full h-8 px-2 bg-white border-none rounded-lg text-[11px] font-bold focus:ring-1 focus:ring-blue-500" 
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-black text-slate-400">종료 시간</label>
-                            <input 
-                              type="time" 
-                              value={cd.endTime} 
-                              onChange={e => {
-                                const newClassDays = [...sessionFormData.classDays];
-                                newClassDays[idx].endTime = e.target.value;
-                                setSessionFormData({...sessionFormData, classDays: newClassDays});
-                              }}
-                              className="w-full h-8 px-2 bg-white border-none rounded-lg text-[11px] font-bold focus:ring-1 focus:ring-blue-500" 
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                    {(!sessionFormData.classDays || sessionFormData.classDays.length === 0) && (
-                      <div className="text-center py-6 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                        <p className="text-[11px] font-bold text-slate-400 italic">추가된 세부 교육일이 없습니다.</p>
-                      </div>
-                    )}
+                  <div className="space-y-2 col-span-2">
+                    <label className="text-xs font-black text-slate-400 ml-1 uppercase flex gap-2 items-center">
+                      <Building2 className="w-3.5 h-3.5 text-blue-500" /> 협력업체 선택 *
+                    </label>
+                    <select 
+                      required 
+                      value={sessionFormData.partnerId} 
+                      onChange={e => setSessionFormData({...sessionFormData, partnerId: e.target.value})} 
+                      className="w-full h-12 px-4 bg-slate-50 border-2 border-transparent rounded-2xl text-sm font-bold focus:bg-white focus:border-blue-500 transition-all outline-none"
+                    >
+                      <option value="">협력업체 선택</option>
+                      {partners.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
                   </div>
-                </div>
 
-                {/* v1.0.4: Partner Documents Management Section (Business Registration, Contract, Insurance, Bankbook, Checklist) */}
-                {sessionFormData.partnerId && (
-                  <div className="col-span-2 mt-4 space-y-4 pt-6 border-t border-slate-100 animate-in fade-in slide-in-from-top-2 duration-300">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-sm font-black text-slate-900 flex items-center gap-2">
-                        <Building2 className="w-4 h-4 text-blue-600" /> 협력업체 증빙 서류 관리
-                      </h4>
-                      <p className="text-[10px] text-slate-400 font-bold">* 가공되지 않은 원본 저장 및 출력용</p>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-slate-400 ml-1 uppercase flex gap-2 items-center">
+                      <Calendar className="w-3.5 h-3.5 text-blue-500" /> 시작 일자 *
+                    </label>
+                    <input 
+                      type="date" 
+                      required 
+                      value={sessionFormData.startDate} 
+                      onChange={e => {
+                        const newDate = e.target.value;
+                        setSessionFormData({
+                          ...sessionFormData, 
+                          startDate: newDate,
+                          endDate: (!sessionFormData.endDate || !editingSessionId) ? newDate : sessionFormData.endDate
+                        });
+                      }} 
+                      className="w-full h-12 px-4 bg-slate-50 border-2 border-transparent rounded-2xl text-[13px] font-bold focus:bg-white focus:border-blue-500 transition-all outline-none" 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-slate-400 ml-1 uppercase flex gap-2 items-center">
+                      <Clock className="w-3.5 h-3.5 text-blue-500" /> 시작 시간
+                    </label>
+                    <input type="time" value={sessionFormData.startTime} onChange={e => setSessionFormData({...sessionFormData, startTime: e.target.value})} className="w-full h-12 px-4 bg-slate-50 border-2 border-transparent rounded-2xl text-[13px] font-bold focus:bg-white focus:border-blue-500 transition-all outline-none" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-slate-400 ml-1 uppercase flex gap-2 items-center">
+                      <Calendar className="w-3.5 h-3.5 text-blue-500" /> 종료 일자 *
+                    </label>
+                    <input type="date" required value={sessionFormData.endDate} onChange={e => setSessionFormData({...sessionFormData, endDate: e.target.value})} className="w-full h-12 px-4 bg-slate-50 border-2 border-transparent rounded-2xl text-[13px] font-bold focus:bg-white focus:border-blue-500 transition-all outline-none" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-slate-400 ml-1 uppercase flex gap-2 items-center">
+                      <Clock className="w-3.5 h-3.5 text-blue-500" /> 종료 시간
+                    </label>
+                    <input type="time" value={sessionFormData.endTime} onChange={e => setSessionFormData({...sessionFormData, endTime: e.target.value})} className="w-full h-12 px-4 bg-slate-50 border-2 border-transparent rounded-2xl text-[13px] font-bold focus:bg-white focus:border-blue-500 transition-all outline-none" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-slate-400 ml-1 uppercase flex gap-2 items-center">
+                      <User className="w-3.5 h-3.5 text-blue-500" /> 강사명
+                    </label>
+                    <input 
+                      value={sessionFormData.instructorName} 
+                      onChange={e => setSessionFormData({...sessionFormData, instructorName: e.target.value})} 
+                      className="w-full h-12 px-4 bg-slate-50 border-2 border-transparent rounded-2xl text-sm font-bold focus:bg-white focus:border-blue-500 transition-all outline-none" 
+                      placeholder="강사 성함" 
+                    />
+                  </div>
+
+                  <div className="col-span-2 mt-4 space-y-4 pt-6 border-t border-slate-100">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-black text-slate-400 ml-1 uppercase flex gap-2 items-center">
+                        <CalendarDays className="w-4 h-4 text-blue-600" /> 상세 교육일 (수업날짜/시간)
+                      </label>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => {
+                          const newClassDays = [...(sessionFormData.classDays || [])];
+                          const lastDate = newClassDays.length > 0 ? new Date(newClassDays[newClassDays.length - 1].date) : new Date(sessionFormData.startDate || new Date());
+                          if (newClassDays.length > 0) lastDate.setDate(lastDate.getDate() + 1);
+                          
+                          newClassDays.push({
+                            date: lastDate.toISOString().split('T')[0],
+                            startTime: sessionFormData.startTime || "09:00",
+                            endTime: sessionFormData.endTime || "12:00",
+                            title: `${sessionFormData.courseName || ""} ${newClassDays.length + 1}차시`,
+                            capacity: sessionFormData.capacity || "30",
+                            participantCount: "0"
+                          });
+                          setSessionFormData({...sessionFormData, classDays: newClassDays});
+                        }}
+                        className="h-9 px-4 text-xs font-black border-blue-200 text-blue-600 hover:bg-blue-50 rounded-xl whitespace-nowrap transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5 mr-1" /> 교육일 추가
+                      </Button>
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {[
-                        { label: "사업자등록증", field: "businessRegistration" },
-                        { label: "계약서 원본", field: "contractFile" },
-                        { label: "보험증권", field: "insuranceFile" },
-                        { label: "통장사본", field: "bankbookFile" },
-                        { label: "사전점검체크리스트", field: "preInspectionFile" }
-                      ].map((item) => {
-                        const partner = partners.find(p => p.id === sessionFormData.partnerId);
-                        const value = partner ? (partner as any)[item.field] : null;
-                        
-                        return (
-                          <div key={item.field} className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[11px] font-black text-slate-500">{item.label}</span>
-                              {value && (
-                                <div className="flex gap-1">
-                                  <button 
-                                    type="button"
-                                    onClick={() => {
-                                      const link = document.createElement("a");
-                                      link.href = `/api/download?file=${encodeURIComponent(value)}`;
-                                      link.download = value;
-                                      document.body.appendChild(link);
-                                      link.click();
-                                      document.body.removeChild(link);
-                                    }}
-                                    className="p-1.5 bg-white text-blue-600 border border-blue-100 rounded-lg hover:bg-blue-50 transition-colors shadow-sm"
-                                    title="원본 다운로드"
-                                  >
-                                    <Download className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button 
-                                    type="button"
-                                    onClick={() => window.open(`/api/download?file=${encodeURIComponent(value)}`, '_blank')}
-                                    className="p-1.5 bg-white text-slate-600 border border-slate-100 rounded-lg hover:bg-slate-50 transition-colors shadow-sm"
-                                    title="인쇄 전 미리보기"
-                                  >
-                                    <Link className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                            
-                            <label className={cn(
-                              "relative flex items-center justify-center h-10 border-2 border-dashed rounded-xl cursor-pointer transition-all overflow-hidden",
-                              value ? "border-emerald-200 bg-white" : "border-slate-200 bg-slate-100 hover:border-blue-300 hover:bg-white"
-                            )}>
+                    <div className="space-y-3">
+                      {sessionFormData.classDays?.map((cd: any, idx: number) => (
+                        <div key={idx} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-3 relative group/cd">
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              const newClassDays = sessionFormData.classDays.filter((_: any, i: number) => i !== idx);
+                              setSessionFormData({...sessionFormData, classDays: newClassDays});
+                            }}
+                            className="absolute top-3 right-3 p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-all opacity-0 group-hover/cd:opacity-100"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black text-slate-400 ml-1">수업 날짜</label>
                               <input 
-                                type="file" 
-                                accept=".pdf" 
-                                className="hidden" 
-                                onChange={async (e) => {
-                                  const file = e.target.files?.[0];
-                                  if (!file) return;
-                                  
-                                  const formData = new FormData();
-                                  formData.append("file", file);
-                                  
-                                  const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
-                                  if (uploadRes.ok) {
-                                    const result = await uploadRes.json();
-                                    const partner = partners.find(p => p.id === sessionFormData.partnerId);
-                                    if (partner) {
-                                      const updatedPartner = { ...partner, [item.field]: result.fileName };
-                                      const updateRes = await fetch(`/api/partners/${partner.id}`, {
-                                        method: "PUT",
-                                        headers: { "Content-Type": "application/json" },
-                                        body: JSON.stringify(updatedPartner)
-                                      });
-                                      if (updateRes.ok) {
-                                        setPartners(partners.map(p => p.id === partner.id ? updatedPartner : p));
-                                        alert(`${item.label} 원본이 성공적으로 업로드되었습니다.`);
-                                      }
-                                    }
-                                  }
+                                type="date" 
+                                value={cd.date} 
+                                onChange={e => {
+                                  const newClassDays = [...sessionFormData.classDays];
+                                  newClassDays[idx].date = e.target.value;
+                                  setSessionFormData({...sessionFormData, classDays: newClassDays});
                                 }}
+                                className="w-full h-10 px-3 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:border-blue-500 transition-all outline-none" 
                               />
-                              <div className="flex items-center gap-2 truncate px-2">
-                                {value ? (
-                                  <><FilePlus2 className="w-3.5 h-3.5 text-emerald-500" /><span className="text-[10px] font-bold text-emerald-600 truncate max-w-[120px]">{value}</span></>
-                                ) : (
-                                  <><UploadCloud className="w-3.5 h-3.5 text-slate-400" /><span className="text-[10px] font-bold text-slate-400 text-center leading-none">원본 PDF 업로드</span></>
-                                )}
-                              </div>
-                            </label>
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black text-slate-400 ml-1">수업 명칭</label>
+                              <input 
+                                type="text" 
+                                value={cd.title} 
+                                onChange={e => {
+                                  const newClassDays = [...sessionFormData.classDays];
+                                  newClassDays[idx].title = e.target.value;
+                                  setSessionFormData({...sessionFormData, classDays: newClassDays});
+                                }}
+                                className="w-full h-10 px-3 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:border-blue-500 transition-all outline-none" 
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black text-slate-400 ml-1">시작 시간</label>
+                              <input 
+                                type="time" 
+                                value={cd.startTime} 
+                                onChange={e => {
+                                  const newClassDays = [...sessionFormData.classDays];
+                                  newClassDays[idx].startTime = e.target.value;
+                                  setSessionFormData({...sessionFormData, classDays: newClassDays});
+                                }}
+                                className="w-full h-10 px-3 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:border-blue-500 transition-all outline-none" 
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black text-slate-400 ml-1">종료 시간</label>
+                              <input 
+                                type="time" 
+                                value={cd.endTime} 
+                                onChange={e => {
+                                  const newClassDays = [...sessionFormData.classDays];
+                                  newClassDays[idx].endTime = e.target.value;
+                                  setSessionFormData({...sessionFormData, classDays: newClassDays});
+                                }}
+                                className="w-full h-10 px-3 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:border-blue-500 transition-all outline-none" 
+                              />
+                            </div>
                           </div>
-                        )
-                      })}
+                        </div>
+                      ))}
+                      {(!sessionFormData.classDays || sessionFormData.classDays.length === 0) && (
+                        <div className="text-center py-10 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                          <p className="text-xs font-bold text-slate-400 italic">추가된 세부 교육일이 없습니다.</p>
+                        </div>
+                      )}
                     </div>
                   </div>
-                )}
+
+                  {sessionFormData.partnerId && (
+                    <div className="col-span-2 mt-4 space-y-4 pt-6 border-t border-slate-100 animate-in fade-in slide-in-from-top-2 duration-300">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                          <Building2 className="w-4 h-4 text-blue-600" /> 협력업체 증빙 서류 관리
+                        </h4>
+                        <p className="text-[10px] text-slate-400 font-bold">* 원본 PDF 업로드 및 미리보기용</p>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {[
+                          { label: "사업자등록증", field: "businessRegistration" },
+                          { label: "계약서 원본", field: "contractFile" },
+                          { label: "보험증권", field: "insuranceFile" },
+                          { label: "통장사본", field: "bankbookFile" },
+                          { label: "사전점검체크리스트", field: "preInspectionFile" }
+                        ].map((item) => {
+                          const partner = partners.find(p => p.id === sessionFormData.partnerId);
+                          const value = partner ? (partner as any)[item.field] : null;
+                          
+                          return (
+                            <div key={item.field} className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-black text-slate-500">{item.label}</span>
+                                {value && (
+                                  <div className="flex gap-1">
+                                    <button 
+                                      type="button"
+                                      onClick={() => {
+                                        const link = document.createElement("a");
+                                        link.href = `/api/download?file=${encodeURIComponent(value)}`;
+                                        link.download = value;
+                                        document.body.appendChild(link);
+                                        link.click();
+                                        document.body.removeChild(link);
+                                      }}
+                                      className="p-1.5 bg-white text-blue-600 border border-blue-100 rounded-lg hover:bg-blue-50 transition-colors shadow-sm"
+                                      title="원본 다운로드"
+                                    >
+                                      <Download className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button 
+                                      type="button"
+                                      onClick={() => window.open(`/api/download?file=${encodeURIComponent(value)}`, '_blank')}
+                                      className="p-1.5 bg-white text-slate-600 border border-slate-100 rounded-lg hover:bg-slate-50 transition-colors shadow-sm"
+                                      title="미리보기"
+                                    >
+                                      <Link className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                              
+                              <label className={cn(
+                                "relative flex items-center justify-center h-10 border-2 border-dashed rounded-xl cursor-pointer transition-all overflow-hidden",
+                                value ? "border-emerald-200 bg-white" : "border-slate-200 bg-slate-100 hover:border-blue-300 hover:bg-white"
+                              )}>
+                                <input 
+                                  type="file" 
+                                  accept=".pdf" 
+                                  className="hidden" 
+                                  onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    
+                                    const formData = new FormData();
+                                    formData.append("file", file);
+                                    
+                                    const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
+                                    if (uploadRes.ok) {
+                                      const result = await uploadRes.json();
+                                      const partner = partners.find(p => p.id === sessionFormData.partnerId);
+                                      if (partner) {
+                                        const updatedPartner = { ...partner, [item.field]: result.fileName };
+                                        const updateRes = await fetch(`/api/partners/${partner.id}`, {
+                                          method: "PUT",
+                                          headers: { "Content-Type": "application/json" },
+                                          body: JSON.stringify(updatedPartner)
+                                        });
+                                        if (updateRes.ok) {
+                                          setPartners(partners.map(p => p.id === partner.id ? updatedPartner : p));
+                                          alert(`${item.label} 원본이 성공적으로 업로드되었습니다.`);
+                                        }
+                                      }
+                                    }
+                                  }}
+                                />
+                                <div className="flex items-center gap-2 truncate px-2">
+                                  {value ? (
+                                    <><FilePlus2 className="w-3.5 h-3.5 text-emerald-500" /><span className="text-[10px] font-bold text-emerald-600 truncate max-w-[120px]">{value}</span></>
+                                  ) : (
+                                    <><UploadCloud className="w-3.5 h-3.5 text-slate-400" /><span className="text-[10px] font-bold text-slate-400 text-center leading-none">PDF 업로드</span></>
+                                  )}
+                                </div>
+                              </label>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-              <Button type="submit" className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl shadow-lg shadow-blue-100 transition-all active:scale-[0.98]">
-                {editingSessionId ? "교육과정 수정 저장" : "교육과정 추가 완료"}
-              </Button>
+              <div className="flex-shrink-0 p-8 border-t border-slate-100 flex justify-end gap-3 bg-slate-50/50 rounded-b-[2.5rem]">
+                <button 
+                  type="button" 
+                  onClick={() => {setIsSessionModalOpen(false); setEditingSessionId(null);}} 
+                  className="px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-2xl font-bold hover:bg-slate-50 transition-colors shadow-sm"
+                >
+                  취소
+                </button>
+                <Button 
+                  type="submit" 
+                  className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl shadow-lg shadow-blue-100 transition-all active:scale-[0.98]"
+                >
+                  {editingSessionId ? "수정 내용 저장" : "교육과정 등록 완료"}
+                </Button>
+              </div>
             </form>
           </Card>
         </div>

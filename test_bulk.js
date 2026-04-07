@@ -1,4 +1,4 @@
-const fetch = require('node-fetch');
+// Native fetch is available in Node.js
 
 async function test() {
   // We need real IDs from the DB. Let's fetch others first or hardcode some from seed
@@ -20,7 +20,7 @@ async function test() {
 
   console.log('Testing Bulk API...');
   // Let's actually find real IDs first
-  const { PrismaClient } = require('./src/generated/client');
+  const { PrismaClient } = require('@prisma/client');
   const prisma = new PrismaClient();
   const session = await prisma.programSession.findFirst();
   const template = await prisma.questionTemplate.findFirst({

@@ -338,136 +338,142 @@ export default function MeetingsPage() {
 
       {/* New Meeting Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-[40px] w-full max-w-4xl max-h-[90vh] shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col">
-            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-white">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <Card className="w-full max-w-4xl max-h-[90vh] flex flex-col border-none shadow-2xl rounded-[2.5rem] bg-white overflow-hidden p-0 shadow-blue-900/10">
+            <div className="flex-shrink-0 bg-blue-600 px-8 py-7 text-white flex justify-between items-center">
               <div>
-                <h2 className="text-2xl font-black text-slate-900">{isEditing ? "회의록 수정" : "신규 회의 추가"}</h2>
-                <p className="text-slate-400 text-xs font-bold mt-1 uppercase tracking-widest">{isEditing ? "Update Meeting Details" : "New Meeting Registration"}</p>
+                <h2 className="text-2xl font-black">{isEditing ? "회의록 수정" : "신규 회의 등록"}</h2>
+                <p className="text-xs font-bold opacity-80 mt-1 uppercase tracking-widest">
+                  {isEditing ? "Update Meeting Details" : "New Meeting Registration"}
+                </p>
               </div>
               <button 
                 onClick={resetForm} 
-                className="p-3 hover:bg-slate-100 rounded-2xl transition-colors"
+                className="hover:rotate-90 transition-all p-3 bg-white/10 rounded-full hover:bg-white/20"
               >
-                <X className="w-6 h-6 text-slate-400" />
+                <X className="w-7 h-7" />
               </button>
             </div>
             
-            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8 space-y-10 custom-scrollbar">
-              {/* Dropzone - Only show when creating new meeting */}
-              {!isEditing && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 ml-1">
-                    <div className="w-1.5 h-3 bg-blue-600 rounded-full"></div>
-                    <h3 className="text-sm font-black text-slate-800">회의록 파일 업로드 (AI OCR 자동 분석)</h3>
-                  </div>
-                  <label className={`block w-full h-24 border-2 border-dashed rounded-3xl cursor-pointer transition-all relative overflow-hidden ${selectedFile ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50'}`}>
-                    <input type="file" accept=".pdf" className="hidden" onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])} />
-                    <div className="flex items-center justify-center h-full gap-4">
-                      <div className={`p-3 rounded-2xl ${selectedFile ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
-                        {isUploading ? <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div> : <UploadCloud className="w-6 h-6" />}
+            <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
+              <div className="flex-1 overflow-y-auto p-10 space-y-12 custom-scrollbar">
+                {/* AI OCR Section - Only for new */}
+                {!isEditing && (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 ml-1">
+                      <div className="w-1.5 h-3 bg-blue-500 rounded-full"></div>
+                      <h3 className="text-sm font-black text-slate-800">회의록 파일 업로드 (AI OCR 자동 분석)</h3>
+                    </div>
+                    <label className={`block w-full h-32 border-2 border-dashed rounded-[2rem] cursor-pointer transition-all relative overflow-hidden ${selectedFile ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50'}`}>
+                      <input type="file" accept=".pdf" className="hidden" onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])} />
+                      <div className="flex items-center justify-center h-full gap-5">
+                        <div className={`p-4 rounded-2xl ${selectedFile ? 'bg-emerald-100 text-emerald-600' : 'bg-white shadow-sm text-slate-400'}`}>
+                          {isUploading ? <div className="w-6 h-6 border-3 border-blue-600 border-t-transparent rounded-full animate-spin"></div> : <UploadCloud className="w-8 h-8" />}
+                        </div>
+                        <div>
+                          <p className="text-base font-black text-slate-800">{selectedFile ? selectedFile.name : '회의록 PDF 드래그 또는 클릭'}</p>
+                          <p className="text-xs text-slate-400 font-bold mt-1">{isUploading ? 'AI가 문서를 분석하여 아래 필드를 채우고 있습니다...' : '파일을 업로드하면 참석자, 안건 등이 자동 추출됩니다.'}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-black text-slate-800">{selectedFile ? selectedFile.name : '회의록 PDF 드래그 또는 클릭'}</p>
-                        <p className="text-xs text-slate-400 font-bold">{isUploading ? 'AI가 문서를 분석하여 아래 필드를 채우고 있습니다...' : '파일을 업로드하면 참석자, 안건 등이 자동 추출됩니다.'}</p>
+                    </label>
+                  </div>
+                )}
+
+                {/* 1. Basic Info Section */}
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2 ml-1">
+                    <div className="w-1.5 h-3 bg-indigo-500 rounded-full"></div>
+                    <h3 className="text-sm font-black text-slate-800 tracking-tight">1. 회의 진행 정보</h3>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-10 gap-y-5 bg-slate-50/50 p-8 rounded-[2rem] border border-slate-100">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase ml-1">회의 일자 *</label>
+                      <input type="date" value={formData.date} onChange={e => setFormData(prev => ({...prev, date: e.target.value}))} className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none shadow-sm" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase ml-1">회의 시간</label>
+                      <input type="text" placeholder="예: 14:00~16:00" value={formData.time} onChange={e => setFormData(prev => ({...prev, time: e.target.value}))} className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none shadow-sm" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase ml-1">회의 장소</label>
+                      <input type="text" placeholder="회의실 또는 화상회의 링크" value={formData.location} onChange={e => setFormData(prev => ({...prev, location: e.target.value}))} className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none shadow-sm" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase ml-1">회의 회차</label>
+                      <input type="number" value={formData.sequenceNumber} onChange={e => setFormData(prev => ({...prev, sequenceNumber: parseInt(e.target.value)}))} className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none shadow-sm" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase ml-1">참석자 명단</label>
+                      <input type="text" placeholder="총 ○명, 성함 나열" value={formData.attendees} onChange={e => setFormData(prev => ({...prev, attendees: e.target.value}))} className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none shadow-sm" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase ml-1">담당기관(수행사)</label>
+                      <input type="text" placeholder="기관명 또는 팀명" value={formData.managedOrg} onChange={e => setFormData(prev => ({...prev, managedOrg: e.target.value}))} className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none shadow-sm" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Content Section */}
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2 ml-1">
+                    <div className="w-1.5 h-3 bg-emerald-500 rounded-full"></div>
+                    <h3 className="text-sm font-black text-slate-800 tracking-tight">2. 논의 안건 및 상세 내용</h3>
+                  </div>
+                  
+                  <div className="space-y-6">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase ml-1">회의 제목 (핵심 주제) *</label>
+                      <input type="text" required placeholder="예: 2024 상반기 사업운영 점검 회의" value={formData.title} onChange={e => setFormData(prev => ({...prev, title: e.target.value}))} className="w-full h-14 bg-white border-2 border-slate-100 rounded-2xl px-5 text-base font-black focus:border-blue-500 transition-all outline-none shadow-sm" />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div className="space-y-1.5">
+                         <label className="text-[10px] font-black text-slate-400 ml-1 uppercase tracking-wider">회의 목적</label>
+                         <textarea rows={3} value={formData.purpose} onChange={e => setFormData(prev => ({...prev, purpose: e.target.value}))} className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl p-5 text-sm font-bold focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all outline-none resize-none" placeholder="회의 개요와 달성하고자 하는 목표" />
+                      </div>
+                      <div className="space-y-1.5">
+                         <label className="text-[10px] font-black text-slate-400 ml-1 uppercase tracking-wider">주요 안건</label>
+                         <textarea rows={3} value={formData.agenda} onChange={e => setFormData(prev => ({...prev, agenda: e.target.value}))} className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl p-5 text-sm font-bold focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all outline-none resize-none" placeholder="다루고자 하는 주요 토픽" />
                       </div>
                     </div>
-                  </label>
-                </div>
-              )}
 
-              {/* Basic Info Section */}
-              <div className="space-y-6">
-                <div className="flex items-center gap-2 ml-1">
-                  <div className="w-1.5 h-3 bg-indigo-600 rounded-full"></div>
-                  <h3 className="text-sm font-black text-slate-800">1. 회의 기본 정보</h3>
-                </div>
-                <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-                  <div className="flex items-center gap-4">
-                    <label className="w-24 text-[11px] font-black text-slate-400 shrink-0">회의 일자</label>
-                    <input type="date" value={formData.date} onChange={e => setFormData(prev => ({...prev, date: e.target.value}))} className="flex-1 bg-slate-50 border-none rounded-xl p-3 text-sm font-bold focus:ring-2 focus:ring-blue-500" />
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <label className="w-24 text-[11px] font-black text-slate-400 shrink-0">회의 시간</label>
-                    <input type="text" placeholder="예: 14:00" value={formData.time} onChange={e => setFormData(prev => ({...prev, time: e.target.value}))} className="flex-1 bg-slate-50 border-none rounded-xl p-3 text-sm font-bold focus:ring-2 focus:ring-blue-500" />
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <label className="w-24 text-[11px] font-black text-slate-400 shrink-0">회의 장소</label>
-                    <input type="text" placeholder="회의 장소 입력" value={formData.location} onChange={e => setFormData(prev => ({...prev, location: e.target.value}))} className="flex-1 bg-slate-50 border-none rounded-xl p-3 text-sm font-bold focus:ring-2 focus:ring-blue-500" />
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <label className="w-24 text-[11px] font-black text-slate-400 shrink-0">회의 회차</label>
-                    <input type="number" value={formData.sequenceNumber} onChange={e => setFormData(prev => ({...prev, sequenceNumber: parseInt(e.target.value)}))} className="flex-1 bg-slate-50 border-none rounded-xl p-3 text-sm font-bold focus:ring-2 focus:ring-blue-500" />
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <label className="w-24 text-[11px] font-black text-slate-400 shrink-0">참석자</label>
-                    <input type="text" placeholder="참석 인원 및 명단" value={formData.attendees} onChange={e => setFormData(prev => ({...prev, attendees: e.target.value}))} className="flex-1 bg-slate-50 border-none rounded-xl p-3 text-sm font-bold focus:ring-2 focus:ring-blue-500" />
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <label className="w-24 text-[11px] font-black text-slate-400 shrink-0">담당기관</label>
-                    <input type="text" placeholder="수행 업체명" value={formData.managedOrg} onChange={e => setFormData(prev => ({...prev, managedOrg: e.target.value}))} className="flex-1 bg-slate-50 border-none rounded-xl p-3 text-sm font-bold focus:ring-2 focus:ring-blue-500" />
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-400 ml-1 uppercase tracking-wider">회의 상세 내용 및 결과 *</label>
+                      <textarea rows={8} required value={formData.meetingContent} onChange={e => setFormData(prev => ({...prev, meetingContent: e.target.value}))} className="w-full bg-slate-50/50 border border-slate-100 rounded-[2rem] p-6 text-sm font-medium leading-relaxed focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all outline-none resize-none" placeholder="논의 상세 과정 및 합의된 결정 사항을 구체적으로 기록해 주세요." />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div className="space-y-1.5">
+                         <label className="text-[10px] font-black text-slate-400 ml-1 uppercase tracking-wider">후속 조치 / 준비 사항</label>
+                         <textarea rows={2} value={formData.preparation} onChange={e => setFormData(prev => ({...prev, preparation: e.target.value}))} className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl p-5 text-sm font-bold focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all outline-none resize-none" placeholder="차기 회의 준비물이나 할 일" />
+                      </div>
+                      <div className="space-y-1.5">
+                         <label className="text-[10px] font-black text-slate-400 ml-1 uppercase tracking-wider">기타 참고사항</label>
+                         <textarea rows={2} value={formData.others} onChange={e => setFormData(prev => ({...prev, others: e.target.value}))} className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl p-5 text-sm font-bold focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all outline-none resize-none" placeholder="특이사항이나 차기 일정 등" />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Content Section */}
-              <div className="space-y-6">
-                <div className="flex items-center gap-2 ml-1">
-                  <div className="w-1.5 h-3 bg-emerald-600 rounded-full"></div>
-                  <h3 className="text-sm font-black text-slate-800">2. 회의 내용 상세</h3>
-                </div>
-                
-                <div className="space-y-4">
-                  <div className="flex items-center gap-4">
-                    <label className="w-24 text-[11px] font-black text-slate-400 shrink-0">회의 제목</label>
-                    <input type="text" placeholder="회의의 핵심 주제" value={formData.title} onChange={e => setFormData(prev => ({...prev, title: e.target.value}))} className="flex-1 bg-slate-50 border-none rounded-xl p-4 text-sm font-bold focus:ring-2 focus:ring-blue-500" />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                       <label className="text-[11px] font-black text-slate-400 ml-1 uppercase">회의 목적</label>
-                       <textarea rows={2} value={formData.purpose} onChange={e => setFormData(prev => ({...prev, purpose: e.target.value}))} className="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-blue-500 resize-none" placeholder="회의를 개최한 이유와 목표" />
-                    </div>
-                    <div className="space-y-2">
-                       <label className="text-[11px] font-black text-slate-400 ml-1 uppercase">주요 안건</label>
-                       <textarea rows={2} value={formData.agenda} onChange={e => setFormData(prev => ({...prev, agenda: e.target.value}))} className="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-blue-500 resize-none" placeholder="논의할 핵심 사항들" />
-                    </div>
-                    <div className="space-y-2">
-                       <label className="text-[11px] font-black text-slate-400 ml-1 uppercase">준비 사항</label>
-                       <textarea rows={2} value={formData.preparation} onChange={e => setFormData(prev => ({...prev, preparation: e.target.value}))} className="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-blue-500 resize-none" placeholder="회의 전/후 필요한 준비물이나 조치" />
-                    </div>
-                    <div className="space-y-2">
-                       <label className="text-[11px] font-black text-slate-400 ml-1 uppercase">차기 일정</label>
-                       <textarea rows={2} value={formData.nextSchedule} onChange={e => setFormData(prev => ({...prev, nextSchedule: e.target.value}))} className="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-blue-500 resize-none" placeholder="다음 회의 또는 후속 조치 일정" />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[11px] font-black text-slate-400 ml-1 uppercase">상세 회의 내용</label>
-                    <textarea rows={5} value={formData.meetingContent} onChange={e => setFormData(prev => ({...prev, meetingContent: e.target.value}))} className="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold focus:ring-2 focus:ring-blue-500 resize-none" placeholder="논의 내용 및 결정 사항을 기록해 주세요." />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[11px] font-black text-slate-400 ml-1 uppercase">기타 사항</label>
-                    <input type="text" value={formData.others} onChange={e => setFormData(prev => ({...prev, others: e.target.value}))} className="w-full bg-slate-50 border-none rounded-xl p-4 text-sm font-bold focus:ring-2 focus:ring-blue-500" placeholder="위 항목 외 참고할 특이사항" />
-                  </div>
-                </div>
+              <div className="flex-shrink-0 p-8 border-t border-slate-100 bg-slate-50/50 flex gap-4">
+                <button 
+                  type="button" 
+                  onClick={resetForm} 
+                  className="flex-1 h-14 bg-white border border-slate-200 text-slate-500 rounded-2xl font-black hover:bg-slate-50 transition-colors shadow-sm"
+                >
+                  취소하기
+                </button>
+                <Button 
+                  onClick={handleSubmit} 
+                  disabled={loading} 
+                  className="flex-[2] bg-blue-600 hover:bg-blue-700 text-white h-14 rounded-2xl font-black text-lg shadow-xl shadow-blue-100 transition-all active:scale-[0.98]"
+                >
+                  {loading ? '기록 저장 중...' : (isEditing ? '수정사항 최종 저장' : '회의록 등록 완료')}
+                </Button>
               </div>
             </form>
-
-            <div className="p-8 bg-slate-50 border-t border-slate-100 flex gap-4">
-              <Button 
-                onClick={resetForm} 
-                variant="ghost" 
-                className="flex-1 h-14 rounded-2xl font-black text-slate-500 hover:bg-slate-200"
-              >
-                취소하기
-              </Button>
-              <Button onClick={handleSubmit} disabled={loading} className="flex-[2] bg-slate-900 hover:bg-black text-white h-14 rounded-2xl font-black text-lg shadow-xl shadow-slate-200">
-                {loading ? '기록 저장 중...' : (isEditing ? '수정사항 저장' : '회의록 등록 완료')}
-              </Button>
-            </div>
-          </div>
+          </Card>
         </div>
       )}
 

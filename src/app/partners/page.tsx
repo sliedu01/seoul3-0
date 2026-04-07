@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Plus, Pencil, Trash2, FileDown, UploadCloud, AlertCircle } from "lucide-react"
+import { Plus, Pencil, Trash2, FileDown, UploadCloud, AlertCircle, X } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 
 type Partner = { 
@@ -301,50 +301,63 @@ export default function PartnersPage() {
 
       {/* Main Modal Overlay */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-              <h3 className="text-lg font-bold text-slate-900">{editingId ? "협력업체 기본 정보 수정" : "새 협력업체 등록"}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">×</button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[85vh] overflow-y-auto">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700">업체명 <span className="text-red-500">*</span></label>
-                  <input required className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-blue-600 focus:ring-2 focus:ring-blue-100 transition-all" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="예: (주)에듀테크 파트너스" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">담당자 성명</label>
-                  <input className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-blue-600 focus:ring-2 focus:ring-blue-100 transition-all" value={formData.contactName} onChange={e => setFormData({...formData, contactName: e.target.value})} placeholder="홍길동" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">담당자 연락처</label>
-                  <input className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-blue-600 focus:ring-2 focus:ring-blue-100 transition-all" value={formData.contactPhone} onChange={e => setFormData({...formData, contactPhone: e.target.value})} placeholder="010-0000-0000" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">담당자 이메일</label>
-                  <input type="email" className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-blue-600 focus:ring-2 focus:ring-blue-100 transition-all" value={formData.contactEmail} onChange={e => setFormData({...formData, contactEmail: e.target.value})} placeholder="example@company.com" />
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <label className="text-sm font-semibold text-slate-700">회사 본점 주소</label>
-                  <input className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-blue-600 focus:ring-2 focus:ring-blue-100 transition-all" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} placeholder="서울특별시 중구 세종대로 110" />
-                </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <Card className="w-full max-w-xl max-h-[90vh] flex flex-col border-none shadow-2xl rounded-[2.5rem] bg-white overflow-hidden p-0 relative">
+            <div className="flex-shrink-0 bg-slate-900 px-8 py-6 text-white flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-bold">{editingId ? "협력업체 정보 수정" : "새 협력업체 등록"}</h3>
+                <p className="text-xs font-medium opacity-60 mt-1">업체 기본 정보 및 증빙 서류를 관리합니다.</p>
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
-                <FileField label="사업자등록증 (PDF)" field="businessRegistration" value={formData.businessRegistration} isUploading={isUploading === 'businessRegistration'} onUpload={handleFileUpload} />
-                <FileField label="계약서 원본 (PDF)" field="contractFile" value={formData.contractFile} isUploading={isUploading === 'contractFile'} onUpload={handleFileUpload} />
-                <FileField label="보험증권 (PDF)" field="insuranceFile" value={formData.insuranceFile} isUploading={isUploading === 'insuranceFile'} onUpload={handleFileUpload} />
-                <FileField label="사전점검체크리스트 (PDF)" field="preInspectionFile" value={formData.preInspectionFile} isUploading={isUploading === 'preInspectionFile'} onUpload={handleFileUpload} />
-                <FileField label="통장사본 (PDF)" field="bankbookFile" value={formData.bankbookFile} isUploading={isUploading === 'bankbookFile'} onUpload={handleFileUpload} />
+              <button 
+                onClick={() => {setIsModalOpen(false); setEditingId(null);}} 
+                className="hover:rotate-90 transition-transform p-1.5 bg-white/10 rounded-full hover:bg-white/20"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
+              <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-bold">
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-xs font-black text-slate-400 ml-1 uppercase">업체명 <span className="text-red-500">*</span></label>
+                    <input required className="w-full h-12 bg-slate-50 border-none rounded-2xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="상호명 입력" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700">담당자 성명</label>
+                    <input className="w-full h-12 bg-slate-50 border-none rounded-2xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none" value={formData.contactName} onChange={e => setFormData({...formData, contactName: e.target.value})} placeholder="홍길동" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700">담당자 연락처</label>
+                    <input className="w-full h-12 bg-slate-50 border-none rounded-2xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none" value={formData.contactPhone} onChange={e => setFormData({...formData, contactPhone: e.target.value})} placeholder="010-0000-0000" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-slate-700">담당자 이메일</label>
+                    <input type="email" className="w-full h-12 bg-slate-50 border-none rounded-2xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none" value={formData.contactEmail} onChange={e => setFormData({...formData, contactEmail: e.target.value})} placeholder="example@company.com" />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-sm font-semibold text-slate-700">회사 본점 주소</label>
+                    <input className="w-full h-12 bg-slate-50 border-none rounded-2xl px-4 py-2 text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} placeholder="서울특별시 중구 세종대로 110" />
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-4 border-t border-slate-100">
+                  <FileField label="사업자등록증 (PDF)" field="businessRegistration" value={formData.businessRegistration} isUploading={isUploading === 'businessRegistration'} onUpload={handleFileUpload} />
+                  <FileField label="계약서 원본 (PDF)" field="contractFile" value={formData.contractFile} isUploading={isUploading === 'contractFile'} onUpload={handleFileUpload} />
+                  <FileField label="보험증권 (PDF)" field="insuranceFile" value={formData.insuranceFile} isUploading={isUploading === 'insuranceFile'} onUpload={handleFileUpload} />
+                  <FileField label="사전점검체크리스트 (PDF)" field="preInspectionFile" value={formData.preInspectionFile} isUploading={isUploading === 'preInspectionFile'} onUpload={handleFileUpload} />
+                  <FileField label="통장사본 (PDF)" field="bankbookFile" value={formData.bankbookFile} isUploading={isUploading === 'bankbookFile'} onUpload={handleFileUpload} />
+                </div>
               </div>
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
-                <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>취소</Button>
-                <Button type="submit" disabled={isUploading !== null} className="bg-blue-600 hover:bg-blue-700 text-white font-bold">{editingId ? "수정 내용 저장" : "업체 등록 완료"}</Button>
+              <div className="flex-shrink-0 p-8 border-t border-slate-100 flex justify-end gap-3 bg-slate-50/50">
+                <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} className="rounded-xl h-12 px-6 font-bold">취소</Button>
+                <Button type="submit" disabled={isUploading !== null} className="bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl h-12 px-8 shadow-lg shadow-slate-200">
+                  {editingId ? "수정 내용 저장" : "업체 등록 완료"}
+                </Button>
               </div>
             </form>
-          </div>
+          </Card>
         </div>
       )}
 

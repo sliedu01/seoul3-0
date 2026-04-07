@@ -1,6 +1,7 @@
 "use client"
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { 
   Wallet, FileSpreadsheet, Plus, Search, Filter,
   ArrowDownToLine, Download, Upload, CheckCircle2,
@@ -391,9 +392,7 @@ export default function BudgetPage() {
         </div>
         <div className="flex gap-2">
           <button 
-            onClick={() => {
-              document.getElementById('settings-frame')?.scrollIntoView({ behavior: 'smooth' });
-            }}
+            onClick={() => setShowSettings(true)}
             className="flex items-center gap-2 px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg font-bold text-sm shadow-sm hover:bg-indigo-200"
           >
             <Settings className="w-4 h-4" /> 항목/카테고리 관리
@@ -586,210 +585,8 @@ export default function BudgetPage() {
         </div>
       </Card>
 
-      {/* MIDDLE VIEW: 예산 항목(비목/세목) 관리 */}
-      <h2 className="text-2xl font-black mt-12 mb-4 flex items-center gap-2">
-        <Settings className="w-6 h-6 text-indigo-600" />
-        예산/정산 항목 관리
-      </h2>
-      <Card className="p-6 mb-12 border-indigo-200 shadow-md">
-          <div className="flex justify-between items-center mb-4">
-            <div className="flex border border-slate-200 bg-slate-50 p-1 rounded-lg w-fit">
-               {[1, 2].map(lvl => (
-                 <button key={lvl} onClick={() => {setSettingsViewLevel(lvl); setSettingParentId(null); setSelectedCategoryIds([]);}} className={`px-6 py-2 text-sm font-bold rounded-md transition ${settingsViewLevel === lvl ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:bg-slate-100'}`}>
-                   {lvl===1 ? '1. 비목 관리' : '2. 관리세목 관리'}
-                 </button>
-               ))}
-            </div>
-            {selectedCategoryIds.length > 0 && (
-              <button 
-                onClick={handleBulkDeleteCategory}
-                className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg font-bold text-sm hover:bg-red-100 transition"
-              >
-                <Trash2 className="w-4 h-4" /> 선택 삭제 ({selectedCategoryIds.length})
-              </button>
-            )}
-          </div>
+      {/* HIDDEN INLINE SECTION - Removed and converted to Modal below */}
 
-          <div className="flex gap-6">
-            <div className="flex-1 overflow-y-auto max-h-[400px] border border-slate-200 rounded-lg custom-scrollbar">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-100/80 sticky top-0 text-slate-600 uppercase text-[11px] font-black tracking-wider z-10">
-                  <tr>
-                    <th className="p-3 text-center w-10">
-                      <input 
-                        type="checkbox" 
-                        onChange={handleSelectAllCategories}
-                        checked={currentLevelCategories.length > 0 && selectedCategoryIds.length === currentLevelCategories.length}
-                        className="w-4 h-4 rounded border-slate-300 transition cursor-pointer"
-                      />
-                    </th>
-                    <th className="p-3 text-left">항목명</th>
-                    <th className="p-3 text-left">소속 상위항목</th>
-                    <th className="p-3 text-right">기본예산</th>
-                    <th className="p-3 text-center w-40">관리</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {settingsViewLevel === 1 && categories.map(c => (
-                    <tr key={c.id} className={`border-b border-slate-100 transition-colors ${selectedCategoryIds.includes(c.id) ? 'bg-blue-50/30' : 'hover:bg-slate-50/50'}`}>
-                      <td className="p-3 text-center">
-                        <input 
-                          type="checkbox" 
-                          checked={selectedCategoryIds.includes(c.id)} 
-                          onChange={() => toggleCategorySelection(c.id)}
-                          className="w-4 h-4 rounded border-slate-300 transition cursor-pointer"
-                        />
-                      </td>
-                      <td className="p-3 font-bold text-slate-800">
-                        {editingCategoryId === c.id ? <input className="w-full p-2 border-2 border-indigo-200 rounded bg-white shadow-sm font-bold text-slate-900" value={editCatName} onChange={e=>setEditCatName(e.target.value)} autoFocus /> : <span className="pl-1">{c.name}</span>}
-                      </td>
-                      <td className="p-3 text-slate-400 font-medium">-</td>
-                      <td className="p-3 text-right">
-                        {editingCategoryId === c.id ? (
-                          <div className="relative">
-                            <input type="number" className="w-full p-2 border-2 border-indigo-200 rounded text-right bg-white shadow-sm font-black text-indigo-700" value={editCatBudget} onChange={e=>setEditCatBudget(e.target.value)} />
-                            <span className="absolute right-3 top-2 text-xs text-slate-400">원</span>
-                          </div>
-                        ) : (
-                          <span className="font-black text-slate-700 px-2">{c.budgetAmount.toLocaleString()}원</span>
-                        )}
-                      </td>
-                      <td className="p-3 text-center">
-                        <div className="flex justify-center gap-1.5">
-                          {editingCategoryId === c.id ? (
-                            <>
-                              <button onClick={() => handleUpdateCategory(c.id)} className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 text-white text-xs font-black rounded-md shadow-sm hover:bg-blue-700 transition"><CheckCircle2 className="w-3.5 h-3.5"/> 저장</button>
-                              <button onClick={() => setEditingCategoryId(null)} className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 text-slate-600 text-xs font-bold rounded-md hover:bg-slate-200 transition"><XIcon className="w-3.5 h-3.5"/> 취소</button>
-                            </>
-                          ) : (
-                            <>
-                              <button onClick={() => { setEditingCategoryId(c.id); setEditCatName(c.name); setEditCatBudget(c.budgetAmount.toString()); }} className="flex items-center gap-1 px-2.5 py-1.5 bg-indigo-50 text-indigo-600 text-xs font-black rounded-md hover:bg-indigo-100 transition-all border border-indigo-100"><Edit className="w-3.5 h-3.5"/> 수정</button>
-                              <button onClick={()=>handleDeleteCategory(c.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition"><Trash2 className="w-4 h-4"/></button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {settingsViewLevel === 2 && categories.flatMap(l1 => (l1.children || []).map((l2: any) => (
-                    <tr key={l2.id} className={`border-b border-slate-100 transition-colors ${selectedCategoryIds.includes(l2.id) ? 'bg-blue-50/30' : 'hover:bg-slate-50/50'}`}>
-                      <td className="p-3 text-center">
-                        <input 
-                          type="checkbox" 
-                          checked={selectedCategoryIds.includes(l2.id)} 
-                          onChange={() => toggleCategorySelection(l2.id)}
-                          className="w-4 h-4 rounded border-slate-300 transition cursor-pointer"
-                        />
-                      </td>
-                      <td className="p-3 font-bold text-slate-800">
-                        {editingCategoryId === l2.id ? <input className="w-full p-2 border-2 border-indigo-200 rounded bg-white shadow-sm font-bold text-slate-900" value={editCatName} onChange={e=>setEditCatName(e.target.value)} autoFocus /> : <span className="pl-1">{l2.name}</span>}
-                      </td>
-                      <td className="p-3"><span className="text-[11px] font-black text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full ring-1 ring-slate-200">{l1.name}</span></td>
-                      <td className="p-3 text-right">
-                        {editingCategoryId === l2.id ? (
-                          <div className="relative">
-                            <input type="text" className="w-full p-2 border-2 border-indigo-200 rounded text-right bg-white shadow-sm font-black text-indigo-700" value={formatWithCommas(editCatBudget)} onChange={e=>setEditCatBudget(e.target.value.replace(/[^0-9]/g, ""))} />
-                            <span className="absolute right-3 top-2 text-xs text-slate-400">원</span>
-                          </div>
-                        ) : (
-                          <span className="font-black text-slate-700 px-2">{l2.budgetAmount.toLocaleString()}원</span>
-                        )}
-                      </td>
-                      <td className="p-3 text-center">
-                        <div className="flex justify-center gap-1.5">
-                          {editingCategoryId === l2.id ? (
-                            <>
-                              <button onClick={() => handleUpdateCategory(l2.id)} className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 text-white text-xs font-black rounded-md shadow-sm hover:bg-blue-700 transition"><CheckCircle2 className="w-3.5 h-3.5"/> 저장</button>
-                              <button onClick={() => setEditingCategoryId(null)} className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 text-slate-600 text-xs font-bold rounded-md hover:bg-slate-200 transition"><XIcon className="w-3.5 h-3.5"/> 취소</button>
-                            </>
-                          ) : (
-                            <>
-                              <button onClick={() => { setEditingCategoryId(l2.id); setEditCatName(l2.name); setEditCatBudget(l2.budgetAmount.toString()); }} className="flex items-center gap-1 px-2.5 py-1.5 bg-indigo-50 text-indigo-600 text-xs font-black rounded-md hover:bg-indigo-100 transition-all border border-indigo-100"><Edit className="w-3.5 h-3.5"/> 수정</button>
-                              <button onClick={()=>handleDeleteCategory(l2.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition"><Trash2 className="w-4 h-4"/></button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )))}
-                  {settingsViewLevel === 3 && categories.flatMap(l1 => (l1.children || []).flatMap((l2: any) => (l2.children || []).map((l3: any) => (
-                    <tr key={l3.id} className={`border-b border-slate-100 transition-colors ${selectedCategoryIds.includes(l3.id) ? 'bg-blue-50/30' : 'hover:bg-slate-50/50'}`}>
-                      <td className="p-3 text-center">
-                        <input 
-                          type="checkbox" 
-                          checked={selectedCategoryIds.includes(l3.id)} 
-                          onChange={() => toggleCategorySelection(l3.id)}
-                          className="w-4 h-4 rounded border-slate-300 transition cursor-pointer"
-                        />
-                      </td>
-                      <td className="p-3 font-bold text-slate-800">
-                        {editingCategoryId === l3.id ? <input className="w-full p-2 border-2 border-indigo-200 rounded bg-white shadow-sm font-bold text-slate-900" value={editCatName} onChange={e=>setEditCatName(e.target.value)} autoFocus /> : <span className="pl-1">{l3.name}</span>}
-                      </td>
-                      <td className="p-3"><span className="text-[10px] font-black text-slate-400 tracking-tight uppercase leading-none">{l1.name} <span className="text-slate-300 text-[8px] mx-1">/</span> {l2.name}</span></td>
-                      <td className="p-3 text-right">
-                        {editingCategoryId === l3.id ? (
-                          <div className="relative">
-                            <input type="number" className="w-full p-2 border-2 border-indigo-200 rounded text-right bg-white shadow-sm font-black text-indigo-700" value={editCatBudget} onChange={e=>setEditCatBudget(e.target.value)} />
-                            <span className="absolute right-3 top-2 text-xs text-slate-400">원</span>
-                          </div>
-                        ) : (
-                          <span className="font-black text-indigo-600 px-2">{l3.budgetAmount.toLocaleString()}원</span>
-                        )}
-                      </td>
-                      <td className="p-3 text-center">
-                        <div className="flex justify-center gap-1.5">
-                          {editingCategoryId === l3.id ? (
-                            <>
-                              <button onClick={() => handleUpdateCategory(l3.id)} className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 text-white text-xs font-black rounded-md shadow-sm hover:bg-blue-700 transition"><CheckCircle2 className="w-3.5 h-3.5"/> 저장</button>
-                              <button onClick={() => setEditingCategoryId(null)} className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 text-slate-600 text-xs font-bold rounded-md hover:bg-slate-200 transition"><XIcon className="w-3.5 h-3.5"/> 취소</button>
-                            </>
-                          ) : (
-                            <>
-                              <button onClick={() => { setEditingCategoryId(l3.id); setEditCatName(l3.name); setEditCatBudget(l3.budgetAmount.toString()); }} className="flex items-center gap-1 px-2.5 py-1.5 bg-indigo-50 text-indigo-600 text-xs font-black rounded-md hover:bg-indigo-100 transition-all border border-indigo-100"><Edit className="w-3.5 h-3.5"/> 수정</button>
-                              <button onClick={()=>handleDeleteCategory(l3.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition"><Trash2 className="w-4 h-4"/></button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))))}
-
-                </tbody>
-              </table>
-            </div>
-
-            <div className="w-[320px] bg-white p-5 rounded-xl border border-indigo-100 self-start shadow-sm ring-1 ring-slate-200/50">
-              <h3 className="text-xs font-black text-slate-800 mb-4 uppercase tracking-widest flex items-center gap-2">
-                <Plus className="w-4 h-4 text-indigo-500"/> 신규 항목 등록
-              </h3>
-              <form onSubmit={handleAddCategory} className="flex flex-col gap-4">
-                {settingsViewLevel > 1 && (
-                  <div>
-                    <label className="block text-[11px] font-black text-slate-500 mb-1.5"><span className="text-red-500">*</span> 상위 소속 항목 선택</label>
-                    <select className="w-full p-2 text-sm font-bold border border-slate-300 rounded shadow-sm bg-white" required value={settingParentId||''} onChange={e=>setSettingParentId(e.target.value)}>
-                      <option value="">-- 부모 항목 --</option>
-                      {settingsViewLevel === 2 
-                        ? categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)
-                        : categories.flatMap(c => c.children?.map((c2:any)=><option key={c2.id} value={c2.id}>[{c.name}] {c2.name}</option>))
-                      }
-                    </select>
-                  </div>
-                )}
-                <div>
-                  <label className="block text-[11px] font-black text-slate-500 mb-1.5"><span className="text-red-500">*</span> 신규 항목 이름</label>
-                  <input type="text" required placeholder="예: 여비, 강사료 등" className="w-full p-2 text-sm font-bold border border-slate-300 shadow-sm rounded bg-white" value={newCatName} onChange={e=>setNewCatName(e.target.value)} />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-black text-slate-500 mb-1.5"><span className="text-red-500">*</span> 초기 배정 금액 (원)</label>
-                  <input type="text" required placeholder="0" className="w-full p-2 text-sm font-black text-indigo-700 bg-white border border-slate-300 shadow-sm rounded text-right" value={formatWithCommas(newCatBudget)} onChange={e=>setNewCatBudget(e.target.value.replace(/[^0-9]/g, ""))} />
-                </div>
-                <button type="submit" className="w-full mt-2 bg-indigo-600 text-white px-4 py-3 text-sm rounded-lg font-black tracking-wide shadow-md hover:bg-indigo-700 transition">
-                  {settingsViewLevel === 1 ? '비목 등록' : settingsViewLevel === 2 ? '관리세목 등록' : '세세목 등록'}
-                </button>
-              </form>
-            </div>
-         </div>
-      </Card>
 
       {/* BOTTOM VIEW: 집행명세서 그리드 */}
       <h2 id="bottom-view-heading" className="text-2xl font-black mt-12 mb-4 flex items-between gap-2 flex-wrap items-center">
@@ -927,93 +724,398 @@ export default function BudgetPage() {
         </div>
       </Card>
 
-      {/* Modal Overlay for Add / Edit Expenditure */}
       {showForm && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-white shadow-2xl p-6 rounded-2xl border-0 ring-1 ring-slate-200/50 relative">
-            <form onSubmit={handleSubmitExpenditure} className="space-y-6">
-              <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-                <h3 className="font-black text-xl text-slate-800 flex items-center gap-2">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <Card className="w-full max-w-4xl max-h-[90vh] flex flex-col border-none shadow-2xl rounded-[2.5rem] bg-white overflow-hidden p-0 shadow-blue-900/10">
+            <div className="flex-shrink-0 bg-slate-900 px-8 py-6 text-white flex justify-between items-center">
+              <div>
+                <h3 className="text-xl font-black flex items-center gap-2">
                   {editingExpId ? '집행명세 수정' : '새 집행명세 등록'}
-                  {!editingExpId && <span className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded">3단계 선택</span>}
+                  {!editingExpId && <span className="text-[10px] font-black bg-blue-500 text-white px-2 py-0.5 rounded-sm uppercase ml-2 tracking-widest">STEP 1. 정보입력</span>}
                 </h3>
-                <button type="button" onClick={() => {setShowForm(false); setEditingExpId(null);}} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"><XIcon className="w-5 h-5"/></button>
+                <p className="text-xs font-bold opacity-60 mt-1 uppercase tracking-widest">Expenditure Entry & Adjustment</p>
               </div>
-              
-              {/* 3단계 Cascading Dropdowns */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pb-5 border-b border-slate-100">
-                <div>
-                  <label className="block text-[11px] font-black uppercase text-slate-500 mb-2 tracking-wider">비목 (Level 1) <span className="text-red-500">*</span></label>
-                  <select className="w-full p-2.5 border-2 border-slate-200 rounded-lg text-sm font-bold bg-slate-50 focus:bg-white focus:border-blue-400 transition-colors outline-none" value={formL1} onChange={e => {setFormL1(e.target.value); setFormL2(''); setFormData({...formData, categoryId: ''});}} required>
-                    <option value="">-- 비목 선택 --</option>
-                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+              <button 
+                type="button" 
+                onClick={() => {setShowForm(false); setEditingExpId(null);}} 
+                className="hover:rotate-90 transition-all p-2 bg-white/10 rounded-full hover:bg-white/20"
+              >
+                <XIcon className="w-7 h-7" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitExpenditure} className="flex-1 flex flex-col min-h-0">
+              <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar">
+                {/* 3-Level Cascading Dropdowns */}
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2 ml-1">
+                    <div className="w-1.5 h-3 bg-blue-600 rounded-full"></div>
+                    <h4 className="text-sm font-black text-slate-800">1. 예산 항목 선택</h4>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-50 p-8 rounded-[2rem] border border-slate-100">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase ml-1">비목 (Level 1) *</label>
+                      <select 
+                        className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none shadow-sm" 
+                        value={formL1} 
+                        onChange={e => {setFormL1(e.target.value); setFormL2(''); setFormData({...formData, categoryId: ''});}} 
+                        required
+                      >
+                        <option value="">-- 비목 선택 --</option>
+                        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase ml-1">관리세목 (Level 2) *</label>
+                      <select 
+                        className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none shadow-sm" 
+                        value={formL2} 
+                        onChange={e => {setFormL2(e.target.value); setFormData({...formData, categoryId: e.target.value});}} 
+                        required 
+                        disabled={!formL1}
+                      >
+                        <option value="">-- 관리세목 선택 --</option>
+                        {categories.find(c => c.id === formL1)?.children?.map((c:any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase ml-1 text-indigo-600">세세목명 (상세 명칭) *</label>
+                      <input 
+                        type="text" 
+                        placeholder="예: 강사료, 여비 등 구체적 명칭" 
+                        className="w-full h-12 bg-white border-2 border-indigo-100 rounded-xl px-4 text-sm font-black focus:border-indigo-500 focus:ring-0 transition-all outline-none shadow-sm placeholder:font-normal" 
+                        value={formData.subDetailName} 
+                        onChange={e => setFormData({...formData, subDetailName: e.target.value})} 
+                        required 
+                        disabled={!formL2} 
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-[11px] font-black uppercase text-slate-500 mb-2 tracking-wider">관리세목 (Level 2) <span className="text-red-500">*</span></label>
-                  <select className="w-full p-2.5 border-2 border-slate-200 rounded-lg text-sm font-bold bg-slate-50 focus:bg-white focus:border-blue-400 transition-colors outline-none" value={formL2} onChange={e => {setFormL2(e.target.value); setFormData({...formData, categoryId: e.target.value});}} required disabled={!formL1}>
-                    <option value="">-- 관리세목 선택 --</option>
-                    {categories.find(c => c.id === formL1)?.children?.map((c:any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2 ml-1">
+                    <div className="w-1.5 h-3 bg-emerald-500 rounded-full"></div>
+                    <h4 className="text-sm font-black text-slate-800">2. 집행 금액 및 일자</h4>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase ml-1">집행 날짜 (예정시 비움)</label>
+                      <input 
+                        type="date" 
+                        className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none shadow-sm" 
+                        value={formData.executionDate} 
+                        onChange={e => setFormData({...formData, executionDate: e.target.value})} 
+                      />
+                    </div>
+                    
+                    <div className="md:col-span-3 grid grid-cols-3 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-blue-600 uppercase ml-1 tracking-wider flex justify-between">금액 (합계) * <span className="opacity-50 text-[8px] lowercase font-normal italic">자동 분리</span></label>
+                        <input 
+                          type="text" 
+                          placeholder="0" 
+                          required 
+                          className="w-full h-12 bg-blue-50/30 border-2 border-blue-200 rounded-xl px-4 text-right text-base font-black text-slate-900 focus:bg-white focus:border-blue-500 transition-all outline-none shadow-sm" 
+                          value={formatWithCommas(formData.totalAmount)} 
+                          onChange={e => handleAmountChange('total', e.target.value)} 
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase ml-1">공급가액</label>
+                        <input 
+                          type="text" 
+                          placeholder="0" 
+                          className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 text-right text-sm font-bold text-slate-600 focus:ring-1 focus:ring-slate-300 transition-all outline-none shadow-sm" 
+                          value={formatWithCommas(formData.supplyAmount)} 
+                          onChange={e => handleAmountChange('supply', e.target.value)} 
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase ml-1">부가세</label>
+                        <input 
+                          type="text" 
+                          placeholder="0" 
+                          className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 text-right text-sm font-bold text-slate-600 focus:ring-1 focus:ring-slate-300 transition-all outline-none shadow-sm" 
+                          value={formatWithCommas(formData.taxAmount)} 
+                          onChange={e => handleAmountChange('tax', e.target.value)} 
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-[11px] font-black uppercase text-slate-500 mb-2 tracking-wider">세세목명 (상세 내역) <span className="text-red-500">*</span></label>
-                  <input type="text" placeholder="직접 입력 (예: 강사료, 여비 등)" className="w-full p-2.5 border-2 border-indigo-200 rounded-lg text-sm font-black bg-indigo-50/50 text-indigo-900 focus:bg-white focus:border-indigo-400 transition-colors outline-none placeholder:font-normal placeholder:text-indigo-300" value={formData.subDetailName} onChange={e => setFormData({...formData, subDetailName: e.target.value})} required disabled={!formL2} />
+
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2 ml-1">
+                    <div className="w-1.5 h-3 bg-amber-500 rounded-full"></div>
+                    <h4 className="text-sm font-black text-slate-800">3. 증빙 및 기타 상세</h4>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="grid grid-cols-1 gap-6">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase ml-1">증빙 구분 *</label>
+                        <select 
+                          className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none shadow-sm" 
+                          value={formData.evidenceType} 
+                          onChange={e => setFormData({...formData, evidenceType: e.target.value})}
+                        >
+                          <option>세금계산서</option><option>입금증</option><option>영수증</option><option>기타증빙</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase ml-1">증빙 파일 업로드 <span className="normal-case opacity-50 font-medium">(PDF/Img)</span></label>
+                        <div className="relative h-12">
+                          <input 
+                            type="file" 
+                            accept=".pdf,image/*" 
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                            onChange={e => setSelectedFile(e.target.files?.[0] || null)} 
+                          />
+                          <div className="flex items-center h-full px-4 bg-slate-50 border border-slate-200 rounded-xl border-dashed">
+                             <FileText className="w-4 h-4 text-slate-400 mr-2" />
+                             <span className="text-xs font-bold text-slate-500 truncate">
+                              {selectedFile ? selectedFile.name : (formData.originalFileName || '선택된 파일 없음')}
+                             </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-6">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase ml-1">집행 용도 / 적요 *</label>
+                        <textarea 
+                          rows={1} 
+                          placeholder="회의 다과비 지출, 강사 ○○○ 강사료 등" 
+                          className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none shadow-sm resize-none" 
+                          value={formData.purpose} 
+                          onChange={e => setFormData({...formData, purpose: e.target.value})} 
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase ml-1">메모 (선택)</label>
+                        <textarea 
+                          rows={1} 
+                          placeholder="특이사항 기록" 
+                          className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none shadow-sm resize-none italic" 
+                          value={formData.memo} 
+                          onChange={e => setFormData({...formData, memo: e.target.value})} 
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-                <div>
-                  <label className="block text-[11px] font-black uppercase text-slate-500 mb-2 tracking-wider">집행일 <span className="normal-case text-slate-400 font-bold ml-1">(비우면 예정)</span></label>
-                  <input type="date" className="w-full p-2.5 border-2 border-slate-200 rounded-lg text-sm font-bold bg-slate-50 focus:bg-white focus:border-blue-400 transition-colors outline-none" value={formData.executionDate} onChange={e => setFormData({...formData, executionDate: e.target.value})} />
-                </div>
-                
-                {/* 3개 금액 분할 입력 */}
-                <div className="col-span-3 grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-[11px] font-black uppercase text-blue-600 mb-2 tracking-wider flex items-center justify-between">금액 (합계) <span className="text-[9px] text-slate-400 font-bold lowercase">*입력시 자동분리</span></label>
-                    <input type="text" placeholder="예: 110,000" required className="w-full p-2.5 border-2 border-blue-300 rounded-lg text-base font-black text-slate-900 text-right bg-blue-50/30 focus:bg-white focus:border-blue-500 outline-none transition-colors" value={formatWithCommas(formData.totalAmount)} onChange={e => handleAmountChange('total', e.target.value)} />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-black uppercase text-slate-500 mb-2 tracking-wider">공급가액</label>
-                    <input type="text" placeholder="0" className="w-full p-2.5 border-2 border-slate-200 rounded-lg text-sm font-bold text-slate-700 text-right bg-white focus:border-slate-400 outline-none transition-colors" value={formatWithCommas(formData.supplyAmount)} onChange={e => handleAmountChange('supply', e.target.value)} />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-black uppercase text-slate-500 mb-2 tracking-wider">부가세</label>
-                    <input type="text" placeholder="0" className="w-full p-2.5 border-2 border-slate-200 rounded-lg text-sm font-bold text-slate-700 text-right bg-white focus:border-slate-400 outline-none transition-colors" value={formatWithCommas(formData.taxAmount)} onChange={e => handleAmountChange('tax', e.target.value)} />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-black uppercase text-slate-500 mb-2 tracking-wider">증빙 종류</label>
-                  <select className="w-full p-2.5 border-2 border-slate-200 rounded-lg text-sm font-bold bg-slate-50 focus:bg-white focus:border-blue-400 outline-none transition-colors" value={formData.evidenceType} onChange={e => setFormData({...formData, evidenceType: e.target.value})}>
-                    <option>세금계산서</option><option>입금증</option><option>영수증</option><option>기타증빙</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[11px] font-black uppercase text-slate-500 mb-2 tracking-wider">증빙 파일 <span className="normal-case text-slate-400 font-bold ml-1">(PDF/Img)</span></label>
-                  <input type="file" accept=".pdf,image/*" className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-slate-100 hover:file:bg-slate-200 file:font-black file:text-slate-700 cursor-pointer transition-colors" onChange={e => setSelectedFile(e.target.files?.[0] || null)} />
-                </div>
-                <div className="col-span-2 flex gap-4">
-                  <div className="flex-1">
-                    <label className="block text-[11px] font-black uppercase text-slate-500 mb-2 tracking-wider">집행 용도 / 적요</label>
-                    <input type="text" placeholder="용도를 간단히 기록하세요" className="w-full p-2.5 border-2 border-slate-200 rounded-lg text-sm font-bold bg-slate-50 focus:bg-white focus:border-blue-400 outline-none transition-colors" value={formData.purpose} onChange={e => setFormData({...formData, purpose: e.target.value})} />
-                  </div>
-                  <div className="flex-1">
-                    <label className="block text-[11px] font-black uppercase text-slate-500 mb-2 tracking-wider">메모</label>
-                    <input type="text" placeholder="기타 참고사항" className="w-full p-2.5 border-2 border-slate-200 rounded-lg text-sm font-medium bg-slate-50 focus:bg-white focus:border-blue-400 outline-none transition-colors italic" value={formData.memo} onChange={e => setFormData({...formData, memo: e.target.value})} />
-                  </div>
-                </div>
-              </div>
-              <div className="flex justify-end gap-3 pt-6">
-                <button type="button" onClick={() => {setShowForm(false); setEditingExpId(null);}} className="px-6 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors">
+              <div className="flex-shrink-0 p-8 border-t border-slate-100 flex gap-4 bg-slate-50/50">
+                <button 
+                  type="button" 
+                  onClick={() => {setShowForm(false); setEditingExpId(null);}} 
+                  className="flex-1 h-14 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black hover:bg-slate-50 transition-colors shadow-sm"
+                >
                   취소
                 </button>
-                <button type="submit" className="px-8 py-3 bg-blue-600 text-white rounded-xl font-black shadow-md hover:bg-blue-700 flex items-center gap-2 transition-colors">
-                  <CheckCircle2 className="w-5 h-5"/> {editingExpId ? '수정 내용 저장' : '목록에 추가'}
-                </button>
+                <Button 
+                  type="submit" 
+                  className="flex-[2] h-14 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl shadow-lg shadow-blue-100 transition-all active:scale-[0.98]"
+                >
+                  <CheckCircle2 className="w-5 h-5 mr-2"/> {editingExpId ? '수정 내용 저장하기' : '집행 내역 등록 완료'}
+                </Button>
               </div>
             </form>
+          </Card>
+        </div>
+      )}
+      {/* Category Management Modal (비목/관리세목 등록) */}
+      {showSettings && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <Card className="w-full max-w-5xl max-h-[90vh] flex flex-col border-none shadow-2xl rounded-[2.5rem] bg-white overflow-hidden p-0 shadow-indigo-900/10">
+            <div className="flex-shrink-0 bg-indigo-600 px-8 py-6 text-white flex justify-between items-center">
+              <div>
+                <h3 className="text-xl font-black flex items-center gap-2">
+                  <Settings className="w-6 h-6" /> 예산 항목(비목/세목) 관리
+                </h3>
+                <p className="text-xs font-bold opacity-60 mt-1 uppercase tracking-widest">Budget Category & Hierarchy Management</p>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setShowSettings(false)} 
+                className="hover:rotate-90 transition-all p-2 bg-white/10 rounded-full hover:bg-white/20"
+              >
+                <XIcon className="w-7 h-7" />
+              </button>
+            </div>
+
+            <div className="flex-1 flex overflow-hidden">
+               {/* Fixed Sidebar for adding in common modal? No, let's keep it split inside the scrollable body but with a clean layout */}
+               <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                  <div className="flex justify-between items-center mb-6">
+                    <div className="flex border border-slate-200 bg-slate-50 p-1 rounded-xl w-fit">
+                       {[1, 2].map(lvl => (
+                         <button key={lvl} onClick={() => {setSettingsViewLevel(lvl); setSettingParentId(null); setSelectedCategoryIds([]);}} className={`px-8 py-2.5 text-sm font-black rounded-lg transition-all ${settingsViewLevel === lvl ? 'bg-white shadow-lg text-indigo-600' : 'text-slate-500 hover:bg-slate-100'}`}>
+                           {lvl===1 ? 'LEVEL 1. 비목' : 'LEVEL 2. 관리세목'}
+                         </button>
+                       ))}
+                    </div>
+                    {selectedCategoryIds.length > 0 && (
+                      <button 
+                        onClick={handleBulkDeleteCategory}
+                        className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 border border-red-100 rounded-xl font-bold text-sm hover:bg-red-500 hover:text-white transition-all shadow-sm"
+                      >
+                        <Trash2 className="w-4 h-4" /> 선택 {selectedCategoryIds.length}개 삭제
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                    {/* Category List Table */}
+                    <div className="lg:col-span-2 border border-slate-100 rounded-[1.5rem] overflow-hidden bg-slate-50/30">
+                      <table className="w-full text-sm">
+                        <thead className="bg-slate-100 text-slate-400 uppercase text-[10px] font-black tracking-widest border-b border-slate-200">
+                          <tr>
+                            <th className="p-4 text-center w-12">
+                              <input 
+                                type="checkbox" 
+                                onChange={handleSelectAllCategories}
+                                checked={currentLevelCategories.length > 0 && selectedCategoryIds.length === currentLevelCategories.length}
+                                className="w-4 h-4 rounded-md border-slate-300 transition cursor-pointer"
+                              />
+                            </th>
+                            <th className="p-4 text-left">항목 정보</th>
+                            <th className="p-4 text-right">배정 예산</th>
+                            <th className="p-4 text-center w-32">관리</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white">
+                          {currentLevelCategories.length === 0 ? (
+                            <tr><td colSpan={4} className="py-20 text-center text-slate-300 font-bold">등록된 항목이 없습니다.</td></tr>
+                          ) : (
+                            currentLevelCategories.map((c: any) => (
+                              <tr key={c.id} className={`border-b border-slate-50 transition-colors ${selectedCategoryIds.includes(c.id) ? 'bg-indigo-50/30' : 'hover:bg-slate-50/50'}`}>
+                                <td className="p-4 text-center">
+                                  <input 
+                                    type="checkbox" 
+                                    checked={selectedCategoryIds.includes(c.id)} 
+                                    onChange={() => toggleCategorySelection(c.id)}
+                                    className="w-4 h-4 rounded-md border-slate-300 transition cursor-pointer"
+                                  />
+                                </td>
+                                <td className="p-4">
+                                  <div className="flex flex-col gap-1">
+                                    {editingCategoryId === c.id ? (
+                                      <input 
+                                        className="w-full p-2.5 border-2 border-indigo-200 rounded-xl bg-white shadow-sm font-black text-slate-900 outline-none" 
+                                        value={editCatName} 
+                                        onChange={e=>setEditCatName(e.target.value)} 
+                                        autoFocus 
+                                      />
+                                    ) : (
+                                      <>
+                                        <span className="font-black text-slate-800 text-base">{c.name}</span>
+                                        {settingsViewLevel > 1 && (
+                                          <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1 uppercase">
+                                            <ArrowDownToLine className="w-2.5 h-2.5 rotate-[-90deg]" /> {categories.find(l1 => l1.children?.some((l2:any) => l2.id === c.id))?.name || '-'}
+                                          </span>
+                                        )}
+                                      </>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="p-4 text-right">
+                                  {editingCategoryId === c.id ? (
+                                    <div className="relative">
+                                      <input 
+                                        type="text" 
+                                        className="w-full p-2.5 border-2 border-indigo-200 rounded-xl text-right bg-white shadow-sm font-black text-indigo-700 outline-none" 
+                                        value={formatWithCommas(editCatBudget)} 
+                                        onChange={e=>setEditCatBudget(e.target.value.replace(/[^0-9]/g, ""))} 
+                                      />
+                                      <span className="absolute right-3 top-3 text-[10px] font-black text-slate-300">원</span>
+                                    </div>
+                                  ) : (
+                                    <span className="font-black text-slate-700 px-2 text-base">{c.budgetAmount.toLocaleString()}원</span>
+                                  )}
+                                </td>
+                                <td className="p-4 text-center">
+                                  <div className="flex justify-center gap-2">
+                                    {editingCategoryId === c.id ? (
+                                      <>
+                                        <button onClick={() => handleUpdateCategory(c.id)} className="p-2.5 bg-blue-600 text-white rounded-xl shadow-lg shadow-blue-200 hover:bg-blue-700 transition">
+                                          <CheckCircle2 className="w-4 h-4"/>
+                                        </button>
+                                        <button onClick={() => setEditingCategoryId(null)} className="p-2.5 bg-slate-100 text-slate-400 rounded-xl hover:bg-slate-200 transition">
+                                          <XIcon className="w-4 h-4"/>
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <button onClick={() => { setEditingCategoryId(c.id); setEditCatName(c.name); setEditCatBudget(c.budgetAmount.toString()); }} className="p-2.5 bg-white border border-slate-200 text-slate-400 rounded-xl hover:text-indigo-600 hover:border-indigo-200 hover:shadow-sm transition-all" title="수정">
+                                          <Edit className="w-4 h-4"/>
+                                        </button>
+                                        <button onClick={()=>handleDeleteCategory(c.id)} className="p-2.5 bg-white border border-slate-200 text-slate-400 rounded-xl hover:text-red-500 hover:border-red-100 hover:shadow-sm transition-all" title="삭제">
+                                          <Trash2 className="w-4 h-4"/>
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Add Form (Right Panel) */}
+                    <div className="bg-indigo-50/50 p-6 rounded-[2rem] border border-indigo-100 shadow-sm sticky top-0">
+                      <h4 className="text-[11px] font-bold text-indigo-600 mb-6 uppercase tracking-widest flex items-center gap-2">
+                        <Plus className="w-4 h-4"/> 신규 항목 마스터 등록
+                      </h4>
+                      <form onSubmit={handleAddCategory} className="space-y-5">
+                        {settingsViewLevel > 1 && (
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-black text-slate-400 uppercase ml-1">상위 소속 항목 선택 *</label>
+                            <select className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 text-sm font-bold focus:ring-2 focus:ring-indigo-500 transition-all outline-none shadow-sm" required value={settingParentId||''} onChange={e=>setSettingParentId(e.target.value)}>
+                              <option value="">-- 상위 비목 선택 --</option>
+                              {categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+                          </div>
+                        )}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black text-slate-400 uppercase ml-1">신규 {settingsViewLevel === 1 ? '비목' : '세목'} 명칭 *</label>
+                          <input type="text" required placeholder="명칭 입력" className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 text-sm font-black focus:ring-2 focus:ring-indigo-500 transition-all outline-none shadow-sm" value={newCatName} onChange={e=>setNewCatName(e.target.value)} />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black text-indigo-600 uppercase ml-1 tracking-wider">배정 예산 (원) *</label>
+                          <div className="relative">
+                            <input type="text" required placeholder="0" className="w-full h-12 bg-white border-2 border-indigo-100 rounded-xl px-4 text-right text-base font-black text-indigo-700 focus:border-indigo-500 transition-all outline-none shadow-sm" value={formatWithCommas(newCatBudget)} onChange={e=>setNewCatBudget(e.target.value.replace(/[^0-9]/g, ""))} />
+                            <span className="absolute left-4 top-3.5 text-[10px] font-black text-indigo-200 uppercase">KRW</span>
+                          </div>
+                        </div>
+                        <button type="submit" className="w-full h-14 bg-indigo-600 text-white rounded-2xl font-black shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-[0.98] mt-4">
+                          {settingsViewLevel === 1 ? '신규 비목 추가하기' : '관리세목 등록 완료'}
+                        </button>
+                      </form>
+                      <p className="mt-6 text-[10px] text-slate-400 font-bold leading-relaxed">
+                        * 비목(L1)은 전체 사업의 대분류이며, 관리세목(L2)은 실제 예산이 배분되는 단위입니다.
+                      </p>
+                    </div>
+                  </div>
+               </div>
+            </div>
+
+            <div className="flex-shrink-0 p-8 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
+               <p className="text-xs font-bold text-slate-400">
+                  <AlertCircle className="w-3 h-3 inline mr-1 mb-0.5" /> 
+                  삭제 시 해당 항목에 연결된 모든 지출 내역이 함께 영향을 받을 수 있으니 주의하세요.
+               </p>
+               <button 
+                  onClick={() => setShowSettings(false)}
+                  className="px-8 py-3 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black hover:bg-slate-50 transition-colors shadow-sm"
+               >
+                  닫기
+               </button>
+            </div>
           </Card>
         </div>
       )}
