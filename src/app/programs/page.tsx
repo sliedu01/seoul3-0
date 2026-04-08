@@ -893,10 +893,9 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
                                     variant="ghost" 
                                     size="sm" 
                                     onClick={() => openSessionCopyModal(program.id, session)} 
-                                    className="h-8 w-8 md:h-9 md:w-9 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
-                                    title="복사"
+                                    className="h-8 md:h-9 px-2 md:px-3 text-blue-600 font-black hover:bg-blue-50 rounded-xl flex gap-1 items-center transition-all active:scale-95 border border-blue-100 whitespace-nowrap text-[10px] md:text-sm"
                                   >
-                                    <Copy className="h-4 w-4" />
+                                    <Copy className="w-3 md:w-4 h-3 md:h-4 shrink-0" /> <span className="whitespace-nowrap">복사</span>
                                   </Button>
                                 )}
                                 {canEdit && (

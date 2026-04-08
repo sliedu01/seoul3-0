@@ -68,7 +68,7 @@ export default function UserManagementPage() {
   );
 
   return (
-    <div className="p-8 max-w-7xl mx-auto min-h-screen bg-slate-50/30">
+    <div className="p-3 md:p-6 lg:p-8 max-w-full mx-auto min-h-screen bg-slate-50/30">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">

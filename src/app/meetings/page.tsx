@@ -227,7 +227,7 @@ export default function MeetingsPage() {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-20 max-w-7xl mx-auto px-4">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-20 mx-auto px-1 md:px-0">
       <div className="flex justify-between items-end border-b border-slate-200 pb-6 mb-10">
         <div>
           <h1 className="text-4xl font-black tracking-tight text-slate-900">회의록 관리</h1>

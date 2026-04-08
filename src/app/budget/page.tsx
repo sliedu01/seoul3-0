@@ -376,12 +376,10 @@ export default function BudgetPage() {
       setSelectedCategoryIds([]);
     }
   };
-
-
   if (loading) return <div className="p-10 text-center font-bold text-slate-500 animate-pulse">예산 데이터를 불러오는 중...</div>;
 
   return (
-    <div className="max-w-[1600px] mx-auto pb-20 space-y-6 animate-in fade-in duration-500">
+    <div className="w-full mx-auto pb-20 space-y-6 animate-in fade-in duration-500">
       <div className="flex justify-between items-end border-b border-slate-200 pb-4">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-slate-900 flex items-center gap-3">
