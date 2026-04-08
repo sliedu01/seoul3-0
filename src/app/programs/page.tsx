@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react"
 export const dynamic = 'force-dynamic' // Vercel 배포 시 최신 데이터 및 UI 반영 강제
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Plus, Pencil, Trash2, FilePlus2, X, Clock, User, BookOpen, Calendar, Building2, UploadCloud, Download, Link, AlertCircle, ChevronDown, ChevronRight, CalendarDays } from "lucide-react"
+import { Plus, Pencil, Trash2, FilePlus2, X, Clock, User, BookOpen, Calendar, Building2, UploadCloud, Download, Link, AlertCircle, ChevronDown, ChevronRight, CalendarDays, Copy } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 
@@ -703,6 +703,52 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
     setIsSessionModalOpen(true)
   }
 
+  const openSessionCopyModal = (programId: string, session: Session) => {
+    setSelectedProgramId(programId)
+    setEditingSessionId(null) // New record
+    
+    const getDateTimeParts = (dateStr: string | null) => {
+      if (!dateStr) return { date: "", time: "" };
+      const d = new Date(dateStr);
+      const yyyy = d.getUTCFullYear();
+      const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(d.getUTCDate()).padStart(2, '0');
+      const hh = String(d.getUTCHours()).padStart(2, '0');
+      const mi = String(d.getUTCMinutes()).padStart(2, '0');
+      return { date: `${yyyy}-${mm}-${dd}`, time: `${hh}:${mi}` };
+    };
+
+    const start = session.startTime ? getDateTimeParts(session.startTime) : { date: getDateTimeParts(session.date).date, time: "" };
+    const end = session.endTime ? getDateTimeParts(session.endTime) : { date: getDateTimeParts(session.date).date, time: "" };
+
+    setSessionFormData({
+      partnerId: session.partnerId || "",
+      startDate: start.date,
+      startTime: session.startTime ? start.time : "",
+      endDate: end.date,
+      endTime: session.endTime ? end.time : "",
+      courseName: `${session.courseName} (복사)`,
+      instructorName: session.instructorName || "",
+      capacity: session.capacity.toString(),
+      participantCount: "0",
+      classDays: (session.classDays || []).map(cd => {
+        const { id, ...rest } = cd;
+        const dateParts = getDateTimeParts(cd.date);
+        const startParts = cd.startTime ? getDateTimeParts(cd.startTime) : { date: dateParts.date, time: "" };
+        const endParts = cd.endTime ? getDateTimeParts(cd.endTime) : { date: dateParts.date, time: "" };
+        
+        return {
+          ...rest,
+          date: dateParts.date,
+          startTime: startParts.time,
+          endTime: endParts.time,
+          participantCount: 0 // Reset participant count for new copy
+        };
+      })
+    })
+    setIsSessionModalOpen(true)
+  }
+
   // 데이터 로딩 중 표시 (애니메이션 효과)
   if (loading && programs.length === 0) return (
     <div className="p-20 text-center flex flex-col items-center justify-center gap-4">
@@ -831,7 +877,7 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
                               })()}
                             </td>
                             <td className="px-8 py-5 whitespace-nowrap" onClick={e => e.stopPropagation()}>
-                              <div className="flex items-center justify-center gap-2 min-w-[120px]">
+                              <div className="flex items-center justify-center gap-2 min-w-[150px]">
                                 {canEdit && (
                                   <Button 
                                     variant="ghost" 
@@ -840,6 +886,17 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
                                     className="h-8 md:h-9 px-2 md:px-3 text-blue-600 font-black hover:bg-blue-50 rounded-xl flex gap-1 items-center transition-all active:scale-95 border border-blue-100 whitespace-nowrap text-[10px] md:text-sm"
                                   >
                                     <FilePlus2 className="w-3 md:w-4 h-3 md:h-4 shrink-0" /> <span className="whitespace-nowrap">입력</span>
+                                  </Button>
+                                )}
+                                {canEdit && (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    onClick={() => openSessionCopyModal(program.id, session)} 
+                                    className="h-8 w-8 md:h-9 md:w-9 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                                    title="복사"
+                                  >
+                                    <Copy className="h-4 w-4" />
                                   </Button>
                                 )}
                                 {canEdit && (
