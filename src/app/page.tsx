@@ -58,7 +58,7 @@ export default function Dashboard() {
   const { stats, schedules } = data || { stats: {}, schedules: { twoWeeksAgo: [], lastWeek: [], thisWeek: [], nextWeek: [] } }
 
   return (
-    <div className="space-y-10 animate-in fade-in duration-500 pb-20 max-w-7xl mx-auto">
+    <div className="space-y-10 animate-in fade-in duration-500 pb-20 w-full">
       <div className="flex justify-between items-end border-b border-slate-200 pb-6 mb-6">
         <div>
           <h1 className="text-4xl font-black tracking-tight text-slate-900">서울런 3.0 현황</h1>

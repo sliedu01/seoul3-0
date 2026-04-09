@@ -30,6 +30,10 @@ model Partner {
   address              String?
   businessRegistration String?
   contractFile         String?
+  contractFile2        String?
+  contractFile3        String?
+  contractFile4        String?
+  contractFile5        String?
   insuranceFile        String?
   bankbookFile         String?
   createdAt            DateTime         @default(now())

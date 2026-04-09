@@ -14,6 +14,10 @@ type Partner = {
   address?: string;
   businessRegistration: string; 
   contractFile: string; 
+  contractFile2?: string;
+  contractFile3?: string;
+  contractFile4?: string;
+  contractFile5?: string;
   insuranceFile: string;
   bankbookFile: string;
   preInspectionFile: string;
@@ -65,7 +69,8 @@ export default function PartnersPage() {
   
   const initialFormState = { 
     name: "", contactName: "", contactPhone: "", contactEmail: "", address: "", 
-    businessRegistration: "", contractFile: "", insuranceFile: "", bankbookFile: "", preInspectionFile: ""
+    businessRegistration: "", contractFile: "", contractFile2: "", contractFile3: "", contractFile4: "", contractFile5: "",
+    insuranceFile: "", bankbookFile: "", preInspectionFile: ""
   }
   const [formData, setFormData] = useState(initialFormState)
   const [isUploading, setIsUploading] = useState<string | null>(null);
@@ -153,6 +158,10 @@ export default function PartnersPage() {
       address: partner.address || "",
       businessRegistration: partner.businessRegistration || "",
       contractFile: partner.contractFile || "",
+      contractFile2: partner.contractFile2 || "",
+      contractFile3: partner.contractFile3 || "",
+      contractFile4: partner.contractFile4 || "",
+      contractFile5: partner.contractFile5 || "",
       insuranceFile: partner.insuranceFile || "",
       bankbookFile: partner.bankbookFile || "",
       preInspectionFile: partner.preInspectionFile || ""
@@ -213,14 +222,14 @@ export default function PartnersPage() {
             <table className="w-full text-sm text-left">
               <thead className="bg-slate-50/80 border-b border-slate-200">
                 <tr>
-                  <th className="px-6 py-4 font-semibold text-slate-700">업체명</th>
-                  <th className="px-6 py-4 font-semibold text-slate-700">실적 요약</th>
-                  <th className="px-6 py-4 font-semibold text-slate-700">사업자등록증</th>
-                  <th className="px-6 py-4 font-semibold text-slate-700">계약서</th>
-                  <th className="px-6 py-4 font-semibold text-slate-700">보험증권</th>
-                  <th className="px-6 py-4 font-semibold text-slate-700">사전점검</th>
-                  <th className="px-6 py-4 font-semibold text-slate-700">통장사본</th>
-                  <th className="px-6 py-4 font-semibold text-slate-700 text-right">관리</th>
+                  <th className="px-3 md:px-6 py-4 font-semibold text-slate-700">업체명</th>
+                  <th className="px-3 md:px-6 py-4 font-semibold text-slate-700">실적 요약</th>
+                  <th className="px-3 md:px-6 py-4 font-semibold text-slate-700">사업자등록증</th>
+                  <th className="px-3 md:px-6 py-4 font-semibold text-slate-700">계약서</th>
+                  <th className="px-3 md:px-6 py-4 font-semibold text-slate-700">보험증권</th>
+                  <th className="px-3 md:px-6 py-4 font-semibold text-slate-700">사전점검</th>
+                  <th className="px-3 md:px-6 py-4 font-semibold text-slate-700">통장사본</th>
+                  <th className="px-3 md:px-6 py-4 font-semibold text-slate-700 text-right">관리</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -249,11 +258,24 @@ export default function PartnersPage() {
                       ) : <span className="text-slate-400">-</span>}
                     </td>
                     <td className="px-6 py-4">
-                      {p.contractFile ? (
-                        <button onClick={() => setPdfModal({ isOpen: true, field: 'contractFile', partnerId: p.id, fileName: p.contractFile })} className="inline-flex items-center text-blue-600 hover:text-blue-800 hover:underline font-medium text-xs">
-                          <FileDown className="w-3 h-3 mr-1"/>{p.contractFile}
-                        </button>
-                      ) : <span className="text-slate-400">-</span>}
+                      <div className="flex flex-col gap-1">
+                        {[
+                          { file: p.contractFile, label: "1회차" },
+                          { file: p.contractFile2, label: "2회차" },
+                          { file: p.contractFile3, label: "3회차" },
+                          { file: p.contractFile4, label: "4회차" },
+                          { file: p.contractFile5, label: "5회차" }
+                        ].map((item, idx) => item.file ? (
+                          <button 
+                            key={idx}
+                            onClick={() => setPdfModal({ isOpen: true, field: idx === 0 ? 'contractFile' : `contractFile${idx + 1}` as any, partnerId: p.id, fileName: item.file! })} 
+                            className="inline-flex items-center text-blue-600 hover:text-blue-800 hover:underline font-medium text-[10px]"
+                          >
+                            <FileDown className="w-2.5 h-2.5 mr-1"/>{item.label}: {item.file}
+                          </button>
+                        ) : null)}
+                        {!p.contractFile && !p.contractFile2 && !p.contractFile3 && !p.contractFile4 && !p.contractFile5 && <span className="text-slate-400">-</span>}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       {p.insuranceFile ? (
@@ -276,7 +298,7 @@ export default function PartnersPage() {
                         </button>
                       ) : <span className="text-slate-400">-</span>}
                     </td>
-                    <td className="px-6 py-4 text-right align-top">
+                    <td className="px-3 md:px-6 py-4 text-right align-top">
                       <div className="flex justify-end gap-1">
                         {canEdit && (
                           <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-800 bg-blue-50/50 hover:bg-blue-100" onClick={() => handleEdit(p)}>
@@ -341,12 +363,25 @@ export default function PartnersPage() {
                   </div>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-4 border-t border-slate-100">
-                  <FileField label="사업자등록증 (PDF)" field="businessRegistration" value={formData.businessRegistration} isUploading={isUploading === 'businessRegistration'} onUpload={handleFileUpload} />
-                  <FileField label="계약서 원본 (PDF)" field="contractFile" value={formData.contractFile} isUploading={isUploading === 'contractFile'} onUpload={handleFileUpload} />
-                  <FileField label="보험증권 (PDF)" field="insuranceFile" value={formData.insuranceFile} isUploading={isUploading === 'insuranceFile'} onUpload={handleFileUpload} />
-                  <FileField label="사전점검체크리스트 (PDF)" field="preInspectionFile" value={formData.preInspectionFile} isUploading={isUploading === 'preInspectionFile'} onUpload={handleFileUpload} />
-                  <FileField label="통장사본 (PDF)" field="bankbookFile" value={formData.bankbookFile} isUploading={isUploading === 'bankbookFile'} onUpload={handleFileUpload} />
+                <div className="space-y-4 pt-4 border-t border-slate-100">
+                  <h4 className="text-sm font-black text-slate-900 border-l-4 border-blue-600 pl-3">증빙 서류 관리</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <FileField label="사업자등록증 (PDF)" field="businessRegistration" value={formData.businessRegistration} isUploading={isUploading === 'businessRegistration'} onUpload={handleFileUpload} />
+                    <FileField label="통장사본 (PDF)" field="bankbookFile" value={formData.bankbookFile} isUploading={isUploading === 'bankbookFile'} onUpload={handleFileUpload} />
+                    <FileField label="보험증권 (PDF)" field="insuranceFile" value={formData.insuranceFile} isUploading={isUploading === 'insuranceFile'} onUpload={handleFileUpload} />
+                    <FileField label="사전점검체크리스트 (PDF)" field="preInspectionFile" value={formData.preInspectionFile} isUploading={isUploading === 'preInspectionFile'} onUpload={handleFileUpload} />
+                  </div>
+                </div>
+
+                <div className="space-y-4 pt-4 border-t border-slate-100">
+                  <h4 className="text-sm font-black text-slate-900 border-l-4 border-indigo-600 pl-3">회차별 계약서 (최대 5회차)</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-3">
+                    <FileField label="1회차 계약서" field="contractFile" value={formData.contractFile} isUploading={isUploading === 'contractFile'} onUpload={handleFileUpload} />
+                    <FileField label="2회차 계약서" field="contractFile2" value={formData.contractFile2} isUploading={isUploading === 'contractFile2'} onUpload={handleFileUpload} />
+                    <FileField label="3회차 계약서" field="contractFile3" value={formData.contractFile3} isUploading={isUploading === 'contractFile3'} onUpload={handleFileUpload} />
+                    <FileField label="4회차 계약서" field="contractFile4" value={formData.contractFile4} isUploading={isUploading === 'contractFile4'} onUpload={handleFileUpload} />
+                    <FileField label="5회차 계약서" field="contractFile5" value={formData.contractFile5} isUploading={isUploading === 'contractFile5'} onUpload={handleFileUpload} />
+                  </div>
                 </div>
               </div>
 

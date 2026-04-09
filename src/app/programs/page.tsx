@@ -787,7 +787,7 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
         <section key={program.id} className="space-y-4">
           <Card className="border-none shadow-sm overflow-hidden bg-white ring-1 ring-slate-100 rounded-[2rem]">
             {/* Table Header */}
-            <div className="px-8 py-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+            <div className="px-4 md:px-8 py-5 border-b border-slate-100 bg-slate-50/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
                 <div className="w-3 h-3 rounded-full bg-blue-600 animate-pulse"></div>
                 <h3 className="text-xl font-black text-slate-900">{program.order}. {program.name}</h3>
@@ -817,8 +817,8 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50/30 text-[11px] font-black text-slate-400 uppercase tracking-tighter border-b border-slate-100">
-                    <th className="px-8 py-4 whitespace-nowrap">교육기간</th>
-                    <th className="px-6 py-4 whitespace-nowrap w-24">회차</th>
+                    <th className="px-4 md:px-8 py-4 whitespace-nowrap">교육기간</th>
+                    <th className="px-4 md:px-6 py-4 whitespace-nowrap w-24">회차</th>
                     <th className="px-6 py-4 min-w-[120px]">협력업체</th>
                     <th className="px-6 py-4 min-w-[200px]">강의명</th>
                     <th className="px-6 py-4 whitespace-nowrap">강사명</th>
@@ -842,7 +842,7 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
                             )} 
                             onClick={() => toggleSessionExpand(session.id)}
                           >
-                            <td className="px-8 py-5 font-bold text-slate-700 whitespace-nowrap">
+                            <td className="px-4 md:px-8 py-5 font-bold text-slate-700 whitespace-nowrap">
                               <div className="flex items-center gap-2 group-hover:translate-x-1 transition-transform">
                                 <span className={cn(
                                   "flex items-center justify-center w-6 h-6 rounded-lg transition-all",
@@ -893,7 +893,7 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
                                     variant="ghost" 
                                     size="sm" 
                                     onClick={() => openSessionCopyModal(program.id, session)} 
-                                    className="h-8 md:h-9 px-2 md:px-3 text-blue-600 font-black hover:bg-blue-50 rounded-xl flex gap-1 items-center transition-all active:scale-95 border border-blue-100 whitespace-nowrap text-[10px] md:text-sm"
+                                    className="h-8 md:h-9 px-2 md:px-3 text-indigo-600 font-black hover:bg-indigo-50 rounded-xl flex gap-1 items-center transition-all active:scale-95 border border-indigo-100 whitespace-nowrap text-[10px] md:text-sm"
                                   >
                                     <Copy className="w-3 md:w-4 h-3 md:h-4 shrink-0" /> <span className="whitespace-nowrap">복사</span>
                                   </Button>
@@ -1021,7 +1021,7 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
       {isProgramModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <Card className="w-full max-w-lg border-none shadow-2xl rounded-[2.5rem] bg-white overflow-hidden p-0">
-            <div className="bg-slate-900 px-8 py-6 text-white flex justify-between items-center">
+            <div className="bg-slate-900 px-6 md:px-8 py-6 text-white flex justify-between items-center">
               <h3 className="text-xl font-black">{editingProgramId ? "사업 정보 수정" : "새 사업 등록"}</h3>
               <button onClick={() => setIsProgramModalOpen(false)} className="hover:rotate-90 transition-transform"><X className="w-6 h-6" /></button>
             </div>
@@ -1071,7 +1071,7 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
       {isSessionModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <Card className="w-full max-w-2xl max-h-[90vh] flex flex-col border-none shadow-2xl rounded-[2.5rem] bg-white overflow-hidden p-0 shadow-blue-900/10">
-            <div className="flex-shrink-0 bg-blue-600 px-8 py-6 text-white flex justify-between items-center">
+            <div className="flex-shrink-0 bg-blue-600 px-6 md:px-8 py-6 text-white flex justify-between items-center">
               <div>
                 <h3 className="text-xl font-black">{editingSessionId ? "교육과정 수정" : "새 교육과정 추가"}</h3>
                 <p className="text-xs font-bold opacity-80 mt-1">세션 정보와 일정을 등록합니다.</p>

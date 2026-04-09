@@ -64,7 +64,7 @@ export default function AdminSurveyReportPage() {
   const COLORS = ["#3b82f6", "#6366f1", "#8b5cf6", "#a855f7", "#d946ef"]
 
   return (
-    <div className="p-8 space-y-10 max-w-7xl mx-auto animate-in fade-in duration-500 pb-20">
+    <div className="p-3 md:p-6 lg:p-8 space-y-10 w-full animate-in fade-in duration-500 pb-20">
       
       {/* Header */}
       <div className="flex justify-between items-end border-b border-slate-200 pb-8">

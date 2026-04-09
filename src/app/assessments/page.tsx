@@ -666,7 +666,7 @@ export default function AssessmentsPage() {
       {isAddTemplateOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-300">
           <Card className="w-full max-w-md max-h-[90vh] flex flex-col border-none shadow-2xl rounded-[2.5rem] bg-white overflow-hidden p-0 shadow-blue-900/10">
-            <div className="flex-shrink-0 bg-blue-600 px-8 py-6 text-white flex justify-between items-center">
+            <div className="flex-shrink-0 bg-blue-600 px-6 md:px-8 py-6 text-white flex justify-between items-center">
               <div>
                 <h3 className="text-xl font-black">새 평가 템플릿 추가</h3>
                 <p className="text-xs font-bold opacity-80 mt-1">평가 대상과 문항 구성을 시작합니다.</p>
@@ -680,7 +680,7 @@ export default function AssessmentsPage() {
             </div>
 
             <form onSubmit={(e) => { e.preventDefault(); handleSaveTemplateMetadata(true); }} className="flex-1 flex flex-col min-h-0">
-              <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
+              <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6 custom-scrollbar">
                 <div className="space-y-4">
                   <label className="text-sm font-black text-slate-800 tracking-tight flex items-center gap-2">
                     <Settings className="w-4 h-4 text-blue-600" /> 템플릿 설정 정보
@@ -732,7 +732,7 @@ export default function AssessmentsPage() {
                 </div>
               </div>
               
-              <div className="flex-shrink-0 p-8 border-t border-slate-100 flex flex-col gap-3 bg-slate-50/50">
+              <div className="flex-shrink-0 p-6 md:p-8 border-t border-slate-100 flex flex-col gap-3 bg-slate-50/50">
                 <Button 
                   type="submit" 
                   className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl shadow-lg shadow-blue-100 transition-all active:scale-[0.98]"
@@ -757,7 +757,7 @@ export default function AssessmentsPage() {
         <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 sm:p-8 animate-in fade-in">
           <div className="bg-slate-50 rounded-[2rem] shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-full animate-in zoom-in-95 border border-white/20">
             {/* Modal Header */}
-            <div className="px-8 py-6 border-b border-slate-200 flex justify-between items-center bg-white/80 backdrop-blur-sm z-10">
+            <div className="px-4 md:px-8 py-6 border-b border-slate-200 flex justify-between items-center bg-white/80 backdrop-blur-sm z-10">
               <div>
                 <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
                     <FileText className="w-5 h-5 text-blue-600"/> 문항 시트 고도화 편집
@@ -776,7 +776,7 @@ export default function AssessmentsPage() {
             </div>
             
             {/* Modal Body: Recursive Tree Rendering */}
-            <div className="p-8 overflow-y-auto space-y-8 flex-1 custom-scrollbar">
+            <div className="p-4 md:p-8 overflow-y-auto space-y-8 flex-1 custom-scrollbar">
               {surveyGroups.map((group, gIdx) => (
                 <div 
                   key={group.id} 
@@ -788,7 +788,7 @@ export default function AssessmentsPage() {
                   className="relative group/group bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden transition-all duration-300 hover:shadow-md"
                 >
                    {/* Level 1: Group (종류) Header */}
-                   <div className="bg-slate-50 px-8 py-4 flex items-center justify-between border-b border-slate-100">
+                   <div className="bg-slate-50 px-4 md:px-8 py-4 flex items-center justify-between border-b border-slate-100">
                       <div className="flex items-center gap-4 flex-1">
                          <div className="flex flex-col gap-1 mr-2 cursor-grab active:cursor-grabbing">
                             <GripVertical className="w-5 h-5 text-slate-300" />

@@ -227,7 +227,7 @@ export default function MeetingsPage() {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-20 mx-auto px-1 md:px-0">
+    <div className="w-full space-y-8 animate-in fade-in duration-500 pb-20">
       <div className="flex justify-between items-end border-b border-slate-200 pb-6 mb-10">
         <div>
           <h1 className="text-4xl font-black tracking-tight text-slate-900">회의록 관리</h1>
@@ -340,7 +340,7 @@ export default function MeetingsPage() {
       {showModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-300">
           <Card className="w-full max-w-4xl max-h-[90vh] flex flex-col border-none shadow-2xl rounded-[2.5rem] bg-white overflow-hidden p-0 shadow-blue-900/10">
-            <div className="flex-shrink-0 bg-blue-600 px-8 py-7 text-white flex justify-between items-center">
+            <div className="flex-shrink-0 bg-blue-600 px-6 md:px-8 py-7 text-white flex justify-between items-center">
               <div>
                 <h2 className="text-2xl font-black">{isEditing ? "회의록 수정" : "신규 회의 등록"}</h2>
                 <p className="text-xs font-bold opacity-80 mt-1 uppercase tracking-widest">
@@ -356,7 +356,7 @@ export default function MeetingsPage() {
             </div>
             
             <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
-              <div className="flex-1 overflow-y-auto p-10 space-y-12 custom-scrollbar">
+              <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-12 custom-scrollbar">
                 {/* AI OCR Section - Only for new */}
                 {!isEditing && (
                   <div className="space-y-4">
@@ -385,7 +385,7 @@ export default function MeetingsPage() {
                     <div className="w-1.5 h-3 bg-indigo-500 rounded-full"></div>
                     <h3 className="text-sm font-black text-slate-800 tracking-tight">1. 회의 진행 정보</h3>
                   </div>
-                  <div className="grid grid-cols-2 gap-x-10 gap-y-5 bg-slate-50/50 p-8 rounded-[2rem] border border-slate-100">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-5 bg-slate-50/50 p-6 md:p-8 rounded-[2rem] border border-slate-100">
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-black text-slate-400 uppercase ml-1">회의 일자 *</label>
                       <input type="date" value={formData.date} onChange={e => setFormData(prev => ({...prev, date: e.target.value}))} className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 text-sm font-bold focus:ring-2 focus:ring-blue-500 transition-all outline-none shadow-sm" />
@@ -481,7 +481,7 @@ export default function MeetingsPage() {
       {selectedMeeting && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-[40px] w-full max-w-4xl max-h-[90vh] shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col">
-            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
+            <div className="p-6 md:p-8 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
               <div>
                 <h2 className="text-2xl font-black text-slate-900 pr-12">{selectedMeeting.title}</h2>
                 <div className="flex flex-wrap gap-2 text-slate-500 font-bold mt-3">
@@ -496,7 +496,7 @@ export default function MeetingsPage() {
               </button>
             </div>
             
-            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-slate-50/50">
+            <div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar bg-slate-50/50">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-6">
                   <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">

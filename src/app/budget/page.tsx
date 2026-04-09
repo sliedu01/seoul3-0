@@ -406,7 +406,7 @@ export default function BudgetPage() {
 
       {/* TOP VIEW: 대시보드 (산출내역서) - 3단계 표시 반영 */}
       <Card className="border-none shadow-md overflow-hidden bg-white">
-        <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+        <div className="px-4 md:px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <h2 className="font-black text-slate-800 flex items-center gap-2">
             📊 비목별 예산 현황 총괄 (산출내역서)
           </h2>
@@ -725,7 +725,7 @@ export default function BudgetPage() {
       {showForm && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-300">
           <Card className="w-full max-w-4xl max-h-[90vh] flex flex-col border-none shadow-2xl rounded-[2.5rem] bg-white overflow-hidden p-0 shadow-blue-900/10">
-            <div className="flex-shrink-0 bg-slate-900 px-8 py-6 text-white flex justify-between items-center">
+            <div className="flex-shrink-0 bg-slate-900 px-6 md:px-8 py-6 text-white flex justify-between items-center">
               <div>
                 <h3 className="text-xl font-black flex items-center gap-2">
                   {editingExpId ? '집행명세 수정' : '새 집행명세 등록'}
@@ -743,14 +743,14 @@ export default function BudgetPage() {
             </div>
 
             <form onSubmit={handleSubmitExpenditure} className="flex-1 flex flex-col min-h-0">
-              <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar">
+              <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-10 custom-scrollbar">
                 {/* 3-Level Cascading Dropdowns */}
                 <div className="space-y-6">
                   <div className="flex items-center gap-2 ml-1">
                     <div className="w-1.5 h-3 bg-blue-600 rounded-full"></div>
                     <h4 className="text-sm font-black text-slate-800">1. 예산 항목 선택</h4>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-50 p-8 rounded-[2rem] border border-slate-100">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-50 p-6 md:p-8 rounded-[2rem] border border-slate-100">
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-black text-slate-400 uppercase ml-1">비목 (Level 1) *</label>
                       <select 
