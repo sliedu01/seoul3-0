@@ -26,12 +26,12 @@ export async function GET(req: Request) {
     }
 
     if (startDate || endDate) {
-      whereClause.createdAt = {};
-      if (startDate) whereClause.createdAt.gte = new Date(startDate);
+      whereClause.session = { ...whereClause.session, date: {} };
+      if (startDate) whereClause.session.date.gte = new Date(startDate);
       if (endDate) {
         const end = new Date(endDate);
         end.setHours(23, 59, 59, 999);
-        whereClause.createdAt.lte = end;
+        whereClause.session.date.lte = end;
       }
     }
 
