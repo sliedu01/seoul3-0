@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { 
   BarChart3, 
@@ -23,6 +24,7 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
 export default function Dashboard() {
+  const router = useRouter()
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
@@ -55,7 +57,10 @@ export default function Dashboard() {
     )
   }
 
-  const { stats, schedules } = data || { stats: {}, schedules: { twoWeeksAgo: [], lastWeek: [], thisWeek: [], nextWeek: [] } }
+  const { stats, schedules } = data || { 
+    stats: { programCount: 0, partnerCount: 0, avgSatisfaction: 0, perceivedGrowth: 0, netGrowth: 0, avgGrowth: 0 }, 
+    schedules: { twoWeeksAgo: [], lastWeek: [], thisWeek: [], nextWeek: [] } 
+  }
 
   return (
     <div className="space-y-10 animate-in fade-in duration-500 pb-20 w-full">
@@ -80,30 +85,34 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <StatsCard 
             title="등록된 사업 수" 
-            value={stats.programCount} 
+            value={stats?.programCount || 0} 
             icon={Briefcase} 
             color="blue" 
             label="현재 운영 중인 전체 사업"
+            onClick={() => router.push('/programs')}
           />
           <StatsCard 
             title="참여 협력업체" 
-            value={stats.partnerCount} 
+            value={stats?.partnerCount || 0} 
             icon={Building2} 
             color="emerald" 
             label="기관 및 교육 파트너"
+            onClick={() => router.push('/partners')}
           />
           <StatsCard 
             title="평균 만족도" 
-            value={stats.avgSatisfaction} 
+            value={stats?.avgSatisfaction || 0} 
             icon={Users} 
             color="orange" 
             label="수강생 피드백 점수"
             unit="/ 5.0"
+            onClick={() => router.push('/reports')}
           />
           <StatsCard 
             icon={TrendingUp} 
             color="indigo" 
             isCustom
+            onClick={() => router.push('/reports')}
           >
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-2">
@@ -111,7 +120,7 @@ export default function Dashboard() {
                   <p className="text-[10px] font-black text-slate-400 tracking-tighter">학습 인지 변화도</p>
                   <div className="flex items-baseline gap-0.5">
                     <h3 className="text-3xl font-black tracking-tighter text-indigo-600">
-                      {stats.perceivedGrowth}
+                      {stats?.perceivedGrowth || 0}
                     </h3>
                     <span className="text-sm font-bold text-indigo-400">%</span>
                   </div>
@@ -120,7 +129,7 @@ export default function Dashboard() {
                   <p className="text-[10px] font-black text-slate-400 tracking-tighter text-right">역량 도달률</p>
                   <div className="flex items-baseline gap-0.5 justify-end">
                     <h3 className="text-3xl font-black tracking-tighter text-indigo-600">
-                      {stats.netGrowth}
+                      {stats?.netGrowth || 0}
                     </h3>
                     <span className="text-sm font-bold text-indigo-400">%</span>
                   </div>
@@ -129,7 +138,7 @@ export default function Dashboard() {
               <div className="pt-2 border-t border-indigo-100/50 flex justify-between items-center">
                 <p className="text-xs text-slate-400 font-black tracking-widest opacity-60">평균 도달 수준</p>
                 <div className="flex items-baseline gap-0.5 text-indigo-600 font-black">
-                  <span className="text-lg">{stats.avgGrowth}</span>
+                  <span className="text-lg">{stats?.avgGrowth || 0}</span>
                   <span className="text-[10px]">%</span>
                 </div>
               </div>
@@ -197,16 +206,23 @@ export default function Dashboard() {
   )
 }
 
-function StatsCard({ title, value, icon: Icon, color, label, unit, children, isCustom }: any) {
+function StatsCard({ title, value, icon: Icon, color, label, unit, children, isCustom, onClick }: any) {
   const colorMap: any = {
-    blue: "from-blue-500 to-indigo-600 text-blue-600 bg-blue-50 border-blue-100",
-    emerald: "from-emerald-500 to-teal-600 text-emerald-600 bg-emerald-50 border-emerald-100",
-    orange: "from-orange-500 to-amber-600 text-orange-600 bg-orange-50 border-orange-100",
-    indigo: "from-indigo-500 to-purple-600 text-indigo-600 bg-indigo-50 border-indigo-100",
+    blue: "from-blue-500 to-indigo-600 text-blue-600 bg-blue-50 border-blue-100 px-1 hover:border-blue-300",
+    emerald: "from-emerald-500 to-teal-600 text-emerald-600 bg-emerald-50 border-emerald-100 px-1 hover:border-emerald-300",
+    orange: "from-orange-500 to-amber-600 text-orange-600 bg-orange-50 border-orange-100 px-1 hover:border-orange-300",
+    indigo: "from-indigo-500 to-purple-600 text-indigo-600 bg-indigo-50 border-indigo-100 px-1 hover:border-indigo-300",
   }
 
   return (
-    <Card className={`border-none shadow-sm hover:shadow-xl transition-all duration-300 group overflow-hidden ${colorMap[color].split(' ').slice(2).join(' ')}`}>
+    <Card 
+      onClick={onClick}
+      className={cn(
+        "border-none shadow-sm hover:shadow-xl transition-all duration-300 group overflow-hidden",
+        colorMap[color].split(' ').slice(2).join(' '),
+        onClick && "cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+      )}
+    >
       <CardContent className="p-6">
         <div className="flex justify-between items-start mb-4">
           <div className={`p-3 rounded-2xl bg-white shadow-md border ${colorMap[color].split(' ')[3]}`}>

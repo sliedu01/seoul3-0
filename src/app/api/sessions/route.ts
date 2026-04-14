@@ -106,12 +106,13 @@ export async function POST(req: Request) {
       ]
     });
 
-    for (let i = 0; i < allSessions.length; i++) {
-      await prisma.programSession.update({
-        where: { id: allSessions[i].id },
+    const updatePromises = allSessions.map((s, i) => 
+      prisma.programSession.update({
+        where: { id: s.id },
         data: { sessionNumber: i + 1 }
-      });
-    }
+      })
+    );
+    await prisma.$transaction(updatePromises);
 
     const session = await prisma.programSession.findUnique({
       where: { id: newSession.id },

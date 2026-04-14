@@ -40,7 +40,10 @@ function PartnerPerformance({ partnerId }: { partnerId: string }) {
         setStats(data);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch((err) => {
+        console.error("Partner stats fetch error:", err);
+        setLoading(false);
+      });
   }, [partnerId]);
 
   if (loading) return <span className="text-[10px] text-slate-400 animate-pulse">집계 중...</span>;
@@ -50,13 +53,13 @@ function PartnerPerformance({ partnerId }: { partnerId: string }) {
     <div className="flex flex-col gap-1">
       <div className="flex items-center gap-2">
         <span className="text-[11px] font-bold text-slate-700">만족도</span>
-        <span className="text-[11px] text-blue-600 font-bold">{stats.avgSatisfaction.toFixed(1)} / 5.0</span>
+        <span className="text-11px text-blue-600 font-bold">{(stats?.avgSatisfaction || 0).toFixed(1)} / 5.0</span>
       </div>
       <div className="flex items-center gap-2">
         <span className="text-[11px] font-bold text-slate-700">향상도</span>
-        <span className="text-[11px] text-emerald-600 font-bold">+{stats.avgDelta.toFixed(1)}%</span>
+        <span className="text-[11px] text-emerald-600 font-bold">+{(stats?.avgDelta || 0).toFixed(1)}%</span>
       </div>
-      <div className="text-[9px] text-slate-400">총 {stats.sessionCount}세션 / {stats.totalResponses}명 참여</div>
+      <div className="text-[9px] text-slate-400">총 {stats?.sessionCount || 0}세션 / {stats?.totalResponses || 0}명 참여</div>
     </div>
   );
 }

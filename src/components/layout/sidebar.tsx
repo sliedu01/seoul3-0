@@ -73,7 +73,12 @@ export function Sidebar() {
         
         <nav className="flex-1 space-y-1.5 p-4 mt-2 overflow-y-auto custom-scrollbar">
           {routes
-            .filter(route => route.href !== '/admin/users' || user?.role === 'ADMIN')
+            .filter(route => {
+              if (route.href === '/admin/users' && user?.role !== 'ADMIN') return false;
+              if (route.href === '/reports' && user?.role === 'MEMBER') return false;
+              if (route.href === '/assessments' && user?.role === 'MEMBER') return false;
+              return true;
+            })
             .map((route) => {
             const isActive = pathname === route.href;
             return (

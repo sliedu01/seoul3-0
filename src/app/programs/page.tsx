@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react"
 export const dynamic = 'force-dynamic' // Vercel 배포 시 최신 데이터 및 UI 반영 강제
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Plus, Pencil, Trash2, FilePlus2, X, Clock, User, BookOpen, Calendar, Building2, UploadCloud, Download, Link, AlertCircle, ChevronDown, ChevronRight, CalendarDays, Copy } from "lucide-react"
+import { Plus, Pencil, Trash2, FilePlus2, X, Clock, User, Users, BookOpen, Calendar, Building2, UploadCloud, Download, Link, AlertCircle, ChevronDown, ChevronRight, CalendarDays, Copy } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 
@@ -142,13 +142,23 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
   // Survey Entry Modal
   const [showSurveyModal, setShowSurveyModal] = useState(false)
   const [activeSession, setActiveSession] = useState<Session | null>(null)
-  const [surveyFormData, setSurveyFormData] = useState({ 
-    pdfPath: "", 
-    googleUrl: "", 
-    excelFile: null as File | null,
-    templateId: "" 
+  
+  type SurveyState = { templateId: string, pdfPath: string, googleUrl: string, excelFile: File | null }
+  const [surveyTabsData, setSurveyTabsData] = useState<{ satisfaction: SurveyState, maturity: SurveyState }>({
+    satisfaction: { templateId: "", pdfPath: "", googleUrl: "", excelFile: null },
+    maturity: { templateId: "", pdfPath: "", googleUrl: "", excelFile: null }
   })
-  const [inputMethod, setInputMethod] = useState<"PDF" | "EXCEL" | "GOOGLE">("PDF")
+  const [inputMethods, setInputMethods] = useState<{ satisfaction: "PDF" | "EXCEL" | "GOOGLE", maturity: "PDF" | "EXCEL" | "GOOGLE" }>({
+    satisfaction: "PDF",
+    maturity: "PDF"
+  })
+  // 엑셀 입력 포맷 선택: SEQUENTIAL(순차입력) | AGGREGATED(결과입력)
+  const [excelFormats, setExcelFormats] = useState<{ satisfaction: "SEQUENTIAL" | "AGGREGATED", maturity: "SEQUENTIAL" | "AGGREGATED" }>({
+    satisfaction: "SEQUENTIAL",
+    maturity: "SEQUENTIAL"
+  })
+  const [activeSurveyTab, setActiveSurveyTab] = useState<"SATISFACTION" | "MATURITY">("SATISFACTION")
+  
   const [isDragging, setIsDragging] = useState(false)
   const [templates, setTemplates] = useState<any[]>([])
   const [isOcrProcessing, setIsOcrProcessing] = useState(false)
@@ -196,242 +206,301 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
 
   const handleProgramSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsProgramModalOpen(false) // 즉각적인 UI 반응 (낙관적 모달 닫기)
+
     const url = editingProgramId ? `/api/programs/${editingProgramId}` : "/api/programs"
     const method = editingProgramId ? "PUT" : "POST"
 
-    const res = await fetch(url, {
-      method,
-      body: JSON.stringify(programFormData),
-      headers: { "Content-Type": "application/json" }
-    })
-    
-    if (res.ok) {
-      setIsProgramModalOpen(false)
-      fetchData(true) // 백그라운드 갱신
-    } else {
-      const error = await res.json()
-      alert(`저장 실패: ${error.error || "알 수 없는 오류"}`)
+    try {
+      const res = await fetch(url, {
+        method,
+        body: JSON.stringify(programFormData),
+        headers: { "Content-Type": "application/json" }
+      })
+      
+      if (res.ok) {
+        fetchData(true) // 백그라운드 갱신
+      } else {
+        const error = await res.json()
+        alert(`저장 실패: ${error.error || "알 수 없는 오류"}`)
+        setIsProgramModalOpen(true) // 롤백 (다시 모달 열기)
+      }
+    } catch(err) {
+      alert("서버 연결에 실패했습니다.")
+      setIsProgramModalOpen(true) // 롤백
     }
   }
 
   const handleSessionSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsSessionModalOpen(false) // 즉각적인 UI 반응
+
     const url = editingSessionId ? `/api/sessions/${editingSessionId}` : "/api/sessions"
     const method = editingSessionId ? "PATCH" : "POST"
 
-    // DB에 KST 값을 그대로 저장 (UTC 컬럼에 KST 시간을 직접 저장하는 방식)
     const startDateTime = sessionFormData.startTime ? `${sessionFormData.startDate}T${sessionFormData.startTime}:00.000Z` : null
     const endDateTime = sessionFormData.endTime ? `${sessionFormData.endDate || sessionFormData.startDate}T${sessionFormData.endTime}:00.000Z` : null
 
-    const res = await fetch(url, {
-      method,
-      body: JSON.stringify({
-        ...sessionFormData,
-        date: sessionFormData.startDate,
-        programId: selectedProgramId,
-        startTime: startDateTime,
-        endTime: endDateTime,
-        capacity: Number(sessionFormData.capacity),
-        participantCount: Number(sessionFormData.participantCount),
-        // 전처리된 classDays 배열 전송
-        classDays: (sessionFormData.classDays || []).map((cd: any) => ({
-          ...cd,
-          // 각 교육일의 날짜와 시간을 결합하여 ISO Date 문자열 생성
-          date: `${cd.date}T00:00:00.000Z`,
-          startTime: cd.startTime ? `${cd.date}T${cd.startTime}:00.000Z` : null,
-          endTime: cd.endTime ? `${cd.date}T${cd.endTime}:00.000Z` : null,
-          capacity: Number(cd.capacity || 0),
-          participantCount: Number(cd.participantCount || 0)
-        }))
-      }),
-      headers: { "Content-Type": "application/json" }
-    })
-    
-    if (res.ok) {
-      setIsSessionModalOpen(false)
-      fetchData(true) // 백그라운드 갱신
-    } else {
-      const error = await res.json()
-      alert(`저장 실패: ${error.error || "알 수 없는 오류"}`)
+    try {
+      const res = await fetch(url, {
+        method,
+        body: JSON.stringify({
+          ...sessionFormData,
+          date: sessionFormData.startDate,
+          programId: selectedProgramId,
+          startTime: startDateTime,
+          endTime: endDateTime,
+          capacity: Number(sessionFormData.capacity),
+          participantCount: Number(sessionFormData.participantCount),
+          classDays: (sessionFormData.classDays || []).map((cd: any) => ({
+            ...cd,
+            date: `${cd.date}T00:00:00.000Z`,
+            startTime: cd.startTime ? `${cd.date}T${cd.startTime}:00.000Z` : null,
+            endTime: cd.endTime ? `${cd.date}T${cd.endTime}:00.000Z` : null,
+            capacity: Number(cd.capacity || 0),
+            participantCount: Number(cd.participantCount || 0)
+          }))
+        }),
+        headers: { "Content-Type": "application/json" }
+      })
+      
+      if (res.ok) {
+        fetchData(true) // 백그라운드 갱신
+      } else {
+        const error = await res.json()
+        alert(`저장 실패: ${error.error || "알 수 없는 오류"}`)
+        setIsSessionModalOpen(true) // 롤백
+      }
+    } catch(err) {
+      alert("서버 연결 오류가 발생했습니다.")
+      setIsSessionModalOpen(true) // 롤백
     }
   }
 
   const handleSurveySubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!activeSession) return
-    if (!surveyFormData.templateId) {
-      alert("평가 템플릿을 먼저 선택해주세요.")
+    
+    if (!surveyTabsData.satisfaction.templateId && !surveyTabsData.maturity.templateId) {
+      alert("적어도 하나의 평가 템플릿(만족도 또는 성숙도)을 선택해주세요.")
       return
     }
 
     setIsOcrProcessing(true)
 
     try {
-      const qRes = await fetch(`/api/templates/${surveyFormData.templateId}`)
-      const templateData = await qRes.json()
-      const questions = templateData.questions || []
-      const selectedTemplate = templates.find(t => t.id === surveyFormData.templateId)
+      let totalRegistered = 0;
+      for (const type of ["satisfaction", "maturity"] as const) {
+        const formData = surveyTabsData[type];
+        const method = inputMethods[type];
+        
+        if (!formData.templateId) continue;
 
-      if (questions.length === 0) {
-        alert("템플릿에 등록된 문항이 없습니다.")
-        setIsOcrProcessing(false)
-        return
-      }
+        const qRes = await fetch(`/api/templates/${formData.templateId}`)
+        const templateData = await qRes.json()
+        const questions = templateData.questions || []
+        const selectedTemplate = templates.find(t => t.id === formData.templateId)
 
-      // Simulation or Real Data based on input method
-      let mockResponses = [];
-      const getCat = (q: any) => {
-          if (!q.category) return "미지정";
-          return q.category.includes('|') ? q.category.split('|').pop() : q.category;
-      };
+        if (questions.length === 0) {
+          alert(`${type === "satisfaction" ? "만족도" : "성숙도"} 템플릿에 문항이 없습니다.`)
+          continue;
+        }
 
-      if (inputMethod === "EXCEL" && surveyFormData.excelFile) {
-          const XLSX = await import("xlsx");
-          const data = await surveyFormData.excelFile.arrayBuffer();
-          const workbook = XLSX.read(data);
-          const sheet = workbook.Sheets[workbook.SheetNames[0]];
-          const json: any[] = XLSX.utils.sheet_to_json(sheet);
-          
-          mockResponses = json.map((row: any) => ({
-              studentName: row["성명"] || "알수없음",
-              researchTarget: "ELEMENTARY",
-              type: selectedTemplate?.type?.includes('성숙도') ? 'MATURITY' : 'SATISFACTION',
-              answers: questions.map((q: any) => {
-                  const cat = getCat(q);
-                  const isS = q.growthType === 'NONE' || q.category?.includes('만족') || q.content?.includes('만족');
-                  let score = null, preScore = null, postChange = null, textValue = "";
-                  
-                  if (!isS && (q.growthType === 'CHANGE' || q.growthType === 'PRE_POST')) {
-                      preScore = row[`사전_${cat}`];
-                      const postScore = row[`사후_${cat}`];
-                      if (q.growthType === 'CHANGE') {
-                          postChange = (postScore !== undefined && preScore !== undefined) ? Number(postScore) - Number(preScore) : null;
-                          score = postScore ? Number(postScore) : null;
-                      } else {
-                          score = postScore ? Number(postScore) : null;
-                      }
-                      preScore = preScore ? Number(preScore) : null;
+        let mockResponses: any[] = [];
+        const getCat = (q: any) => {
+            if (!q.category) return "미지정";
+            return q.category.includes('|') ? q.category.split('|').pop() : q.category;
+        };
+
+        const targetType = type === 'maturity' ? 'MATURITY' : 'SATISFACTION';
+
+        if (method === "EXCEL" && formData.excelFile) {
+            const XLSX = await import("xlsx");
+            const data = await formData.excelFile.arrayBuffer();
+            const workbook = XLSX.read(data);
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            const json: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+            const currentExcelFmt = excelFormats[type];
+
+            if (currentExcelFmt === "AGGREGATED") {
+              // ── 결과입력 파싱: 각 행=문항, 점수분포에서 개별 응답 복원 ──
+              const SCORE_COLS_SAT  = ["매우그렇다(5)", "그렇다(4)", "보통(3)", "그렇지않다(2)", "전혀그렇지않다(1)"]
+              const SCORE_COLS_PRE  = ["사전_매우그렇다(5)", "사전_그렇다(4)", "사전_보통(3)", "사전_그렇지않다(2)", "사전_전혀그렇지않다(1)"]
+              const SCORE_COLS_POST = ["사후_매우그렇다(5)", "사후_그렇다(4)", "사후_보통(3)", "사후_그렇지않다(2)", "사후_전혀그렇지않다(1)"]
+              const SCORE_VALS = [5, 4, 3, 2, 1]
+              const isMat = type === 'maturity'
+
+              // 최대 응답자 수 파악
+              let maxP = 0
+              json.forEach((row: any) => {
+                const p = Number(row["참여자"] || 0)
+                if (p > maxP) maxP = p
+              })
+              if (maxP === 0) maxP = 1
+
+              // 각 문항별 점수분포를 개인별 배열로 변환
+              const questionScores: Map<string, { pre: (number|null)[], post: (number|null)[], sat: (number|null)[] }> = new Map()
+              json.forEach((row: any) => {
+                const qContent = String(row["설문문항"] || "").trim()
+                if (!qContent) return
+                const matched = questions.find((q: any) => q.content.trim() === qContent)
+                if (!matched) return
+                const cat = getCat(matched)
+                const key = cat + "||" + qContent
+                const p = Number(row["참여자"] || maxP)
+                if (isMat) {
+                  const preArr: (number|null)[] = []
+                  const postArr: (number|null)[] = []
+                  SCORE_COLS_PRE.forEach((col, i) => {
+                    const cnt = Number(row[col] || 0)
+                    for (let k = 0; k < cnt; k++) preArr.push(SCORE_VALS[i])
+                  })
+                  SCORE_COLS_POST.forEach((col, i) => {
+                    const cnt = Number(row[col] || 0)
+                    for (let k = 0; k < cnt; k++) postArr.push(SCORE_VALS[i])
+                  })
+                  while (preArr.length < p) preArr.push(null)
+                  while (postArr.length < p) postArr.push(null)
+                  questionScores.set(key, { pre: preArr, post: postArr, sat: [] })
+                } else {
+                  const satArr: (number|null)[] = []
+                  SCORE_COLS_SAT.forEach((col, i) => {
+                    const cnt = Number(row[col] || 0)
+                    for (let k = 0; k < cnt; k++) satArr.push(SCORE_VALS[i])
+                  })
+                  while (satArr.length < p) satArr.push(null)
+                  questionScores.set(key, { pre: [], post: [], sat: satArr })
+                }
+              })
+
+              // 개인별 응답으로 재구성
+              mockResponses = Array.from({ length: maxP }).map((_, idx) => ({
+                studentName: `응답자_${idx + 1}`,
+                researchTarget: "ELEMENTARY",
+                type: targetType,
+                answers: questions.map((q: any) => {
+                  const cat = getCat(q)
+                  const key = cat + "||" + q.content.trim()
+                  const data = questionScores.get(key)
+                  if (!data) return { questionId: q.id, score: null, preScore: null, postChange: null, textValue: "" }
+                  if (isMat) {
+                    const pre = data.pre[idx] ?? null
+                    const post = data.post[idx] ?? null
+                    return { questionId: q.id, score: post, preScore: pre, postChange: (pre !== null && post !== null) ? post - pre : null, textValue: "" }
                   } else {
-                      const prefix = q.type === 'MCQ' ? '만족도_' : '';
-                      const val = row[`${prefix}${cat}`];
-                      if (q.type === 'ESSAY') textValue = val || "";
-                      else score = val ? Number(val) : null;
+                    return { questionId: q.id, score: data.sat[idx] ?? null, preScore: null, postChange: null, textValue: "" }
+                  }
+                })
+              }))
+
+            } else {
+              // ── 순차입력 파싱: 기존 방식 (행=학생) ──
+              mockResponses = json.map((row: any) => ({
+                  studentName: row["성명"] || "알수없음",
+                  researchTarget: "ELEMENTARY",
+                  type: targetType,
+                  answers: questions.map((q: any) => {
+                      const cat = getCat(q);
+                      const isS = q.growthType === 'NONE';
+                      let score = null, preScore = null, postChange = null, textValue = "";
+
+                      if (!isS && (q.growthType === 'CHANGE' || q.growthType === 'PRE_POST')) {
+                          const pre = row[`사전_${cat}`];
+                          const post = row[`사후_${cat}`];
+                          preScore = (pre !== undefined && pre !== '') ? Number(pre) : null;
+                          score = (post !== undefined && post !== '') ? Number(post) : null;
+                          postChange = (preScore !== null && score !== null) ? score - preScore : null;
+                      } else {
+                          const val = row[`결과값_${cat}`] ?? row[`주관식_${cat}`] ?? row[cat];
+                          if (q.type === 'ESSAY') textValue = val || "";
+                          else score = (val !== undefined && val !== '') ? Number(val) : null;
+                      }
+                      return { questionId: q.id, score, preScore, postChange, textValue };
+                  })
+              }));
+            }
+        } else {
+            // Simulation
+            const mockCount = method === "PDF" ? 5 : method === "EXCEL" ? 10 : 25
+            mockResponses = Array.from({ length: mockCount }).map((_, idx) => ({
+              studentName: `학생_${idx + 1}`,
+              researchTarget: "ELEMENTARY",
+              type: targetType,
+              answers: questions.map((q: any, qIdx: number) => {
+                  let score: number | null = null, preScore: number | null = null, postChange: number | null = null, textValue = "";
+                  
+                  if (q.growthType === 'CHANGE' || q.growthType === 'PRE_POST') {
+                      const preMark = Math.floor(Math.random() * 3) + 2;
+                      const improvement = Math.random() > 0.3 ? (Math.random() > 0.8 ? 2 : 1) : 0;
+                      const postMark = Math.min(5, preMark + improvement);
+                      
+                      if (q.growthType === 'CHANGE') {
+                          preScore = preMark;
+                          postChange = postMark - preMark;
+                          score = postMark;
+                      } else {
+                          preScore = preMark;
+                          score = postMark;
+                      }
+                  } else if (q.type === 'MCQ') {
+                      score = Math.floor(Math.random() * 2) + 4;
+                  } else if (q.type === 'ESSAY') {
+                      const essaySentences = ["친구들과 조를 짜서 문제 해결을 한 과정이 가장 기억에 남습니다.", "선생님이 알려주신 나의 장점 키워드들이 힘이 되었습니다.", "어렵게 느껴졌던 기술들을 직접 체험해보니 자신감이 생겼습니다.", "다음에는 코딩뿐만 아니라 디자인 수업도 들어보고 싶습니다.", "오늘 배운 내용을 친구들에게도 알려주고 싶어요."];
+                      textValue = essaySentences[Math.floor(Math.random() * essaySentences.length)];
+                  }
+                  
+                  if (Math.random() < 0.01) {
+                      score = null; preScore = null; postChange = null;
                   }
                   return { questionId: q.id, score, preScore, postChange, textValue };
               })
-          }));
-      } else {
-          // Fallback to Simulation (Prompt-Based)
-          const mockCount = inputMethod === "PDF" ? 5 : inputMethod === "EXCEL" ? 10 : 25
-          mockResponses = Array.from({ length: mockCount }).map((_, idx) => ({
-            studentName: `학생_${idx + 1}`,
-            researchTarget: "ELEMENTARY",
-            type: selectedTemplate?.type?.includes('성숙도') ? 'MATURITY' : 'SATISFACTION',
-            answers: questions.map((q: any, qIdx: number) => {
-                let score: number | null = null, preScore: number | null = null, postChange: number | null = null, textValue = "";
-                
-                if (q.growthType === 'CHANGE' || q.growthType === 'PRE_POST') {
-                    const preMark = Math.floor(Math.random() * 3) + 2;
-                    const improvement = Math.random() > 0.3 ? (Math.random() > 0.8 ? 2 : 1) : 0;
-                    const postMark = Math.min(5, preMark + improvement);
-                    
-                    if (q.growthType === 'CHANGE') {
-                        preScore = preMark;
-                        postChange = postMark - preMark;
-                        score = postMark;
-                    } else {
-                        preScore = preMark;
-                        score = postMark;
-                    }
-                } else if (q.type === 'MCQ') {
-                    score = Math.floor(Math.random() * 2) + 4;
-                } else if (q.type === 'ESSAY') {
-                    const essaySentences = ["친구들과 조를 짜서 문제 해결을 한 과정이 가장 기억에 남습니다.", "선생님이 알려주신 나의 장점 키워드들이 힘이 되었습니다.", "어렵게 느껴졌던 기술들을 직접 체험해보니 자신감이 생겼습니다.", "다음에는 코딩뿐만 아니라 디자인 수업도 들어보고 싶습니다.", "오늘 배운 내용을 친구들에게도 알려주고 싶어요."];
-                    textValue = essaySentences[Math.floor(Math.random() * essaySentences.length)];
-                }
-                
-                if (Math.random() < 0.01) {
-                    score = null; preScore = null; postChange = null;
-                }
-                return { questionId: q.id, score, preScore, postChange, textValue };
-            })
-          }))
-      }
+            }))
+        }
 
-      await fetch("/api/responses/bulk", {
-        method: "POST",
-        body: JSON.stringify({
-          sessionId: activeSession.id,
-          templateId: surveyFormData.templateId,
-          responses: mockResponses
-        }),
-        headers: { "Content-Type": "application/json" }
-      })
-
-      // Update Session Metadata
-      await fetch(`/api/sessions/${activeSession.id}/survey-result`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          resultPdfPath: surveyFormData.pdfPath, 
-          resultGoogleFormUrl: surveyFormData.googleUrl 
-        })
-      })
-
-      // === 증빙 문서 자동 등록 (SurveyDocument 매핑) ===
-      const matchedTemplate = templates.find((t: any) => t.id === surveyFormData.templateId);
-      const docType = matchedTemplate?.type?.includes('만족') ? 'SATISFACTION' : 'COMPETENCY';
-
-      // PDF 증빙 파일 등록
-      if (inputMethod === "PDF" && surveyFormData.pdfPath) {
-        // PDF를 FileStorage에 업로드 (이미 업로드된 경우 메타데이터만 등록)
-        await fetch(`/api/sessions/${activeSession.id}/documents`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            type: docType,
-            category: "PDF_EVIDENCE",
-            fileName: surveyFormData.pdfPath,
-            description: `${inputMethod} 방식 증빙 문서`
-          })
-        });
-      }
-
-      // 엑셀 데이터 파일 증빙 등록
-      if (inputMethod === "EXCEL" && surveyFormData.excelFile) {
-        const uploadData = new FormData();
-        uploadData.append("file", surveyFormData.excelFile);
-        const uploadRes = await fetch("/api/upload", { method: "POST", body: uploadData });
-        if (uploadRes.ok) {
-          const { fileName, sha256 } = await uploadRes.json();
-          await fetch(`/api/sessions/${activeSession.id}/documents`, {
+        if (mockResponses.length > 0) {
+          totalRegistered += mockResponses.length;
+          await fetch("/api/responses/bulk", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              type: "DATA_SOURCE",
-              category: "EXCEL_DATA",
-              fileName,
-              description: `엑셀 데이터 원본 (SHA-256: ${sha256?.substring(0, 16)}...)`
-            })
+              sessionId: activeSession.id,
+              templateId: formData.templateId,
+              responses: mockResponses
+            }),
+            headers: { "Content-Type": "application/json" }
           });
+          
+          const docType = targetType === 'SATISFACTION' ? 'SATISFACTION' : 'COMPETENCY';
+
+          if (method === "PDF" && formData.pdfPath) {
+            await fetch(`/api/sessions/${activeSession.id}/documents`, {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ type: docType, category: "PDF_EVIDENCE", fileName: formData.pdfPath, description: `PDF 증빙 문서` })
+            });
+          }
+
+          if (method === "EXCEL" && formData.excelFile) {
+            const uploadData = new FormData();
+            uploadData.append("file", formData.excelFile);
+            const uploadRes = await fetch("/api/upload", { method: "POST", body: uploadData });
+            if (uploadRes.ok) {
+              const { fileName, sha256 } = await uploadRes.json();
+              await fetch(`/api/sessions/${activeSession.id}/documents`, {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ type: "DATA_SOURCE", category: "EXCEL_DATA", fileName: fileName, description: `엑셀 원본` })
+              });
+            }
+          }
+
+          if (method === "GOOGLE" && formData.googleUrl) {
+            await fetch(`/api/sessions/${activeSession.id}/documents`, {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ type: docType, category: "GOOGLE_FORM", googleFormUrl: formData.googleUrl, description: "구글폼 원본" })
+            });
+          }
         }
       }
 
-      // 구글폼 URL 메타데이터 등록
-      if (inputMethod === "GOOGLE" && surveyFormData.googleUrl) {
-        await fetch(`/api/sessions/${activeSession.id}/documents`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            type: docType,
-            category: "GOOGLE_FORM",
-            googleFormUrl: surveyFormData.googleUrl,
-            description: "구글폼 데이터 소스"
-          })
-        });
-      }
-
-      alert(`${inputMethod} 방식을 통해 ${mockResponses.length}건의 데이터가 등록되었습니다.`);
+      alert(`총 ${totalRegistered}건의 데이터가 등록/업데이트 되었습니다.`);
       setShowSurveyModal(false);
       fetchData();
     } catch (err) {
@@ -442,73 +511,121 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
     }
   }
 
-  const handleDownloadExcelTemplate = async () => {
-    if (!surveyFormData.templateId) {
+  const handleDownloadExcelTemplate = async (type: "satisfaction" | "maturity", format: "SEQUENTIAL" | "AGGREGATED") => {
+    const formData = surveyTabsData[type];
+    if (!formData.templateId) {
       alert("평가 템플릿을 먼저 선택해주세요.")
       return
     }
     
     try {
-      const qRes = await fetch(`/api/templates/${surveyFormData.templateId}`)
+      const qRes = await fetch(`/api/templates/${formData.templateId}`)
       const templateData = await qRes.json()
-      const questions = templateData.questions || []
+      const questions = (templateData.questions || []).filter((q: any) => q.type === 'MCQ')
+      const essayQs = (templateData.questions || []).filter((q: any) => q.type === 'ESSAY')
       
-      if (questions.length === 0) {
+      if (questions.length === 0 && essayQs.length === 0) {
         alert("템플릿에 등록된 문항이 없습니다.")
         return
       }
 
       const XLSX = await import("xlsx")
-      
-      // Separate questions by type for grouping
-      const isSat = (q: any) => q.growthType === 'NONE' || q.category?.includes('만족') || q.content?.includes('만족');
+      const isMat = type === 'maturity'
+      const wb = XLSX.utils.book_new()
 
-      const maturityQs = questions.filter((q: any) => q.type === 'MCQ' && !isSat(q));
-      const otherQs = questions.filter((q: any) => q.type !== 'MCQ' || isSat(q));
-
-      // Function to get clean category name
       const getCat = (q: any) => {
-          if (!q.category) return "미지정";
-          return q.category.includes('|') ? q.category.split('|').pop() : q.category;
+        if (!q.category) return "미지정";
+        return q.category.includes('|') ? q.category.split('|').pop() : q.category;
+      };
+      const getGroup = (q: any) => {
+        if (!q.category) return "";
+        return q.category.includes('|') ? q.category.split('|')[0] : "";
       };
 
-      // Header for Excel following the screenshot pattern
-      const headers = ["성명"]
-      maturityQs.forEach((q: any) => headers.push(`사전_${getCat(q)}`))
-      maturityQs.forEach((q: any) => headers.push(`사후_${getCat(q)}`))
-      otherQs.forEach((q: any) => {
-          const prefix = q.type === 'MCQ' ? '만족도_' : '';
-          headers.push(`${prefix}${getCat(q)}`);
-      })
+      if (format === "SEQUENTIAL") {
+        // ── 순차입력: 학생별 1행씩 ──
+        const headers = ["성명"]
+        if (isMat) {
+          questions.forEach((q: any) => headers.push(`사전_${getCat(q)}`))
+          questions.forEach((q: any) => headers.push(`사후_${getCat(q)}`))
+        } else {
+          questions.forEach((q: any) => headers.push(`결과값_${getCat(q)}`))
+        }
+        essayQs.forEach((q: any) => headers.push(`주관식_${getCat(q)}`))
 
-      // Create Sheet Data (Rows)
-      const dataRows = [headers]
-      
-      // Add five empty rows for convenience
-      for (let i = 1; i <= 5; i++) {
-        dataRows.push([`학생_${i}`]) 
+        const dataRows = [headers]
+        for (let i = 1; i <= 5; i++) dataRows.push([`학생_${i}`])
+
+        const ws = XLSX.utils.aoa_to_sheet(dataRows)
+        // Column widths
+        ws['!cols'] = headers.map((_, i) => ({ wch: i === 0 ? 10 : 18 }))
+        XLSX.utils.book_append_sheet(wb, ws, "순차입력")
+
+      } else {
+        // ── 결과입력: 구분별 응답 집계 표 ──
+        // 헤더 행
+        const scoreLabels = isMat
+          ? ["구분", "설문문항", "참여자", "사전_매우그렇다(5)", "사전_그렇다(4)", "사전_보통(3)", "사전_그렇지않다(2)", "사전_전혀그렇지않다(1)", "사전_평균", "사후_매우그렇다(5)", "사후_그렇다(4)", "사후_보통(3)", "사후_그렇지않다(2)", "사후_전혀그렇지않다(1)", "사후_평균"]
+          : ["구분", "설문문항", "참여자", "매우그렇다(5)", "그렇다(4)", "보통(3)", "그렇지않다(2)", "전혀그렇지않다(1)", "평균"]
+
+        const dataRows: any[][] = [scoreLabels]
+        // 구분별 그룹화
+        const catMap = new Map<string, any[]>()
+        questions.forEach((q: any) => {
+          const cat = getCat(q)
+          if (!catMap.has(cat)) catMap.set(cat, [])
+          catMap.get(cat)!.push(q)
+        })
+        catMap.forEach((qs, catName) => {
+          qs.forEach((q, idx) => {
+            const row = isMat
+              ? [idx === 0 ? catName : "", q.content, 0, "", "", "", "", "", "=IFERROR(SUMPRODUCT((D{r}:H{r})*{5,4,3,2,1})/I{r},\"\")",  "", "", "", "", "", ""]
+              : [idx === 0 ? catName : "", q.content, 0, "", "", "", "", "", ""]
+            dataRows.push(row)
+          })
+        })
+        // 주관식 항목 추가
+        if (essayQs.length > 0) {
+          dataRows.push([""])  // 빈 행
+          dataRows.push(["[주관식 응답]"])
+          dataRows.push(isMat ? ["구분", "설문문항", "응답내용"] : ["구분", "설문문항", "응답내용"])
+          essayQs.forEach((q: any) => {
+            dataRows.push([getCat(q), q.content, ""])
+            for (let i = 0; i < 4; i++) dataRows.push(["", "", ""]) // 5줄 입력 공간
+          })
+        }
+
+        const ws = XLSX.utils.aoa_to_sheet(dataRows)
+        ws['!cols'] = [
+          { wch: 14 }, { wch: 40 }, { wch: 8 },
+          ...Array(isMat ? 12 : 6).fill({ wch: 12 })
+        ]
+        // 헤더 스타일 (배경색은 xlsx 기본 미지원, 별도 스타일은 xlsx-style 필요)
+        XLSX.utils.book_append_sheet(wb, ws, "결과입력")
       }
-
-      const ws = XLSX.utils.aoa_to_sheet(dataRows)
-      const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, ws, "설문데이터입력")
       
-      XLSX.writeFile(wb, `${templateData.name}_입력양식.xlsx`)
+      XLSX.writeFile(wb, `${templateData.name}_${format === 'SEQUENTIAL' ? '순차입력' : '결과입력'}_양식.xlsx`)
     } catch (err) {
       console.error(err)
       alert("양식 파일 생성 중 오류가 발생했습니다.")
     }
   }
 
-  const handleFileDrop = (e: React.DragEvent) => {
+  const handleFileDrop = (e: React.DragEvent, type: "satisfaction" | "maturity") => {
     e.preventDefault()
     setIsDragging(false)
     const file = e.dataTransfer.files[0]
     if (file) {
-      if (inputMethod === "PDF" && file.type === "application/pdf") {
-        setSurveyFormData({ ...surveyFormData, pdfPath: file.name })
-      } else if (inputMethod === "EXCEL" && (file.name.endsWith(".xlsx") || file.name.endsWith(".xls") || file.name.endsWith(".csv"))) {
-        setSurveyFormData({ ...surveyFormData, excelFile: file })
+      if (inputMethods[type] === "PDF" && (file.type === "application/pdf" || file.type.startsWith("image/"))) {
+        setSurveyTabsData(prev => ({
+          ...prev, 
+          [type]: { ...prev[type], pdfPath: file.name }
+        }))
+      } else if (inputMethods[type] === "EXCEL" && (file.name.endsWith(".xlsx") || file.name.endsWith(".xls") || file.name.endsWith(".csv"))) {
+        setSurveyTabsData(prev => ({
+          ...prev, 
+          [type]: { ...prev[type], excelFile: file }
+        }))
       } else {
         alert("선택한 입력 방식에 맞는 파일을 업로드해주세요.")
       }
@@ -611,30 +728,38 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
 
   const handleClassDaySubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsClassDayModalOpen(false) // 즉각적인 UI 반영
+
     const url = editingClassDayId ? `/api/classdays/${editingClassDayId}` : "/api/classdays"
     const method = editingClassDayId ? "PATCH" : "POST"
     const startDateTime = classDayFormData.startTime ? `${classDayFormData.date}T${classDayFormData.startTime}:00.000Z` : null
     const endDateTime = classDayFormData.endTime ? `${classDayFormData.date}T${classDayFormData.endTime}:00.000Z` : null
-    const res = await fetch(url, {
-      method,
-      body: JSON.stringify({
-        programSessionId: classDaySessionId,
-        date: `${classDayFormData.date}T00:00:00.000Z`,
-        startTime: startDateTime,
-        endTime: endDateTime,
-        title: classDayFormData.title,
-        capacity: Number(classDayFormData.capacity),
-        participantCount: Number(classDayFormData.participantCount)
-      }),
-      headers: { "Content-Type": "application/json" }
-    })
     
-    if (res.ok) {
-      setIsClassDayModalOpen(false)
-      fetchData(true) // 백그라운드 갱신
-    } else {
-      const error = await res.json()
-      alert(`저장 실패: ${error.error || "알 수 없는 오류"}`)
+    try {
+      const res = await fetch(url, {
+        method,
+        body: JSON.stringify({
+          programSessionId: classDaySessionId,
+          date: `${classDayFormData.date}T00:00:00.000Z`,
+          startTime: startDateTime,
+          endTime: endDateTime,
+          title: classDayFormData.title,
+          capacity: Number(classDayFormData.capacity),
+          participantCount: Number(classDayFormData.participantCount)
+        }),
+        headers: { "Content-Type": "application/json" }
+      })
+      
+      if (res.ok) {
+        fetchData(true) // 백그라운드 갱신
+      } else {
+        const error = await res.json()
+        alert(`저장 실패: ${error.error || "알 수 없는 오류"}`)
+        setIsClassDayModalOpen(true) // 롤백
+      }
+    } catch(err) {
+      alert("서버 연결에 실패했습니다.")
+      setIsClassDayModalOpen(true) // 롤백
     }
   }
 
@@ -683,7 +808,17 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
         instructorName: session.instructorName || "",
         capacity: session.capacity.toString(),
         participantCount: session.participantCount.toString(),
-        classDays: session.classDays || []
+        classDays: (session.classDays || []).map(cd => {
+          const dateParts = getDateTimeParts(cd.date);
+          const startParts = cd.startTime ? getDateTimeParts(cd.startTime) : { date: dateParts.date, time: "" };
+          const endParts = cd.endTime ? getDateTimeParts(cd.endTime) : { date: dateParts.date, time: "" };
+          return {
+            ...cd,
+            date: dateParts.date,
+            startTime: startParts.time,
+            endTime: endParts.time
+          };
+        })
       })
     } else {
       setEditingSessionId(null)
@@ -882,7 +1017,16 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
                                   <Button 
                                     variant="ghost" 
                                     size="sm" 
-                                    onClick={() => { setActiveSession(session); setSurveyFormData({ pdfPath: session.resultPdfPath || "", googleUrl: session.resultGoogleFormUrl || "", excelFile: null, templateId: "" }); setShowSurveyModal(true); }}
+                                    onClick={() => { 
+                                      setActiveSession(session); 
+                                      setSurveyTabsData({
+                                        satisfaction: { templateId: "", pdfPath: "", googleUrl: "", excelFile: null },
+                                        maturity: { templateId: "", pdfPath: "", googleUrl: "", excelFile: null }
+                                      });
+                                      setInputMethods({ satisfaction: "PDF", maturity: "PDF" });
+                                      setActiveSurveyTab("SATISFACTION");
+                                      setShowSurveyModal(true); 
+                                    }}
                                     className="h-8 md:h-9 px-2 md:px-3 text-blue-600 font-black hover:bg-blue-50 rounded-xl flex gap-1 items-center transition-all active:scale-95 border border-blue-100 whitespace-nowrap text-[10px] md:text-sm"
                                   >
                                     <FilePlus2 className="w-3 md:w-4 h-3 md:h-4 shrink-0" /> <span className="whitespace-nowrap">입력</span>
@@ -956,7 +1100,12 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
                                                     onClick={(e) => { 
                                                       e.stopPropagation();
                                                       setActiveSession(session); 
-                                                      setSurveyFormData({ pdfPath: session.resultPdfPath || "", googleUrl: session.resultGoogleFormUrl || "", excelFile: null, templateId: "" }); 
+                                                      setSurveyTabsData({
+                                                        satisfaction: { templateId: "", pdfPath: "", googleUrl: "", excelFile: null },
+                                                        maturity: { templateId: "", pdfPath: "", googleUrl: "", excelFile: null }
+                                                      });
+                                                      setInputMethods({ satisfaction: "PDF", maturity: "PDF" });
+                                                      setActiveSurveyTab("SATISFACTION");
                                                       setShowSurveyModal(true); 
                                                     }}
                                                     className="h-7 px-2 text-blue-600 font-black hover:bg-blue-50 rounded-lg border border-blue-100 flex gap-1 items-center transform transition-all active:scale-95 text-[9px] mr-1"
@@ -1163,6 +1312,32 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
                       className="w-full h-12 px-4 bg-slate-50 border-2 border-transparent rounded-2xl text-sm font-bold focus:bg-white focus:border-blue-500 transition-all outline-none" 
                       placeholder="강사 성함" 
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-slate-400 ml-1 uppercase flex gap-2 items-center">
+                      <Users className="w-3.5 h-3.5 text-blue-500" /> 인원 정보 (정원/출석)
+                    </label>
+                    <div className="flex gap-2">
+                      <div className="flex-1 relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 bg-slate-50 px-1 truncate pointer-events-none">정원</span>
+                        <input 
+                          type="number" min="0"
+                          value={sessionFormData.capacity} 
+                          onChange={e => setSessionFormData({...sessionFormData, capacity: e.target.value})} 
+                          className="w-full h-12 pl-12 pr-2 bg-slate-50 border-2 border-transparent rounded-2xl text-[13px] font-bold focus:bg-white focus:border-blue-500 transition-all outline-none" 
+                        />
+                      </div>
+                      <div className="flex-1 relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 bg-slate-50 px-1 truncate pointer-events-none">출석</span>
+                        <input 
+                          type="number" min="0"
+                          value={sessionFormData.participantCount} 
+                          onChange={e => setSessionFormData({...sessionFormData, participantCount: e.target.value})} 
+                          className="w-full h-12 pl-12 pr-2 bg-slate-50 border-2 border-transparent rounded-2xl text-[13px] font-bold focus:bg-white focus:border-blue-500 transition-all outline-none" 
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   <div className="col-span-2 mt-4 space-y-4 pt-6 border-t border-slate-100">
@@ -1398,178 +1573,260 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
       {/* Survey Entry Modal */}
       {showSurveyModal && activeSession && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <Card className="w-full max-w-lg border-none shadow-2xl rounded-[2.5rem] bg-white overflow-hidden p-0">
-            <div className="bg-slate-900 px-8 py-6 text-white flex justify-between items-center">
+          <Card className="w-full max-w-lg border-none shadow-2xl rounded-[2.5rem] bg-white overflow-hidden p-0 flex flex-col max-h-[90vh]">
+            <div className="bg-slate-900 px-8 py-6 text-white flex justify-between items-center shrink-0">
               <div>
                 <h3 className="text-xl font-black">설문 결과 입력</h3>
                 <p className="text-xs font-bold opacity-60 mt-1">{activeSession.courseName} - {activeSession.sessionNumber}회차</p>
               </div>
-              <button onClick={() => setShowSurveyModal(false)} className="hover:rotate-90 transition-transform"><X className="w-6 h-6" /></button>
+              <button type="button" onClick={() => setShowSurveyModal(false)} className="hover:rotate-90 transition-transform"><X className="w-6 h-6" /></button>
             </div>
-            <form onSubmit={handleSurveySubmit} className="p-8 space-y-6">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                   <label className="text-xs font-black text-slate-400 ml-1 uppercase">평가 템플릿 선택 *</label>
-                   <select 
-                     required 
-                     value={surveyFormData.templateId} 
-                     onChange={e => setSurveyFormData({...surveyFormData, templateId: e.target.value})} 
-                     className="w-full h-12 px-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500"
-                   >
-                     <option value="">적용할 템플릿을 선택하세요</option>
-                     {templates.map(t => (
-                        <option key={t.id} value={t.id}>{t.name} ({t.type.includes('MATURITY') ? '성숙도' : '만족도'})</option>
-                     ))}
-                   </select>
-                </div>
+            
+            <div className="flex bg-slate-100 p-2 mx-8 mt-6 rounded-2xl shrink-0">
+              <button
+                type="button"
+                onClick={() => setActiveSurveyTab("SATISFACTION")}
+                className={cn(
+                  "flex-1 py-3 text-sm font-black rounded-xl transition-all",
+                  activeSurveyTab === "SATISFACTION" ? "bg-white text-blue-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                )}
+              >
+                만족도 조사
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveSurveyTab("MATURITY")}
+                className={cn(
+                  "flex-1 py-3 text-sm font-black rounded-xl transition-all",
+                  activeSurveyTab === "MATURITY" ? "bg-white text-blue-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                )}
+              >
+                성숙도 조사
+              </button>
+            </div>
 
-                <div className="space-y-3">
-                   <label className="text-xs font-black text-slate-400 ml-1 uppercase">입력 방법 선택</label>
-                   <div className="flex p-1 bg-slate-100 rounded-2xl gap-1">
-                      {[
-                        { id: 'PDF', label: 'PDF 입력', icon: UploadCloud },
-                        { id: 'EXCEL', label: '엑셀 입력', icon: FilePlus2 },
-                        { id: 'GOOGLE', label: '구글폼 연동', icon: Link }
-                      ].map(method => (
-                        <button
-                          key={method.id}
-                          type="button"
-                          onClick={() => setInputMethod(method.id as any)}
-                          className={cn(
-                            "flex-1 h-10 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all",
-                            inputMethod === method.id ? "bg-white text-blue-600 shadow-sm shadow-slate-200" : "text-slate-400 hover:text-slate-600"
-                          )}
+            <form onSubmit={handleSurveySubmit} className="flex flex-col flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+              {["satisfaction", "maturity"].map((type) => {
+                const isSat = type === "satisfaction";
+                const isActive = (isSat && activeSurveyTab === "SATISFACTION") || (!isSat && activeSurveyTab === "MATURITY");
+                const currentData = surveyTabsData[type as "satisfaction" | "maturity"];
+                const currentMethod = inputMethods[type as "satisfaction" | "maturity"];
+                const tName = type as "satisfaction" | "maturity";
+
+                return (
+                  <div key={type} className={cn("p-8 space-y-6", isActive ? "block animate-in fade-in" : "hidden")}>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-slate-400 ml-1 uppercase">{isSat ? '만족도' : '성숙도'} 평가 템플릿 선택</label>
+                        <select 
+                          value={currentData.templateId} 
+                          onChange={e => setSurveyTabsData(prev => ({...prev, [tName]: {...prev[tName], templateId: e.target.value}}))} 
+                          className="w-full h-12 px-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
                         >
-                          <method.icon className="w-3.5 h-3.5" />
-                          {method.label}
-                        </button>
-                      ))}
-                   </div>
-                </div>
-
-                {inputMethod === 'PDF' && (
-                  <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                    <label className="text-xs font-black text-slate-400 ml-1 uppercase leading-none mb-1 block">결과 PDF 업로드 (Drag & Drop)</label>
-                    <label 
-                      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                      onDragLeave={() => setIsDragging(false)}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        setIsDragging(false);
-                        const file = e.dataTransfer.files[0];
-                        if (file?.type === 'application/pdf') {
-                          setSurveyFormData({...surveyFormData, pdfPath: file.name});
-                        }
-                      }}
-                      className={cn(
-                          "relative h-40 border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center transition-all cursor-pointer overflow-hidden",
-                          isDragging ? "border-blue-500 bg-blue-50/50 scale-[1.02]" : "border-slate-200 bg-slate-50 hover:bg-slate-100",
-                          surveyFormData.pdfPath ? "border-emerald-500 bg-emerald-50/20" : ""
-                      )}
-                    >
-                      <input type="file" accept=".pdf" className="hidden" onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) setSurveyFormData({...surveyFormData, pdfPath: file.name});
-                      }} />
-                      {surveyFormData.pdfPath ? (
-                          <div className="flex flex-col items-center gap-2 animate-in zoom-in-95">
-                              <div className="w-10 h-10 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-lg">
-                                  <FilePlus2 className="w-5 h-5" />
-                              </div>
-                              <span className="text-xs font-black text-emerald-700">{surveyFormData.pdfPath}</span>
-                              <button type="button" onClick={(e) => { e.preventDefault(); setSurveyFormData({...surveyFormData, pdfPath: ""})}} className="text-[10px] font-bold text-slate-400 hover:text-red-500 hover:underline transition-colors mt-1">파일 제거</button>
-                          </div>
-                      ) : (
-                          <div className="flex flex-col items-center gap-2">
-                              <UploadCloud className={cn("w-10 h-10 text-slate-400", isDragging && "animate-bounce text-blue-500")} />
-                              <p className="text-xs font-bold text-slate-700">PDF 파일을 드래그하거나 클릭하여 업로드</p>
-                              <p className="text-[10px] font-medium text-slate-400 text-center px-8 leading-relaxed">AI가 스캔된 페이지에서 O, V 마커를 분석하여<br/>문항별 점수를 자동 추출합니다. (X 표시는 제외)</p>
-                          </div>
-                      )}
-                    </label>
-                  </div>
-                )}
-
-                {inputMethod === 'EXCEL' && (
-                  <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                    <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 flex items-center justify-between">
-                       <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg">
-                             <Download className="w-5 h-5" />
-                          </div>
-                          <div>
-                             <p className="text-xs font-black text-blue-700">입력용 엑셀 템플릿</p>
-                             <p className="text-[10px] text-blue-500 font-bold">선택한 평가 문항이 포함된 양식</p>
-                          </div>
-                       </div>
-                       <Button type="button" variant="outline" size="sm" className="h-9 px-4 rounded-xl border-blue-200 text-blue-600 font-black hover:bg-white" onClick={handleDownloadExcelTemplate}>다운로드</Button>
-                    </div>
-                    <label 
-                      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                      onDragLeave={() => setIsDragging(false)}
-                      onDrop={handleFileDrop}
-                      className={cn(
-                          "relative h-40 border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center transition-all cursor-pointer overflow-hidden",
-                          isDragging ? "border-blue-500 bg-blue-50/50 scale-[1.02]" : "border-slate-200 bg-slate-50 hover:bg-slate-100",
-                          surveyFormData.excelFile ? "border-emerald-500 bg-emerald-50/20" : ""
-                      )}
-                    >
-                      <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) setSurveyFormData({...surveyFormData, excelFile: file});
-                      }} />
-                      {surveyFormData.excelFile ? (
-                          <div className="flex flex-col items-center gap-2 animate-in zoom-in-95">
-                              <div className="w-10 h-10 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-lg">
-                                  <FilePlus2 className="w-5 h-5" />
-                              </div>
-                              <span className="text-xs font-black text-emerald-700">{surveyFormData.excelFile.name}</span>
-                              <button type="button" onClick={(e) => { e.preventDefault(); setSurveyFormData({...surveyFormData, excelFile: null})}} className="text-[10px] font-bold text-slate-400 hover:text-red-500 hover:underline transition-colors mt-1">파일 제거</button>
-                          </div>
-                      ) : (
-                          <div className="flex flex-col items-center gap-2">
-                              <UploadCloud className={cn("w-10 h-10 text-slate-400", isDragging && "animate-bounce text-blue-500")} />
-                              <p className="text-xs font-bold text-slate-700">엑셀 파일을 드래그하거나 클릭하여 업로드</p>
-                              <p className="text-[10px] font-medium text-slate-400 text-center px-8 leading-relaxed">다운로드한 양식에 데이터를 입력 후<br/>업로드하면 자동으로 분석됩니다.</p>
-                          </div>
-                      )}
-                    </label>
-                  </div>
-                )}
-
-                {inputMethod === 'GOOGLE' && (
-                  <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                    <div className="space-y-2">
-                      <label className="text-xs font-black text-slate-400 ml-1 uppercase">구글 폼 결과 링크 (응답 스프레드시트)</label>
-                      <div className="relative group">
-                        <Link className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
-                        <input 
-                          type="url" 
-                          value={surveyFormData.googleUrl} 
-                          onChange={e => setSurveyFormData({...surveyFormData, googleUrl: e.target.value})} 
-                          className="w-full h-12 pl-11 pr-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500" 
-                          placeholder="https://docs.google.com/spreadsheets/d/..." 
-                        />
+                          <option value="">적용할 템플릿을 선택하세요 (선택안함 시 무시)</option>
+                          {templates.filter(t => isSat ? !t.type.includes('MATURITY') : t.type.includes('MATURITY')).map(t => (
+                              <option key={t.id} value={t.id}>{t.name}</option>
+                          ))}
+                        </select>
                       </div>
-                    </div>
-                    <p className="text-[10px] text-slate-400 font-medium px-4 leading-relaxed">
-                      * 구글 설문지와 연결된 시트의 URL을 입력해 주세요.<br/>
-                      * 시트 내 컬럼 제목이 설문 템플릿 문항과 일치해야 분석이 가능합니다.
-                    </p>
-                  </div>
-                )}
-              </div>
 
-              <div className="pt-2">
+                      {currentData.templateId && (
+                        <div className="space-y-3 animate-in fade-in slide-in-from-top-2 p-1 pt-4 border-t border-slate-100">
+                          <label className="text-xs font-black text-slate-400 ml-1 uppercase">입력 방법 선택</label>
+                          <div className="flex p-1 bg-slate-100 rounded-2xl gap-1">
+                              {[
+                                { id: 'PDF', label: 'PDF 입력', icon: UploadCloud },
+                                { id: 'EXCEL', label: '엑셀 입력', icon: FilePlus2 },
+                                { id: 'GOOGLE', label: '구글폼 연동', icon: Link }
+                              ].map(method => (
+                                <button
+                                  key={method.id}
+                                  type="button"
+                                  onClick={() => setInputMethods(prev => ({...prev, [tName]: method.id as any}))}
+                                  className={cn(
+                                    "flex-1 h-10 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all",
+                                    currentMethod === method.id ? "bg-white text-blue-600 shadow-sm shadow-slate-200" : "text-slate-400 hover:text-slate-600"
+                                  )}
+                                >
+                                  <method.icon className="w-3.5 h-3.5" />
+                                  {method.label}
+                                </button>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {currentData.templateId && currentMethod === 'PDF' && (
+                        <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                          <label className="text-xs font-black text-slate-400 ml-1 uppercase leading-none mb-1 block">결과 PDF/이미지 파일 (Drag & Drop)</label>
+                          <label 
+                            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                            onDragLeave={() => setIsDragging(false)}
+                            onDrop={(e) => handleFileDrop(e, tName)}
+                            className={cn(
+                                "relative h-40 border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center transition-all cursor-pointer overflow-hidden",
+                                isDragging ? "border-blue-500 bg-blue-50/50 scale-[1.02]" : "border-slate-200 bg-slate-50 hover:bg-slate-100",
+                                currentData.pdfPath ? "border-emerald-500 bg-emerald-50/20" : ""
+                            )}
+                          >
+                            <input type="file" accept=".pdf,image/*" className="hidden" onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) setSurveyTabsData(prev => ({...prev, [tName]: {...prev[tName], pdfPath: file.name}}));
+                            }} />
+                            {currentData.pdfPath ? (
+                                <div className="flex flex-col items-center gap-2 animate-in zoom-in-95">
+                                    <div className="w-10 h-10 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-lg">
+                                        <FilePlus2 className="w-5 h-5" />
+                                    </div>
+                                    <span className="text-xs font-black text-emerald-700">{currentData.pdfPath}</span>
+                                    <button type="button" onClick={(e) => { e.preventDefault(); setSurveyTabsData(prev => ({...prev, [tName]: {...prev[tName], pdfPath: ""}}));}} className="text-[10px] font-bold text-slate-400 hover:text-red-500 hover:underline transition-colors mt-1">파일 제거</button>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center gap-2">
+                                    <UploadCloud className={cn("w-10 h-10 text-slate-400", isDragging && "animate-bounce text-blue-500")} />
+                                    <p className="text-xs font-bold text-slate-700">스캔된 파일(PDF, 이미지)을 업로드</p>
+                                    <p className="text-[10px] font-medium text-slate-400 text-center px-8 leading-relaxed">AI가 스캔된 페이지에서 O, V 마커를 분석하여<br/>문항별 점수를 추출 (시뮬레이션)</p>
+                                </div>
+                            )}
+                          </label>
+                        </div>
+                      )}
+
+                      {currentData.templateId && currentMethod === 'EXCEL' && (
+                        <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+
+                          {/* 엑셀 포맷 선택 */}
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase ml-1">입력 방식 선택</label>
+                            <div className="grid grid-cols-2 gap-2">
+                              {([
+                                { id: 'SEQUENTIAL', label: '순차입력', desc: '학생별 1행씩 입력', icon: '📋' },
+                                { id: 'AGGREGATED', label: '결과입력', desc: '구분별 응답 집계표', icon: '📊' },
+                              ] as const).map(fmt => (
+                                <button
+                                  key={fmt.id}
+                                  type="button"
+                                  onClick={() => setExcelFormats(prev => ({ ...prev, [tName]: fmt.id }))}
+                                  className={cn(
+                                    "p-3 rounded-2xl border-2 text-left transition-all",
+                                    excelFormats[tName] === fmt.id
+                                      ? "border-blue-500 bg-blue-50"
+                                      : "border-slate-200 bg-slate-50 hover:border-slate-300"
+                                  )}
+                                >
+                                  <div className="text-base mb-0.5">{fmt.icon}</div>
+                                  <div className={cn("text-xs font-black", excelFormats[tName] === fmt.id ? "text-blue-700" : "text-slate-600")}>{fmt.label}</div>
+                                  <div className={cn("text-[10px] font-bold", excelFormats[tName] === fmt.id ? "text-blue-400" : "text-slate-400")}>{fmt.desc}</div>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* 양식 다운로드 */}
+                          <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg">
+                                  <Download className="w-4 h-4" />
+                                </div>
+                                <div>
+                                  <p className="text-xs font-black text-blue-700">
+                                    {excelFormats[tName] === 'SEQUENTIAL' ? '📋 순차입력 양식' : '📊 결과입력 양식'} 다운로드
+                                  </p>
+                                  <p className="text-[10px] text-blue-500 font-bold">
+                                    {excelFormats[tName] === 'SEQUENTIAL'
+                                      ? '학생 1명 = 1행 | 성명, 결과값_[구분명] 컬럼'
+                                      : '구분 | 문항 | 참여자 | 매우그렇다(5) ... | 평균'}
+                                  </p>
+                                </div>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-9 px-4 rounded-xl border-blue-200 text-blue-600 font-black hover:bg-white shrink-0"
+                                onClick={() => handleDownloadExcelTemplate(tName, excelFormats[tName])}
+                              >
+                                다운로드
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* 파일 업로드 영역 */}
+                          <label 
+                            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                            onDragLeave={() => setIsDragging(false)}
+                            onDrop={(e) => handleFileDrop(e, tName)}
+                            className={cn(
+                                "relative h-36 border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center transition-all cursor-pointer overflow-hidden",
+                                isDragging ? "border-blue-500 bg-blue-50/50 scale-[1.02]" : "border-slate-200 bg-slate-50 hover:bg-slate-100",
+                                currentData.excelFile ? "border-emerald-500 bg-emerald-50/20" : ""
+                            )}
+                          >
+                            <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) setSurveyTabsData(prev => ({...prev, [tName]: {...prev[tName], excelFile: file}}));
+                            }} />
+                            {currentData.excelFile ? (
+                                <div className="flex flex-col items-center gap-2 animate-in zoom-in-95">
+                                    <div className="w-10 h-10 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-lg">
+                                        <FilePlus2 className="w-5 h-5" />
+                                    </div>
+                                    <span className="text-xs font-black text-emerald-700">{currentData.excelFile.name}</span>
+                                    <button type="button" onClick={(e) => { e.preventDefault(); setSurveyTabsData(prev => ({...prev, [tName]: {...prev[tName], excelFile: null}}));}} className="text-[10px] font-bold text-slate-400 hover:text-red-500 hover:underline transition-colors mt-1">파일 제거</button>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center gap-2">
+                                    <UploadCloud className={cn("w-9 h-9 text-slate-400", isDragging && "animate-bounce text-blue-500")} />
+                                    <p className="text-xs font-bold text-slate-700">엑셀 파일을 드래그하거나 클릭하여 업로드</p>
+                                    <p className="text-[10px] font-medium text-slate-400 text-center px-4 leading-relaxed">
+                                      {excelFormats[tName] === 'SEQUENTIAL' ? '순차입력 양식 업로드 시 학생별 분석' : '결과입력 양식 업로드 시 집계 데이터 분석'}
+                                    </p>
+                                </div>
+                            )}
+                          </label>
+                        </div>
+                      )}
+
+                      {currentData.templateId && currentMethod === 'GOOGLE' && (
+                        <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                          <div className="space-y-2">
+                            <label className="text-xs font-black text-slate-400 ml-1 uppercase">구글 폼 결과 링크 (응답 스프레드시트)</label>
+                            <div className="relative group">
+                              <Link className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+                              <input 
+                                type="url" 
+                                value={currentData.googleUrl} 
+                                onChange={e => setSurveyTabsData(prev => ({...prev, [tName]: {...prev[tName], googleUrl: e.target.value}}))} 
+                                className="w-full h-12 pl-11 pr-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none" 
+                                placeholder="https://docs.google.com/spreadsheets/d/..." 
+                              />
+                            </div>
+                          </div>
+                          <p className="text-[10px] text-slate-400 font-medium px-4 leading-relaxed">
+                            * 구글 설문지와 연결된 시트의 URL을 입력해 주세요.<br/>
+                            * 시트 내 컬럼 제목이 설문 템플릿 문항과 일치해야 분석이 가능합니다.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              <div className="p-8 pt-4 pb-8 shrink-0 bg-white">
                 <Button type="submit" disabled={isOcrProcessing} className="w-full h-14 bg-slate-900 hover:bg-slate-800 text-white font-black rounded-2xl transition-all active:scale-[0.98] shadow-xl shadow-slate-200">
                   {isOcrProcessing ? (
                       <div className="flex items-center gap-3">
                           <div className="w-4 h-4 border-2 border-white border-t-transparent animate-spin rounded-full" />
-                          데이터 분석 및 저장 중...
+                          데이터 분석 및 덮어쓰기 저장 관리 중...
                       </div>
-                  ) : "설문 데이터 일괄 등록 및 동기화"}
+                  ) : "선택된 설문 데이터 시스템 일괄 덮어쓰기 적용"}
                 </Button>
-                <p className="text-center text-[10px] text-slate-400 font-bold mt-4 uppercase tracking-widest">Global Survey Synchronization System</p>
+                <p className="text-center text-[10px] text-slate-400 font-bold mt-4 uppercase tracking-widest leading-relaxed">
+                  Global Survey Synchronization System<br/>
+                  <span className="text-slate-400">* 신규 입력 시 기존 등록된 데이터(해당 사업, 동일 설문유형)는 삭제 후 덮어써집니다.</span>
+                </p>
               </div>
             </form>
           </Card>

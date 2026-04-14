@@ -10,12 +10,14 @@ async function renumberSessions(programId: string) {
     ]
   });
 
-  for (let i = 0; i < allSessions.length; i++) {
-    await prisma.programSession.update({
-      where: { id: allSessions[i].id },
+  const updatePromises = allSessions.map((session, i) =>
+    prisma.programSession.update({
+      where: { id: session.id },
       data: { sessionNumber: i + 1 }
-    });
-  }
+    })
+  );
+  
+  await prisma.$transaction(updatePromises);
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {

@@ -8,6 +8,7 @@ import {
   Trash2, Edit, AlertCircle, FileText, Settings, X as XIcon
 } from "lucide-react";
 import * as XLSX from "xlsx";
+import { useAuth } from "@/lib/auth-context";
 
 // 숫자 포맷팅 유틸리티
 const formatWithCommas = (value: string | number) => {
@@ -18,6 +19,7 @@ const formatWithCommas = (value: string | number) => {
 };
 
 export default function BudgetPage() {
+  const { user } = useAuth();
   const [categories, setCategories] = useState<any[]>([]);
   const [expenditures, setExpenditures] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -126,6 +128,13 @@ export default function BudgetPage() {
       return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
     });
   }, [selectedCategoryId, expenditures, categories, sortOrder]);
+
+  const displayCategories = useMemo(() => {
+    if (user?.role === 'MEMBER') {
+      return categories.filter((c: any) => c.name && c.name.includes('사업비'));
+    }
+    return categories;
+  }, [categories, user]);
 
   // ---- 폼 관련 로직 ----
   
@@ -388,20 +397,22 @@ export default function BudgetPage() {
           </h1>
           <p className="text-slate-500 mt-2 font-bold">산출내역서를 기준으로 한 실시간 집행 현황과 증빙 맵핑</p>
         </div>
-        <div className="flex gap-2">
-          <button 
-            onClick={() => setShowSettings(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg font-bold text-sm shadow-sm hover:bg-indigo-200"
-          >
-            <Settings className="w-4 h-4" /> 항목/카테고리 관리
-          </button>
-          <button 
-            onClick={handleExportAll}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg font-bold text-sm shadow-sm hover:bg-emerald-700"
-          >
-            <Download className="w-4 h-4" /> 산출내역 총괄 엑셀
-          </button>
-        </div>
+        {user?.role !== 'MEMBER' && (
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setShowSettings(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg font-bold text-sm shadow-sm hover:bg-indigo-200"
+            >
+              <Settings className="w-4 h-4" /> 항목/카테고리 관리
+            </button>
+            <button 
+              onClick={handleExportAll}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg font-bold text-sm shadow-sm hover:bg-emerald-700"
+            >
+              <Download className="w-4 h-4" /> 산출내역 총괄 엑셀
+            </button>
+          </div>
+        )}
       </div>
 
       {/* TOP VIEW: 대시보드 (산출내역서) - 3단계 표시 반영 */}
@@ -430,7 +441,7 @@ export default function BudgetPage() {
               </tr>
             </thead>
             <tbody>
-               {categories.map((l1) => {
+               {displayCategories.map((l1: any) => {
                  const l2List = l1.children || [];
                  const totalL3Rows = l2List.reduce((acc: number, l2: any) => acc + Math.max(l2.children?.length || 0, 1), 0);
                  const l1Rows = Math.max(totalL3Rows, 1);
@@ -559,9 +570,9 @@ export default function BudgetPage() {
 
                {/* 최종 합계 (Grand Total) */}
                {(() => {
-                 const gBudget = categories.reduce((s: number, c: any) => s + c.budgetAmount, 0);
-                 const gUsed = categories.reduce((s: number, c: any) => s + (c.totalUsed || 0), 0);
-                 const gExpected = categories.reduce((s: number, c: any) => s + (c.totalExpected || 0), 0);
+                 const gBudget = displayCategories.reduce((s: number, c: any) => s + c.budgetAmount, 0);
+                 const gUsed = displayCategories.reduce((s: number, c: any) => s + (c.totalUsed || 0), 0);
+                 const gExpected = displayCategories.reduce((s: number, c: any) => s + (c.totalExpected || 0), 0);
                  const gBalance = gBudget - gUsed - gExpected;
                  const gRate = gBudget > 0 ? (((gUsed + gExpected) / gBudget) * 100).toFixed(1) : "0";
 
@@ -587,6 +598,8 @@ export default function BudgetPage() {
 
 
       {/* BOTTOM VIEW: 집행명세서 그리드 */}
+      {user?.role !== 'MEMBER' && (
+      <>
       <h2 id="bottom-view-heading" className="text-2xl font-black mt-12 mb-4 flex items-between gap-2 flex-wrap items-center">
         <div className="flex items-center gap-2">
           <FileSpreadsheet className="w-6 h-6 text-emerald-600" />
@@ -721,6 +734,8 @@ export default function BudgetPage() {
           </table>
         </div>
       </Card>
+      </>
+      )}
 
       {showForm && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-300">

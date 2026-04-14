@@ -11,11 +11,12 @@ export async function POST(req: Request) {
 
     // Process in transaction to ensure consistency
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Delete existing responses for this session and template to prevent duplicates (5명 -> 10명 방지)
+      // 1. Delete existing responses for this session and type to prevent duplicates
+      const typeStr = responses[0]?.type || "POST";
       await tx.surveyResponse.deleteMany({
         where: {
           programSessionId,
-          templateId,
+          type: typeStr,
         }
       });
 

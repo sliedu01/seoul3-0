@@ -17,6 +17,8 @@ export default function SurveysPage() {
   const [search, setSearch] = useState("")
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [expandedGroups, setExpandedGroups] = useState<string[]>([])
+  const [groupResultTabs, setGroupResultTabs] = useState<Record<string, 'SATISFACTION' | 'MATURITY'>>({})
+
 
   // Filters state
   const [startDate, setStartDate] = useState("")
@@ -543,6 +545,52 @@ export default function SurveysPage() {
     setExpandedGroups(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
   };
 
+  const getGroupResultTab = (key: string, items: any[]) => {
+    if (groupResultTabs[key]) return groupResultTabs[key];
+    const hasMaturity = items.some((s: any) => s.type === 'MATURITY' || s.answers?.some((a: any) => a.preScore != null && a.preScore > 0));
+    return hasMaturity ? 'MATURITY' : 'SATISFACTION';
+  };
+
+  const setGroupResultTab = (key: string, tab: 'SATISFACTION' | 'MATURITY') => {
+    setGroupResultTabs(prev => ({ ...prev, [key]: tab }));
+  };
+
+  const buildAggregatedTable = (items: any[], questions: any[]) => {
+    return questions.map((q: any) => {
+      const dist: Record<number, number> = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+      const distPre: Record<number, number> = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+      let totalScore = 0, totalPre = 0, count = 0, countPre = 0;
+      items.forEach((s: any) => {
+        const ans = s.answers?.find((a: any) => a.questionId === q.id);
+        if (!ans) return;
+        const score = ans.score ?? null;
+        if (score !== null && score > 0) {
+          const r = Math.min(5, Math.max(1, Math.round(score)));
+          dist[r] = (dist[r] || 0) + 1;
+          totalScore += score; count++;
+        }
+        const pre = ans.preScore ?? null;
+        if (pre !== null && pre > 0) {
+          const r = Math.min(5, Math.max(1, Math.round(pre)));
+          distPre[r] = (distPre[r] || 0) + 1;
+          totalPre += pre; countPre++;
+        }
+      });
+      const getCat = (q: any) => {
+        if (!q.category) return '';
+        return q.category.includes('|') ? q.category.split('|').pop()! : q.category;
+      };
+      return {
+        q, cat: getCat(q), content: q.content,
+        participants: count || countPre,
+        dist, distPre,
+        avg: count > 0 ? totalScore / count : null,
+        avgPre: countPre > 0 ? totalPre / countPre : null,
+      };
+    });
+  };
+
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20 max-w-[1600px] mx-auto">
       <div className="flex justify-between items-end no-print">
@@ -901,274 +949,309 @@ export default function SurveysPage() {
                   </div>
                 </div>
 
-                {/* Charts Removed as per user request for less noise */}
 
-                {/* Detail Grid: Overhauled to X-Scrollable Excel Sheet Style */}
+                {/* Aggregated Result View - Satisfaction / Maturity Tabs */}
                 {isExpanded && (() => {
-                    const sortedItems = [...group.items].sort((a,b) => {
-                        const nameA = a.studentName || a.respondentId || "";
-                        const nameB = b.studentName || b.respondentId || "";
-                        return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
-                    });
-                    
-                    const firstSurvey = sortedItems[0] || {};
+                    const firstSurvey = group.items[0] || {};
                     const tQuestions = firstSurvey.template?.questions || [];
-                    const maturityQs = tQuestions.filter((tq: any) => 
-                        tq.type === 'MCQ' && 
-                        (tq.growthType === 'CHANGE' || tq.growthType === 'PRE_POST' || (!tq.category?.includes('만족') && !tq.content?.includes('만족')))
-                    ).sort((a:any, b:any) => a.order - b.order);
-                    
-                    const satQs = tQuestions.filter((tq: any) => 
-                        tq.type === 'MCQ' && 
-                        (tq.growthType === 'NONE' || tq.category?.includes('만족') || tq.content?.includes('만족'))
-                    ).sort((a:any, b:any) => a.order - b.order);
 
-                    const essayQs = tQuestions.filter((tq: any) => tq.type === 'ESSAY').sort((a:any, b:any) => a.order - b.order);
+                    const satQs = tQuestions.filter((q: any) =>
+                        q.type === 'MCQ' && (q.growthType === 'NONE' || (!q.growthType?.includes('CHANGE') && !q.growthType?.includes('PRE_POST')))
+                    ).sort((a: any, b: any) => a.order - b.order);
 
-                    const getShortCat = (c: string) => c?.includes('|') ? c.split('|').pop() : c;
-                    const maturityTitles = maturityQs.map((q: any) => getShortCat(q.category) || q.content.substring(0,10));
-                    const satTitles = satQs.map((q: any) => getShortCat(q.category) || q.content.substring(0,10));
+                    const matQs = tQuestions.filter((q: any) =>
+                        q.type === 'MCQ' && (q.growthType === 'PRE_POST' || q.growthType === 'CHANGE')
+                    ).sort((a: any, b: any) => a.order - b.order);
+
+                    const essayQs = tQuestions.filter((q: any) => q.type === 'ESSAY');
+
+                    const hasSat = satQs.length > 0;
+                    const hasMat = matQs.length > 0;
+                    const activeTab = getGroupResultTab(key, group.items);
+
+                    const satData = buildAggregatedTable(group.items, satQs);
+                    const matData = buildAggregatedTable(group.items, matQs);
+
+                    const SCORE_LABELS: Record<number, string> = {
+                        5: '매우그렇다(5)', 4: '그렇다(4)', 3: '보통(3)', 2: '아니다(2)', 1: '전혀아님(1)'
+                    };
+                    const SCORE_COLORS: Record<number, string> = {
+                        5: 'bg-blue-500', 4: 'bg-indigo-400', 3: 'bg-slate-400', 2: 'bg-amber-400', 1: 'bg-rose-400'
+                    };
+
+                    const ScoreBar = ({ count, total, score }: { count: number; total: number; score: number }) => {
+                        const pct = total > 0 ? (count / total) * 100 : 0;
+                        return (
+                            <div className="flex flex-col items-center gap-0.5 min-w-[48px]">
+                                <span className="text-xs font-black text-slate-700">{count}</span>
+                                <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                    <div className={`h-full ${SCORE_COLORS[score] || 'bg-slate-300'} rounded-full`} style={{ width: `${pct}%` }} />
+                                </div>
+                                <span className="text-[9px] text-slate-400">{pct.toFixed(0)}%</span>
+                            </div>
+                        );
+                    };
+
+                    const buildRows = (data: any[]) => {
+                        const result: { row: any; showCat: boolean; catRowSpan: number }[] = [];
+                        let i = 0;
+                        while (i < data.length) {
+                            const cat = data[i].cat;
+                            let j = i;
+                            while (j < data.length && data[j].cat === cat) j++;
+                            for (let k = i; k < j; k++) {
+                                result.push({ row: data[k], showCat: k === i, catRowSpan: j - i });
+                            }
+                            i = j;
+                        }
+                        return result;
+                    };
+
+                    const AggregatedTable = ({ data, isMat }: { data: any[]; isMat: boolean }) => {
+                        const rows = buildRows(data);
+                        const participants = data.reduce((m, r) => Math.max(m, r.participants), 0) || group.items.length;
+                        if (data.length === 0) return (
+                            <div className="py-16 text-center text-slate-300 italic text-sm font-bold">
+                                {isMat ? '성숙도 사전/사후' : '만족도'} 문항 데이터가 없습니다.
+                            </div>
+                        );
+                        const cats = [...new Set(data.map(r => r.cat))];
+                        return (
+                            <div className="overflow-x-auto">
+                                <table className="w-full border-collapse text-sm min-w-[700px]">
+                                    <thead>
+                                        <tr className="bg-slate-900 text-white text-xs font-black">
+                                            <th rowSpan={2} className="px-4 py-3 text-left w-28 border-r border-slate-700">구분</th>
+                                            <th rowSpan={2} className="px-4 py-3 text-left min-w-[260px] border-r border-slate-700">설문문항</th>
+                                            <th rowSpan={2} className="px-3 py-3 text-center w-14 border-r border-slate-700">참여자</th>
+                                            {isMat ? (
+                                                <>
+                                                    <th colSpan={6} className="px-3 py-2 text-center bg-blue-900/60 border-r border-slate-700">사전 (Pre)</th>
+                                                    <th colSpan={6} className="px-3 py-2 text-center bg-indigo-900/60">사후 (Post)</th>
+                                                </>
+                                            ) : (
+                                                <th colSpan={6} className="px-3 py-2 text-center bg-amber-900/40">응답 분포</th>
+                                            )}
+                                        </tr>
+                                        <tr className="bg-slate-800 text-slate-200 text-[11px] font-black">
+                                            {isMat ? (
+                                                <>
+                                                    {[5,4,3,2,1].map(s => <th key={`prel-${s}`} className="px-2 py-2 text-center w-20 bg-blue-950/40 border-r border-slate-700">{SCORE_LABELS[s]}</th>)}
+                                                    <th className="px-2 py-2 text-center w-16 bg-blue-950/70 border-r border-slate-500">평균</th>
+                                                    {[5,4,3,2,1].map(s => <th key={`postl-${s}`} className="px-2 py-2 text-center w-20 bg-indigo-950/40 border-r border-slate-700">{SCORE_LABELS[s]}</th>)}
+                                                    <th className="px-2 py-2 text-center w-16 bg-indigo-950/70">평균</th>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    {[5,4,3,2,1].map(s => <th key={`satl-${s}`} className="px-2 py-2 text-center w-24 bg-amber-950/30 border-r border-slate-700">{SCORE_LABELS[s]}</th>)}
+                                                    <th className="px-2 py-2 text-center w-16 bg-amber-950/60">평균</th>
+                                                </>
+                                            )}
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {rows.map(({ row, showCat, catRowSpan }, idx) => (
+                                            <tr key={`agg-${idx}`} className="hover:bg-slate-50/70 transition-colors">
+                                                {showCat && (
+                                                    <td rowSpan={catRowSpan} className="px-4 py-3 font-black text-slate-700 text-xs bg-slate-50 border-r border-slate-200 align-middle text-center">
+                                                        {row.cat || '미분류'}
+                                                    </td>
+                                                )}
+                                                <td className="px-4 py-3 text-xs font-medium text-slate-800 leading-relaxed border-r border-slate-100">{row.content}</td>
+                                                <td className="px-3 py-3 text-center font-black text-slate-600 text-sm border-r border-slate-200">{row.participants}</td>
+                                                {isMat ? (
+                                                    <>
+                                                        {[5,4,3,2,1].map(s => (
+                                                            <td key={`pre-${s}`} className="px-3 py-2 text-center bg-blue-50/40 border-r border-slate-100">
+                                                                <ScoreBar count={row.distPre[s] || 0} total={row.participants} score={s} />
+                                                            </td>
+                                                        ))}
+                                                        <td className="px-3 py-2 text-center font-black text-blue-700 bg-blue-100/60 border-r border-slate-300">
+                                                            {row.avgPre !== null ? (row.avgPre as number).toFixed(2) : '-'}
+                                                        </td>
+                                                        {[5,4,3,2,1].map(s => (
+                                                            <td key={`post-${s}`} className="px-3 py-2 text-center bg-indigo-50/40 border-r border-slate-100">
+                                                                <ScoreBar count={row.dist[s] || 0} total={row.participants} score={s} />
+                                                            </td>
+                                                        ))}
+                                                        <td className="px-3 py-2 text-center font-black text-indigo-700 bg-indigo-100/60">
+                                                            {row.avg !== null ? (row.avg as number).toFixed(2) : '-'}
+                                                        </td>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        {[5,4,3,2,1].map(s => (
+                                                            <td key={`sat-${s}`} className="px-3 py-2 text-center bg-amber-50/30 border-r border-slate-100">
+                                                                <ScoreBar count={row.dist[s] || 0} total={row.participants} score={s} />
+                                                            </td>
+                                                        ))}
+                                                        <td className="px-3 py-2 text-center font-black text-amber-700 bg-amber-100/60">
+                                                            {row.avg !== null ? (row.avg as number).toFixed(2) : '-'}
+                                                        </td>
+                                                    </>
+                                                )}
+                                            </tr>
+                                        ))}
+                                        {/* 구분별 소계 */}
+                                        {cats.map(cat => {
+                                            const catRows = data.filter(r => r.cat === cat);
+                                            if (catRows.length < 2) return null;
+                                            const avgs = catRows.filter(r => r.avg !== null).map(r => r.avg as number);
+                                            const preAvgs = catRows.filter(r => r.avgPre !== null).map(r => r.avgPre as number);
+                                            const catAvg = avgs.length > 0 ? avgs.reduce((a, b) => a + b, 0) / avgs.length : null;
+                                            const catAvgPre = preAvgs.length > 0 ? preAvgs.reduce((a, b) => a + b, 0) / preAvgs.length : null;
+                                            return (
+                                                <tr key={`catavg-${cat}`} className="bg-slate-100/60 border-t-2 border-slate-300">
+                                                    <td className="px-4 py-2 text-right text-xs font-black text-slate-400 italic">소계</td>
+                                                    <td className="px-4 py-2 text-xs font-bold text-slate-500 italic">{cat} 구분 평균</td>
+                                                    <td className="px-3 py-2 text-center text-xs text-slate-400">-</td>
+                                                    {isMat ? (
+                                                        <>
+                                                            {[5,4,3,2,1].map(s => <td key={s} className="px-3 py-2 bg-blue-50/20" />)}
+                                                            <td className="px-3 py-2 text-center font-black text-blue-600 bg-blue-100/50">{catAvgPre !== null ? catAvgPre.toFixed(2) : '-'}</td>
+                                                            {[5,4,3,2,1].map(s => <td key={s} className="px-3 py-2 bg-indigo-50/20" />)}
+                                                            <td className="px-3 py-2 text-center font-black text-indigo-600 bg-indigo-100/50">{catAvg !== null ? catAvg.toFixed(2) : '-'}</td>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            {[5,4,3,2,1].map(s => <td key={s} className="px-3 py-2 bg-amber-50/20" />)}
+                                                            <td className="px-3 py-2 text-center font-black text-amber-600 bg-amber-100/50">{catAvg !== null ? catAvg.toFixed(2) : '-'}</td>
+                                                        </>
+                                                    )}
+                                                </tr>
+                                            );
+                                        })}
+                                        {/* 전체 평균 */}
+                                        {(() => {
+                                            const allAvgs = data.filter(r => r.avg !== null).map(r => r.avg as number);
+                                            const allPreAvgs = data.filter(r => r.avgPre !== null).map(r => r.avgPre as number);
+                                            const totalAvg = allAvgs.length > 0 ? allAvgs.reduce((a, b) => a + b, 0) / allAvgs.length : null;
+                                            const totalAvgPre = allPreAvgs.length > 0 ? allPreAvgs.reduce((a, b) => a + b, 0) / allPreAvgs.length : null;
+                                            return (
+                                                <tr className="sticky bottom-0 bg-slate-900 text-white font-black border-t-2 border-slate-700">
+                                                    <td className="px-4 py-3 text-xs uppercase tracking-widest" colSpan={2}>전 문항 평균 (TOTAL AVG)</td>
+                                                    <td className="px-3 py-3 text-center">{participants}</td>
+                                                    {isMat ? (
+                                                        <>
+                                                            {[5,4,3,2,1].map(s => {
+                                                                const cnt = data.reduce((a, r) => a + (r.distPre[s] || 0), 0);
+                                                                return <td key={s} className="px-3 py-3 text-center text-blue-300">{cnt}</td>;
+                                                            })}
+                                                            <td className="px-3 py-3 text-center text-blue-300">{totalAvgPre !== null ? totalAvgPre.toFixed(2) : '-'}</td>
+                                                            {[5,4,3,2,1].map(s => {
+                                                                const cnt = data.reduce((a, r) => a + (r.dist[s] || 0), 0);
+                                                                return <td key={s} className="px-3 py-3 text-center text-indigo-300">{cnt}</td>;
+                                                            })}
+                                                            <td className="px-3 py-3 text-center text-indigo-300">{totalAvg !== null ? totalAvg.toFixed(2) : '-'}</td>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            {[5,4,3,2,1].map(s => {
+                                                                const cnt = data.reduce((a, r) => a + (r.dist[s] || 0), 0);
+                                                                return <td key={s} className="px-3 py-3 text-center text-amber-300">{cnt}</td>;
+                                                            })}
+                                                            <td className="px-3 py-3 text-center text-amber-300">{totalAvg !== null ? totalAvg.toFixed(2) : '-'}</td>
+                                                        </>
+                                                    )}
+                                                </tr>
+                                            );
+                                        })()}
+                                    </tbody>
+                                </table>
+                                {/* 주관식 취합 */}
+                                {essayQs.length > 0 && (
+                                    <div className="mt-6 border-t border-slate-200 pt-4 px-2">
+                                        <h5 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">주관식 응답 취합</h5>
+                                        <div className="space-y-3">
+                                            {essayQs.map((eq: any) => {
+                                                const getCat2 = (q: any) => q.category?.includes('|') ? q.category.split('|').pop() : (q.category || '');
+                                                const texts = group.items.map((s: any) => {
+                                                    const ans = s.answers?.find((a: any) => a.questionId === eq.id);
+                                                    return ans?.text || ans?.textValue || null;
+                                                }).filter(Boolean);
+                                                return (
+                                                    <div key={eq.id} className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <span className="text-[10px] font-black text-slate-400 bg-white px-2 py-1 rounded-lg border border-slate-200">{getCat2(eq)}</span>
+                                                            <p className="text-xs font-bold text-slate-700">{eq.content}</p>
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            {texts.length === 0 ? (
+                                                                <p className="text-[11px] text-slate-300 italic">응답 없음</p>
+                                                            ) : (texts as string[]).map((t: string, i: number) => (
+                                                                <div key={i} className="flex gap-2 text-xs">
+                                                                    <span className="text-slate-300 font-black shrink-0">{i + 1}.</span>
+                                                                    <span className="text-slate-600 leading-relaxed">{t}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    };
 
                     return (
-                    <div className="overflow-x-auto border-t border-slate-200 bg-white shadow-inner">
-                        <table className="w-full text-[10px] border-collapse min-w-[3600px] table-fixed">
-                            <thead>
-                                {/* Row 0: Tier 1 Group Headers */}
-                                <tr className="bg-slate-950 text-white font-black uppercase tracking-widest divide-x divide-slate-800 border-b border-slate-700">
-                                    <th colSpan={3} className="px-4 py-3 text-center bg-slate-900 sticky left-0 z-30">응답자 정보</th>
-                                    <th colSpan={maturityQs.length * 5 + 5} className="px-4 py-3 text-center bg-blue-950/80">성숙도 (사전/사후/인지변화/도달률/근접도)</th>
-                                    <th colSpan={satQs.length + 1} className="px-4 py-3 text-center bg-amber-950/80">만족도</th>
-                                    <th colSpan={essayQs.length} className="px-4 py-3 text-center bg-slate-900">주관식 (상세의견)</th>
-                                    <th colSpan={1} className="px-4 py-3 text-center bg-slate-900 sticky right-0 z-30">관리</th>
-                                </tr>
-                                {/* Row 1: Question Content */}
-                                <tr className="bg-slate-800 text-slate-400 font-bold divide-x divide-slate-700 border-b border-slate-700">
-                                    <th colSpan={3} className="bg-slate-900 sticky left-0 z-20 shadow-[2px_0_5px_rgba(0,0,0,0.1)]">조항목 (질문내용)</th>
-                                    {maturityQs.map((q: any) => <th key={`qcontent-pre-${q.id}`} className="px-2 py-1.5 text-[9px] leading-tight text-slate-500 font-medium overflow-hidden text-ellipsis whitespace-nowrap" title={q.content}>{q.content}</th>)}
-                                    <th className="bg-slate-900"></th>
-                                    {maturityQs.map((q: any) => <th key={`qcontent-post-${q.id}`} className="px-2 py-1.5 text-[9px] leading-tight text-slate-500 font-medium overflow-hidden text-ellipsis whitespace-nowrap" title={q.content}>{q.content}</th>)}
-                                    <th className="bg-slate-900"></th>
-                                    {maturityQs.map((q: any) => <th key={`qcontent-exp-${q.id}`} className="px-2 py-1.5 text-[9px] leading-tight text-slate-500 font-medium overflow-hidden text-ellipsis whitespace-nowrap" title={q.content}>{q.content}</th>)}
-                                    <th className="bg-slate-900"></th>
-                                    {maturityQs.map((q: any) => <th key={`qcontent-net-${q.id}`} className="px-2 py-1.5 text-[9px] leading-tight text-slate-500 font-medium overflow-hidden text-ellipsis whitespace-nowrap" title={q.content}>{q.content}</th>)}
-                                    <th className="bg-slate-900"></th>
-                                    {maturityQs.map((q: any) => <th key={`qcontent-pot-${q.id}`} className="px-2 py-1.5 text-[9px] leading-tight text-slate-500 font-medium overflow-hidden text-ellipsis whitespace-nowrap" title={q.content}>{q.content}</th>)}
-                                    <th className="bg-slate-900"></th>
-                                    {satQs.map((q: any) => <th key={`qcontent-sat-${q.id}`} className="px-2 py-1.5 text-[9px] leading-tight text-slate-500 font-medium overflow-hidden text-ellipsis whitespace-nowrap" title={q.content}>{q.content}</th>)}
-                                    <th className="bg-slate-900"></th>
-                                    {essayQs.map((q: any) => <th key={`qcontent-ess-${q.id}`} className="px-2 py-1.5 text-[9px] leading-tight text-slate-500 font-medium overflow-hidden text-ellipsis whitespace-nowrap" title={q.content}>{q.content}</th>)}
-                                    <th className="bg-slate-900 sticky right-0 z-20"></th>
-                                </tr>
-                                {/* Row 2: Group Headers */}
-                                <tr className="bg-slate-900 text-white font-black uppercase tracking-tighter divide-x divide-slate-700">
-                                    <th rowSpan={2} className="w-64 px-4 py-4 sticky left-0 z-20 bg-slate-900 border-b border-slate-700 shadow-[2px_0_5px_rgba(0,0,0,0.1)]">응답자 성명(ID)</th>
-                                    <th rowSpan={2} className="w-24 px-2 py-4 border-b border-slate-700">조사구분</th>
-                                    <th rowSpan={2} className="w-24 px-2 py-4 border-b border-slate-700">대상</th>
-                                    <th colSpan={maturityQs.length + 1} className="px-3 py-2 text-center bg-blue-900/50">사전조사 (Pre-Score)</th>
-                                    <th colSpan={maturityQs.length + 1} className="px-3 py-2 text-center bg-indigo-900/50">사후조사 (Post = Pre + Change)</th>
-                                    <th colSpan={maturityQs.length + 1} className="px-3 py-2 text-center bg-emerald-900/50">학습 인지 변화도 (%)</th>
-                                    <th colSpan={maturityQs.length + 1} className="px-3 py-2 text-center bg-emerald-800/50">역량 도달률 (%)</th>
-                                    <th colSpan={maturityQs.length + 1} className="px-3 py-2 text-center bg-teal-900/50 border-r border-slate-700">학습 목표 근접도 (%)</th>
-                                    <th colSpan={satQs.length + 1} className="px-3 py-2 text-center bg-amber-900/50">만족도 (사후)</th>
-                                    {essayQs.map((q:any) => <th key={`ess-h-${q.id}`} rowSpan={2} className="w-96 px-4 py-2 border-b border-slate-700 bg-slate-900">{getShortCat(q.category) || "상세의견"}</th>)}
-                                    <th rowSpan={2} className="w-24 px-4 py-2 sticky right-0 z-20 bg-slate-900 border-b border-slate-700">
-                                        <div className="flex flex-col items-center gap-1">
-                                            <span className="text-[9px] text-slate-500">전체</span>
-                                            {canDelete && (
-                                                <button 
-                                                    onClick={() => handleDeleteAll(group.items)}
-                                                    className="text-[10px] bg-rose-600 hover:bg-rose-700 text-white px-2 py-1 rounded transition-colors"
-                                                >
-                                                    삭제
-                                                </button>
-                                            )}
-                                        </div>
-                                    </th>
-                                </tr>
-                                {/* Row 3: Sub-item Labels */}
-                                <tr className="bg-slate-800 text-slate-300 font-bold divide-x divide-slate-700 border-b border-slate-700">
-                                    {maturityQs.map((q:any) => <th key={`pre-sub-${q.id}`} className="px-2 py-2 text-center w-24" title={q.content}>{getShortCat(q.category) || "역량"}</th>)}
-                                    <th className="px-2 py-2 text-center w-24">평균</th>
-                                    {maturityQs.map((q:any) => <th key={`post-sub-${q.id}`} className="px-2 py-2 text-center w-24 bg-indigo-950/30" title={q.content}>{getShortCat(q.category) || "역량"}</th>)}
-                                    <th className="px-2 py-2 text-center w-24 bg-indigo-950/30">평균</th>
-                                    {maturityQs.map((q:any) => <th key={`exp-sub-${q.id}`} className="px-2 py-2 text-center w-24 bg-emerald-950/30" title={q.content}>{getShortCat(q.category) || "역량"}</th>)}
-                                    <th className="px-2 py-2 text-center w-24 bg-emerald-950/30">평균</th>
-                                    {maturityQs.map((q:any) => <th key={`net-sub-${q.id}`} className="px-2 py-2 text-center w-24 bg-emerald-900/30" title={q.content}>{getShortCat(q.category) || "역량"}</th>)}
-                                    <th className="px-2 py-2 text-center w-24 bg-emerald-900/30">평균</th>
-                                    {maturityQs.map((q:any) => <th key={`pot-sub-${q.id}`} className="px-2 py-2 text-center w-24 bg-teal-950/30" title={q.content}>{getShortCat(q.category) || "역량"}</th>)}
-                                    <th className="px-2 py-2 text-center w-24 bg-teal-950/30 border-r border-slate-700">평균</th>
-                                    {satQs.map((q:any) => <th key={`sat-sub-${q.id}`} className="px-2 py-2 text-center w-24 bg-amber-950/30" title={q.content}>{getShortCat(q.category) || "만족도"}</th>)}
-                                    <th className="px-2 py-2 text-center w-24 bg-amber-950/30">평균</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100 bg-white">
-                                {sortedItems.map((survey: any, sIdx: number) => {
-                                    const getScore = (q: any) => {
-                                        const ans = survey.answers?.find((a: any) => a.questionId === q.id);
-                                        if (!ans) return { id: null, pre: 0, post: 0, change: 0, score: 0 };
-                                        
-                                        const pre = ans.preScore || 0;
-                                        const change = ans.postChange || 0;
-                                        let post = 0;
-                                        if (q?.growthType === 'CHANGE') {
-                                            post = pre > 0 ? Math.min(5, Math.max(1, pre + change)) : 0;
-                                        } else {
-                                            post = ans.score || 0;
-                                        }
-                                        return { id: ans.id, pre, post, change, score: ans.score || 0 };
-                                    };
+                        <div className="border-t border-slate-200 bg-white">
+                            {/* 탭 전환 헤더 */}
+                            <div className="flex gap-2 p-4 border-b border-slate-100 bg-slate-50 items-center">
+                                {hasSat && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setGroupResultTab(key, 'SATISFACTION')}
+                                        className={cn(
+                                            "px-5 py-2 rounded-xl text-xs font-black transition-all",
+                                            activeTab === 'SATISFACTION'
+                                                ? 'bg-amber-500 text-white shadow-lg shadow-amber-100'
+                                                : 'bg-white text-slate-400 border border-slate-200 hover:border-amber-300'
+                                        )}
+                                    >
+                                        ⭐ 만족도 조사 ({satQs.length}문항)
+                                    </button>
+                                )}
+                                {hasMat && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setGroupResultTab(key, 'MATURITY')}
+                                        className={cn(
+                                            "px-5 py-2 rounded-xl text-xs font-black transition-all",
+                                            activeTab === 'MATURITY'
+                                                ? 'bg-blue-600 text-white shadow-lg shadow-blue-100'
+                                                : 'bg-white text-slate-400 border border-slate-200 hover:border-blue-300'
+                                        )}
+                                    >
+                                        📊 성숙도 조사 ({matQs.length}문항)
+                                    </button>
+                                )}
+                                <div className="ml-auto flex items-center gap-2">
+                                    <span className="text-[10px] font-black text-slate-400 bg-white px-3 py-1.5 rounded-lg border border-slate-200">
+                                        총 응답 {group.items.length}명
+                                    </span>
+                                    {canDelete && (
+                                        <button
+                                            onClick={() => handleDeleteAll(group.items)}
+                                            className="text-[10px] bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg transition-colors font-black"
+                                        >
+                                            전체 삭제
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                            {/* 탭 컨텐츠 */}
+                            <div className="p-4">
+                                {activeTab === 'SATISFACTION' && <AggregatedTable data={satData} isMat={false} />}
+                                {activeTab === 'MATURITY' && <AggregatedTable data={matData} isMat={true} />}
+                            </div>
+                        </div>
+                    );
+                })()}
 
-                                    const EditableCell = ({ value, onSave, label, type="number", allowZero=false }: any) => {
-                                        const [tempVal, setTempVal] = useState(value);
-                                        const [isEditing, setIsEditing] = useState(false);
-                                        if (!isEditing) {
-                                            const isNull = value === null || value === undefined || value === "" || value === "인식불가" || (!allowZero && value === 0);
-                                            return (
-                                                <div onClick={() => setIsEditing(true)} className={cn("cursor-pointer w-full h-full flex items-center justify-center transition-all group font-black", isNull ? "bg-rose-100 text-rose-600 animate-pulse" : "hover:bg-white/50")}>
-                                                    {isNull ? "인식불가" : value}
-                                                    <Edit3 className="w-2 h-2 ml-1 opacity-0 group-hover:opacity-100 text-slate-400" />
-                                                </div>
-                                            );
-                                        }
-                                        return (
-                                            <input autoFocus type={type} className="w-12 h-6 text-center text-[10px] font-bold bg-white border border-blue-500 rounded outline-none" value={tempVal} onChange={(e) => setTempVal(e.target.value)} onBlur={() => { setIsEditing(false); if (tempVal !== value) onSave(tempVal); }}
-                                                onKeyDown={(e) => { if (e.key === 'Enter') { setIsEditing(false); if (tempVal !== value) onSave(tempVal); } }} />
-                                        );
-                                    };
 
-                                    const mScores = maturityQs.map((q: any) => getScore(q));
-                                    const sScores = satQs.map((q: any) => getScore(q));
-                                    const mPreAvg = mScores.filter((s: any) => s.pre > 0).length > 0 ? mScores.reduce((a:any,b:any)=>a+b.pre,0)/mScores.filter((s:any)=>s.pre>0).length : 0;
-                                    const mPostAvg = mScores.filter((s: any) => s.post > 0).length > 0 ? mScores.reduce((a:any,b:any)=>a+b.post,0)/mScores.filter((s:any)=>s.post>0).length : 0;
-                                    const satAvg = sScores.filter((s: any) => s.score > 0).length > 0 ? sScores.reduce((a:any,b:any)=>a+b.score,0)/sScores.filter((s:any)=>s.score>0).length : 0;
-                                    
-                                    const expImp = mScores.map((s: any) => s.post > s.pre ? 100 : 0);
-                                    const netGro = mScores.map((s: any) => s.pre > 0 ? ((s.post - s.pre) / s.pre) * 100 : 0);
-                                    const potGro = mScores.map((s: any) => (5 - s.pre) > 0 ? ((s.post - s.pre) / (5 - s.pre)) * 100 : (s.post >= s.pre ? 100 : -100));
-                                    const essayTexts = survey.answers?.filter((a: any) => tQuestions.find((q:any)=>q.id===a.questionId)?.type === 'ESSAY').map((a: any) => a.text || a.textValue).join(" / ");
 
-                                    return (
-                                        <tr key={survey.id} className="hover:bg-blue-50/30 transition-colors divide-x divide-slate-100/50 text-center">
-                                            <td className="px-4 py-3 font-bold text-slate-900 sticky left-0 z-10 bg-white border-r border-slate-200 shadow-[2px_0_5px_rgba(0,0,0,0.1)]">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-slate-400 font-normal">{sIdx + 1}</span>
-                                                    <div className="flex-1 min-w-[100px]">
-                                                        <EditableCell value={survey.studentName || (survey.respondentId?.length > 10 ? survey.respondentId.substring(0,8) : survey.respondentId)} onSave={(v: any) => handleInlineUpdate(survey.id, 'studentName', v, false)} type="text" />
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-2 py-3">
-                                                <span className={cn(
-                                                    "px-1.5 py-0.5 rounded text-[9px] font-black",
-                                                    survey.type === 'PRE' ? 'bg-blue-600 text-white' : 
-                                                    survey.type === 'POST' ? 'bg-indigo-600 text-white' : 
-                                                    survey.type === 'SATISFACTION' ? 'bg-amber-600 text-white' : 'bg-slate-200 text-slate-500'
-                                                )}>
-                                                    {(() => {
-                                                        if (survey.type === 'SATISFACTION') return '만족도';
-                                                        if (survey.template?.type?.includes('성숙도')) return '성숙도';
-                                                        if (survey.template?.type?.includes('만족')) return '만족도';
-                                                        return survey.type === 'PRE' ? '사전' : survey.type === 'POST' ? '사후' : survey.type;
-                                                    })()}
-                                                </span>
-                                            </td>
-                                            <td className="px-2 py-3">
-                                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-black ${survey.researchTarget === 'ELEMENTARY' ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-600'}`}>
-                                                    {survey.researchTarget === 'ELEMENTARY' ? '초등' : '중고'}
-                                                </span>
-                                            </td>
-                                            {mScores.map((s: any, i: number) => <td key={`pre-${i}`} className="px-1 py-1 bg-blue-50/5 h-10">{s.id ? <EditableCell value={s.pre} onSave={(v: any) => handleInlineUpdate(s.id!, 'preScore', parseInt(v), true, { postChange: s.post - parseInt(v) })} /> : '0'}</td>)}
-                                            <td className="px-2 py-3 font-black bg-blue-100/40 text-blue-700">{mPreAvg.toFixed(1)}</td>
-                                            {mScores.map((s: any, i: number) => <td key={`post-${i}`} className="px-1 py-1 bg-indigo-50/10 h-10">{s.id ? <div className="flex flex-col items-center justify-center gap-0.5"><div className="text-[10px] font-black text-indigo-700 leading-none h-6 w-full"><EditableCell value={s.post} onSave={(v: any) => handleInlineUpdate(s.id!, 'score', parseInt(v), true, { postChange: parseInt(v) - s.pre })} /></div><div className="text-[8px] text-slate-400 bg-white/50 px-1 rounded border border-slate-100 min-w-[24px]"><EditableCell value={s.change} onSave={(v: any) => handleInlineUpdate(s.id!, 'postChange', parseInt(v))} allowZero={true} /></div></div> : '0'}</td>)}
-                                            <td className="px-2 py-3 font-black bg-indigo-100/40 text-indigo-700">{mPostAvg.toFixed(1)}</td>
-                                            {expImp.map((v: number, i: number) => <td key={`exp-${i}`} className="px-2 py-3 font-bold bg-emerald-50/30 text-emerald-700">{v}%</td>)}
-                                            <td className="px-2 py-3 font-black bg-emerald-200/50 text-emerald-800">{(expImp.reduce((a: any, b: any) => a + b, 0) / (expImp.length || 1)).toFixed(0)}%</td>
-                                            {netGro.map((v: any, i: number) => <td key={`net-${i}`} className={`px-2 py-3 font-black ${v > 0 ? 'text-blue-600' : v < 0 ? 'text-rose-600' : 'text-slate-400'}`}>{v.toFixed(0)}%</td>)}
-                                            <td className="px-2 py-3 font-black bg-blue-100/30">{(netGro.reduce((a: any, b: any) => a + b, 0) / (netGro.length || 1)).toFixed(0)}%</td>
-                                            {potGro.map((v: any, i: number) => <td key={`pot-${i}`} className={`px-2 py-3 font-black bg-teal-50/40 ${v > 0 ? 'text-teal-700' : 'text-slate-400'}`}>{v.toFixed(0)}%</td>)}
-                                            <td className="px-2 py-3 font-black bg-teal-200/40 border-r border-slate-700">{(potGro.reduce((a: any, b: any) => a + b, 0) / (potGro.length || 1)).toFixed(0)}%</td>
-                                            {sScores.map((s: any, i: number) => <td key={`sat-v-${i}`} className="px-1 py-1 bg-amber-50/10 h-10">{s.id ? <EditableCell value={s.score} onSave={(v: any) => handleInlineUpdate(s.id!, 'score', parseInt(v))} /> : '0'}</td>)}
-                                            <td className="px-2 py-3 font-black bg-amber-50/50 text-amber-700">{satAvg.toFixed(2)}</td>
-                                            {essayQs.map((eq: any) => {
-                                                const ans = survey.answers?.find((a: any) => a.questionId === eq.id);
-                                                return <td key={`ess-v-${eq.id}`} className="px-4 py-3 text-slate-500 italic whitespace-pre-wrap leading-relaxed min-w-[320px] text-left border-r border-slate-100">{ans?.text || ans?.textValue || "-"}</td>;
-                                            })}
-                                            <td className="px-4 py-3 sticky right-0 z-10 bg-white border-l border-slate-100">
-                                                <div className="flex items-center justify-center gap-1">
-                                                    {canEdit && (
-                                                        <Button variant="ghost" size="sm" onClick={() => handleOpenEdit(survey)} className="h-8 w-8 text-slate-300 hover:text-blue-600">
-                                                            <Edit3 className="w-4 h-4"/>
-                                                        </Button>
-                                                    )}
-                                                    {canDelete && (
-                                                        <Button variant="ghost" size="sm" onClick={() => handleDelete(survey.id)} className="h-8 w-8 text-slate-300 hover:text-rose-500">
-                                                            <Trash2 className="w-4 h-4"/>
-                                                        </Button>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-
-                                {/* Table Footer (Final Average Row) with Accurate Calculations */}
-                                <tr className="sticky bottom-0 z-30 bg-slate-900 text-white font-black border-t-2 border-slate-700 shadow-[0_-5px_15px_rgba(0,0,0,0.3)] divide-x divide-slate-700 h-14 text-center">
-                                    <td className="px-4 py-3 sticky left-0 z-40 bg-slate-900 border-r border-slate-700 uppercase tracking-widest text-[9px] flex items-center justify-center gap-2">
-                                        <div className="w-1.5 h-3 bg-blue-500 rounded-full animate-pulse"></div> 전체 평균 (TOTAL AVG)
-                                    </td>
-                                    <td className="px-2 py-3">-</td>
-                                    <td className="px-2 py-3">-</td>
-                                    {/* Maturity Pre Averages */}
-                                    {maturityQs.map((mq: any) => {
-                                        const sum = sortedItems.reduce((acc: any, s: any) => acc + (s.answers?.find((a: any) => a.questionId === mq.id)?.preScore || 0), 0);
-                                        const count = sortedItems.filter((s: any) => s.answers?.find((a: any) => a.questionId === mq.id)?.preScore > 0).length || 1;
-                                        return <td key={`foot-pre-${mq.id}`} className="px-2 py-3 bg-blue-950/20 text-blue-300">{(sum / count).toFixed(1)}</td>;
-                                    })}
-                                    <td className="px-2 py-3 bg-blue-950/20 text-blue-300">{(sortedItems.reduce((acc: any, s: any) => {
-                                        const preList = s.answers?.filter((a: any) => maturityQs.some((mq: any) => mq.id === a.questionId)) || [];
-                                        return acc + (preList.length > 0 ? preList.reduce((i: any, a: any) => i + (a.preScore || 0), 0) / preList.length : 0);
-                                    }, 0) / (sortedItems.length || 1)).toFixed(1)}</td>
-
-                                    {/* Maturity Post Averages */}
-                                    {maturityQs.map((mq: any) => {
-                                        const sum = sortedItems.reduce((acc, s: any) => {
-                                            const ans = s.answers?.find((a: any) => a.questionId === mq.id);
-                                            if (!ans) return acc;
-                                            const score = mq.growthType === 'CHANGE' ? Math.min(5, Math.max(1, (ans.preScore || 0) + (ans.postChange || 0))) : (ans.score || 0);
-                                            return acc + score;
-                                        }, 0);
-                                        return <td key={`foot-post-${mq.id}`} className="px-2 py-3 bg-indigo-950/40 text-indigo-300">{(sum / (sortedItems.length || 1)).toFixed(1)}</td>;
-                                    })}
-                                    <td className="px-2 py-3 bg-indigo-950/40 text-indigo-300">{(sortedItems.reduce((acc: any, s: any) => {
-                                        const postList = s.answers?.filter((a: any) => maturityQs.some((mq: any) => mq.id === a.questionId)) || [];
-                                        return acc + (postList.length > 0 ? postList.reduce((i: any, a: any) => {
-                                            const q = maturityQs.find((mq: any) => mq.id === a.questionId);
-                                            return i + (q?.growthType === 'CHANGE' ? Math.min(5, Math.max(1, (a.preScore || 0) + (a.postChange || 0))) : (a.score || 0));
-                                        }, 0) / postList.length : 0);
-                                    }, 0) / (sortedItems.length || 1)).toFixed(1)}</td>
-
-                                    {/* Placeholder for Metrics */}
-                                    {Array.from({ length: maturityQs.length * 3 + 3 }).map((_, i) => <td key={`foot-pad-${i}`} className="px-2 py-3 text-slate-500 bg-slate-100/30 font-normal">-</td>)}
-
-                                    {/* Satisfaction Category Averages */}
-                                    {satQs.map((sq: any) => {
-                                        const sum = sortedItems.reduce((acc, s: any) => acc + (s.answers?.find((a: any) => a.questionId === sq.id)?.score || 0), 0);
-                                        const count = sortedItems.filter(s => s.answers?.find((a: any) => a.questionId === sq.id)?.score > 0).length || 1;
-                                        return <td key={`foot-sat-${sq.id}`} className="px-2 py-3 bg-amber-950/20 text-amber-300">{(sum / count).toFixed(1)}</td>;
-                                    })}
-                                    <td className="px-2 py-3 bg-amber-950/20 text-amber-300">{(sortedItems.reduce((acc: any, s: any) => {
-                                        const satList = s.answers?.filter((a: any) => satQs.some((sq: any) => sq.id === a.questionId)) || [];
-                                        return acc + (satList.length > 0 ? satList.reduce((i: any, a: any) => i + (a.score || 0), 0) / satList.length : 0);
-                                    }, 0) / (sortedItems.length || 1)).toFixed(2)}</td>
-
-                                    {/* Footer Columns for Essays */}
-                                    {essayQs.map((eq: any) => <td key={`foot-ess-${eq.id}`} className="px-4 py-3 bg-slate-800">-</td>)}
-                                    <td className="px-4 py-3 sticky right-0 z-40 bg-slate-900 border-l border-slate-700">-</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                  )
                 })()}
               </Card>
             )

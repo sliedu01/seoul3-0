@@ -42,19 +42,27 @@ export async function GET() {
     const programCount = await prisma.program.count();
     const partnerCount = await prisma.partner.count();
 
-    // Fetch all relevant answers and questions for logic-based aggregation
-    const allAnswers = await prisma.answer.findMany({
-      include: { question: true }
+    // SQL DB에 평균 연산 자체를 위임하여 숫자 하나만 받아옴
+    const satStats = await prisma.answer.aggregate({
+      where: {
+        score: { not: null },
+        question: {
+          OR: [
+            { growthType: 'NONE' },
+            { category: { contains: '만족' } },
+            { content: { contains: '만족' } }
+          ]
+        }
+      },
+      _avg: {
+        score: true
+      }
     });
+
+    const avgSatisfaction = satStats._avg.score ? satStats._avg.score.toFixed(1) : "0.0";
 
     const isSat = (q: any) => q.growthType === 'NONE' || q.category?.includes('만족') || q.content?.includes('만족');
     const isMat = (q: any) => (q.growthType === 'CHANGE' || q.growthType === 'PRE_POST') && !isSat(q);
-
-    // Average Satisfaction
-    const satAnswers = allAnswers.filter(a => a.question && isSat(a.question) && a.score !== null);
-    const avgSatisfaction = satAnswers.length > 0 
-      ? (satAnswers.reduce((acc, curr) => acc + (curr.score || 0), 0) / satAnswers.length).toFixed(1)
-      : "0.0";
 
     // Growth Metrics
     let perceivedGrowth = 0;
