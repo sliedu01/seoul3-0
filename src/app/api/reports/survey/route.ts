@@ -49,13 +49,14 @@ export async function GET(req: Request) {
     }
 
 
-    // 1. Fetch all responses for the selection with program info
+    // 1. Fetch all responses for the selection with program info AND template type
     const responses = await prisma.surveyResponse.findMany({
       where: whereClause,
       include: {
         session: {
           include: { program: true }
         },
+        template: true,
         answers: {
           include: { question: true }
         },
@@ -77,8 +78,8 @@ export async function GET(req: Request) {
       programMap.get(pid)?.push(r);
     });
 
-    // Categorization: Keyword "만족" means Satisfaction, otherwise Maturity/Competency
-    const isSatCat = (cat: string, content: string) => {
+    // Categorization: template.type 기반 분류 (1순위), 키워드는 fallback (2순위)
+    const isSatByKeyword = (cat: string, content: string) => {
         const text = content || "";
         const c = cat || "";
         return c.includes("만족") || c.includes("satisfaction") || c.toLowerCase().includes("sat") ||
@@ -88,13 +89,31 @@ export async function GET(req: Request) {
                text.includes("멘토") || text.includes("친절");
     };
 
+    // template.type 기반 판별: response 단위로 만족도/성숙도 구분
+    const isResponseSatisfaction = (r: any) => {
+      // 1순위: template.type 필드 사용
+      if (r.template?.type) {
+        return r.template.type.includes('SATISFACTION');
+      }
+      // 2순위: response.type 필드 사용
+      if (r.type && (r.type === 'SATISFACTION' || r.type === 'MATURITY')) {
+        return r.type === 'SATISFACTION';
+      }
+      // 3순위(fallback): 키워드 기반 (legacy 데이터)
+      return r.answers?.every((a: any) => isSatByKeyword(a.question?.category || "", a.question?.content || ""));
+    };
+
     // 3. Process Each Program Individually
     const programReports = Array.from(programMap.entries()).map(([pid, pResponses]) => {
       const pProgram = pResponses[0].session.program;
 
+      // response 단위로 만족도/성숙도 분리
+      const maturityResponses = pResponses.filter((r: any) => !isResponseSatisfaction(r));
+      const satisfactionResponses = pResponses.filter((r: any) => isResponseSatisfaction(r));
+
       // Group competency answers by respondent to calculate PER-PERSON growth
-      const respondentGrowthStats = pResponses.map((r: any) => {
-        const compAns = r.answers.filter((a: any) => !isSatCat(a.question?.category || "", a.question?.content || ""));
+      const respondentGrowthStats = maturityResponses.map((r: any) => {
+        const compAns = r.answers.filter((a: any) => a.question?.type !== 'ESSAY');
         if (compAns.length === 0) return null;
 
         let rPreSum = 0, rPostSum = 0, rCount = 0;
@@ -179,7 +198,7 @@ export async function GET(req: Request) {
       };
 
       // Radar Data (Grouped by Category)
-      const pCompAnswers = pResponses.flatMap(r => r.answers).filter(a => !isSatCat(a.question?.category || "", a.question?.content || ""));
+      const pCompAnswers = maturityResponses.flatMap(r => r.answers).filter(a => a.question?.type !== 'ESSAY');
       const mappedCompAnswers = pCompAnswers.map(a => ({ ...a, mappedCat: getCategoryMatches(a.question?.category, a.question?.content) }));
       const pCompCategories = Array.from(new Set(mappedCompAnswers.map(a => a.mappedCat))).filter(Boolean);
       
@@ -209,8 +228,8 @@ export async function GET(req: Request) {
         };
       });
 
-      // Satisfaction & Subjective 
-      const pSatAnswers = pResponses.flatMap(r => r.answers).filter(a => isSatCat(a.question?.category || "", a.question?.content || ""));
+      // Satisfaction & Subjective (template.type 기반으로 분류된 만족도 응답 사용)
+      const pSatAnswers = satisfactionResponses.flatMap(r => r.answers).filter(a => a.question?.type !== 'ESSAY');
       const mappedSatAnswers = pSatAnswers.map(a => ({ ...a, mappedCat: getCategoryMatches(a.question?.category, a.question?.content) }));
       const pSatCategories = Array.from(new Set(mappedSatAnswers.map(a => a.mappedCat))).filter(cat => cat && cat !== "주관식");
       const pSatisfactionData = pSatCategories.map(cat => {
@@ -220,8 +239,9 @@ export async function GET(req: Request) {
       });
       const pOverallSat = pSatisfactionData.length > 0 ? pSatisfactionData.reduce((acc, curr) => acc + curr.score, 0) / pSatisfactionData.length : 0;
 
-      // 질문(문항) 기반 주관식 수집: 실제 DB 질문 단위로 답변 그룹화
-      const allMappedAnswers = [...mappedSatAnswers, ...mappedCompAnswers];
+      // 질문(문항) 기반 주관식 수집: 모든 응답(만족도+성숙도)에서 주관식 추출
+      const allAnswers = pResponses.flatMap((r: any) => r.answers);
+      const allMappedAnswers = allAnswers.map((a: any) => ({ ...a, mappedCat: getCategoryMatches(a.question?.category, a.question?.content) }));
       const subjectiveAnswers = allMappedAnswers.filter(a =>
         (a.mappedCat === "주관식" || a.question?.type === "ESSAY") &&
         a.text && a.text.trim()

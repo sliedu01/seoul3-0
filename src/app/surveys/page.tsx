@@ -547,8 +547,15 @@ export default function SurveysPage() {
 
   const getGroupResultTab = (key: string, items: any[]) => {
     if (groupResultTabs[key]) return groupResultTabs[key];
-    const hasMaturity = items.some((s: any) => s.type === 'MATURITY' || s.answers?.some((a: any) => a.preScore != null && a.preScore > 0));
-    return hasMaturity ? 'MATURITY' : 'SATISFACTION';
+    // 1순위: template.type 필드 확인
+    const hasMaturityTemplate = items.some((s: any) => s.template?.type?.includes('MATURITY'));
+    if (hasMaturityTemplate) return 'MATURITY';
+    // 2순위: response.type 필드 확인  
+    const hasMaturityType = items.some((s: any) => s.type === 'MATURITY');
+    if (hasMaturityType) return 'MATURITY';
+    // 3순위(fallback): preScore 유무로 추정 (legacy 데이터)
+    const hasPreScore = items.some((s: any) => s.answers?.some((a: any) => a.preScore != null && a.preScore > 0));
+    return hasPreScore ? 'MATURITY' : 'SATISFACTION';
   };
 
   const setGroupResultTab = (key: string, tab: 'SATISFACTION' | 'MATURITY') => {
@@ -747,9 +754,21 @@ export default function SurveysPage() {
       {/* Main Table Layer - Accordion Structure */}
       <div className="space-y-6">
         {sortedGroupedEntries.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-slate-200">
-            <Search className="w-12 h-12 text-slate-100 mx-auto mb-4" />
-            <p className="text-slate-400 font-bold italic">조회된 설문 결과가 없습니다.</p>
+          <div className="py-24 text-center bg-white rounded-[3rem] border-2 border-dashed border-slate-100 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-700">
+             <AlertCircle className="w-16 h-16 text-blue-100 mx-auto mb-6" />
+             <h3 className="text-xl font-black text-slate-900">조회된 설문 결과가 없습니다.</h3>
+             <p className="text-slate-500 mt-2 font-bold px-8 max-w-md mx-auto leading-relaxed">
+               현재 설정된 <span className="text-blue-600 underline underline-offset-4 decoration-2 bg-blue-50/50 px-1.5 rounded-lg text-[11px]">조회 기간(교육 진행일 기준)</span>에 등록된 데이터가 있는지 확인해 주세요.
+             </p>
+             <div className="mt-10 flex justify-center gap-4">
+                <Button 
+                  variant="outline" 
+                  onClick={() => { setStartDate(""); setEndDate(""); setSelectedProgramIds([]); setSelectedPartnerIds([]); setSelectedInstructor(""); setSurveyTypeFilter("ALL"); setResearchTargetFilter(""); setSearch(""); }} 
+                  className="rounded-2xl h-12 px-8 font-black border-slate-200 text-slate-600 hover:bg-slate-50 transition-all active:scale-95"
+                >
+                  전체 기간/필터 초기화
+                </Button>
+             </div>
           </div>
         ) : sortedGroupedEntries.map(([key, group]: any) => {
             // Aggregate Summary Stats for this Master Row

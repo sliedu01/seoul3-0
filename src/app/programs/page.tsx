@@ -3,9 +3,179 @@ import React, { useState, useEffect } from "react"
 export const dynamic = 'force-dynamic' // Vercel 배포 시 최신 데이터 및 UI 반영 강제
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Plus, Pencil, Trash2, FilePlus2, X, Clock, User, Users, BookOpen, Calendar, Building2, UploadCloud, Download, Link, AlertCircle, ChevronDown, ChevronRight, CalendarDays, Copy } from "lucide-react"
+import { Plus, Pencil, Trash2, FilePlus2, X, Clock, User, Users, BookOpen, Calendar, Building2, UploadCloud, Download, Link, AlertCircle, ChevronDown, ChevronRight, CalendarDays, Copy, FileText, LayoutGrid } from "lucide-react"
+import { useForm } from "react-hook-form"
+import { utils, read, write } from "xlsx"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
+import { SurveyAdminTab } from "@/components/survey/SurveyAdminTab";
+import { parseSurveyExcel, SurveyInputFormat, SurveyType } from "@/lib/survey-parser";
+
+// ── 설문 그리드 입력 컴포넌트 ──
+const SurveyDataGrid = ({ 
+  headers, 
+  data, 
+  onChange, 
+  placeholder = "여기에 엑셀 데이터를 붙여넣으세요 (Ctrl+V)",
+  fixedCols = 0, // 앞에서부터 몇 개의 열을 고정할지
+  isAggregated = false
+}: { 
+  headers: string[], 
+  data: string[][], 
+  onChange: (newData: string[][]) => void,
+  placeholder?: string,
+  fixedCols?: number,
+  isAggregated?: boolean
+}) => {
+  const handlePaste = (e: React.ClipboardEvent) => {
+    if (fixedCols === 0) {
+      e.preventDefault();
+      const pasteData = e.clipboardData.getData('text');
+      if (!pasteData) return;
+      const rows = pasteData.split(/\r?\n/).filter(r => r.trim() !== "").map(row => row.split('\t'));
+      if (rows.length === 0) return;
+      const normalizedRows = rows.map(row => {
+        const newRow = new Array(headers.length).fill("");
+        row.forEach((cell, i) => { if (i < headers.length) newRow[i] = cell.trim(); });
+        return newRow;
+      });
+      onChange(normalizedRows);
+      return;
+    }
+
+    // 고정 열이 있는 경우 (AGGREGATED 모드 등)
+    e.preventDefault();
+    const pasteData = e.clipboardData.getData('text');
+    if (!pasteData) return;
+    const rows = pasteData.split(/\r?\n/).filter(r => r.trim() !== "").map(row => row.split('\t'));
+    
+    const newData = [...data];
+    rows.forEach((row, rIdx) => {
+      if (newData[rIdx]) {
+        row.forEach((cell, cIdx) => {
+          // 붙여넣는 데이터의 열 인덱스를 headers 인덱스로 변환 (고정 열 이후부터 채움)
+          // 만약 사용자가 엑셀 전체를 복사했다면 (8열), 앞의 2열을 무시하고 3번째 열부터 채우거나
+          // 사용자가 숫자 부분만 복사했다면 (6열), 바로 3번째 열부터 채웁니다.
+          let targetCol = fixedCols + cIdx;
+          
+          // 사용자가 엑셀 전체(헤더 포함 또는 고정열 포함)를 복사한 경우를 대비한 가공 로직
+          // 만약 row의 길이가 headers와 같다면, fixedCols 만큼 건너뛰고 매핑 시도
+          if (row.length === headers.length) {
+            if (cIdx < fixedCols) return; // 고정열 영역은 건너뜀
+            targetCol = cIdx;
+          }
+
+          if (targetCol < headers.length) {
+            newData[rIdx][targetCol] = cell.trim();
+          }
+        });
+      }
+    });
+    onChange(newData);
+  };
+
+  const handleCellChange = (rIdx: number, cIdx: number, value: string) => {
+    const newData = [...data];
+    if (!newData[rIdx]) newData[rIdx] = new Array(headers.length).fill("");
+    newData[rIdx][cIdx] = value;
+    onChange(newData);
+  };
+
+  const addRow = () => onChange([...data, new Array(headers.length).fill("")]);
+  const removeRow = (idx: number) => {
+    if (data.length <= 1) {
+      onChange([new Array(headers.length).fill("")]);
+    } else {
+      onChange(data.filter((_, i) => i !== idx));
+    }
+  };
+
+  return (
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      <div className="flex justify-between items-center px-2">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">Excel Copy & Paste Engine Active</p>
+        </div>
+        <button 
+          type="button" 
+          onClick={addRow} 
+          className="h-8 px-3 bg-white border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-200 rounded-xl text-[10px] font-black flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+        >
+          <Plus className="w-3 h-3" /> 행 추가하기
+        </button>
+      </div>
+      <div 
+        className="relative overflow-hidden border-2 border-slate-100 rounded-[2.5rem] bg-slate-50/30 transition-all focus-within:border-blue-200 focus-within:bg-white focus-within:shadow-xl focus-within:shadow-blue-500/5"
+        onPaste={handlePaste}
+      >
+        <div className="overflow-x-auto max-h-[400px] custom-scrollbar">
+          <table className="w-full text-left border-collapse min-w-[800px]">
+            <thead className="sticky top-0 z-10">
+              <tr className="bg-slate-100/80 backdrop-blur-md">
+                <th className="p-4 text-[10px] font-black text-slate-400 border-b border-slate-200/50 w-14 text-center">NO.</th>
+                {headers.map((h, i) => (
+                  <th key={i} className="p-4 text-[10px] font-black text-slate-900 border-b border-slate-200/50 min-w-[120px] whitespace-nowrap">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-blue-600/40 text-[8px] uppercase">Column {i + 1}</span>
+                      {h}
+                    </div>
+                  </th>
+                ))}
+                <th className="p-4 text-[10px] font-black text-slate-400 border-b border-slate-200/50 w-14 text-center">DEL</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white/50">
+              {data.map((row, rIdx) => (
+                <tr key={rIdx} className="group hover:bg-blue-50/30 transition-colors">
+                  <td className="p-3 text-[10px] font-black text-slate-300 text-center border-b border-slate-100/50">{String(rIdx + 1).padStart(2, '0')}</td>
+                  {headers.map((_, cIdx) => (
+                    <td key={cIdx} className="p-1 border-b border-slate-100/50">
+                      <input 
+                        type="text"
+                        value={row[cIdx] || ""}
+                        readOnly={cIdx < fixedCols}
+                        placeholder={rIdx === 0 ? "데이터 입력..." : ""}
+                        onChange={(e) => handleCellChange(rIdx, cIdx, e.target.value)}
+                        className={cn(
+                          "w-full h-9 px-3 border-none text-[11px] font-bold outline-none transition-all rounded-xl",
+                          cIdx < fixedCols 
+                            ? "bg-slate-50 text-slate-400 cursor-not-allowed" 
+                            : "bg-transparent text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500/20"
+                        )}
+                      />
+                    </td>
+                  ))}
+                  <td className="p-1 text-center border-b border-slate-100/50">
+                     <button type="button" onClick={() => removeRow(rIdx)} className="w-8 h-8 mx-auto flex items-center justify-center text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100">
+                       <Trash2 className="w-4 h-4" />
+                     </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {data.every(r => r.every(c => c === "")) && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 backdrop-blur-[2px] pointer-events-none p-12 transition-all">
+            <div className="w-16 h-16 bg-blue-600 text-white rounded-[1.5rem] flex items-center justify-center shadow-2xl shadow-blue-500/20 mb-5 animate-bounce">
+              <LayoutGrid className="w-8 h-8" />
+            </div>
+            <h4 className="text-sm font-black text-slate-900 mb-1">{placeholder}</h4>
+            <p className="text-[11px] text-slate-400 font-bold max-w-[280px] text-center leading-relaxed">
+              엑셀의 셀 영역을 복사(Ctrl+C)한 뒤<br/>
+              이곳을 클릭하고 붙여넣기(Ctrl+V) 하세요.
+            </p>
+            <div className="mt-6 flex gap-2">
+              <div className="px-3 py-1 bg-slate-100 rounded-full text-[9px] font-black text-slate-400">TABS SUPPORTED</div>
+              <div className="px-3 py-1 bg-slate-100 rounded-full text-[9px] font-black text-slate-400">NEWLINES SUPPORTED</div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 type Partner = { 
   id: string; 
@@ -148,25 +318,41 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
     satisfaction: { templateId: "", pdfPath: "", googleUrl: "", excelFile: null },
     maturity: { templateId: "", pdfPath: "", googleUrl: "", excelFile: null }
   })
-  const [inputMethods, setInputMethods] = useState<{ satisfaction: "PDF" | "EXCEL" | "GOOGLE", maturity: "PDF" | "EXCEL" | "GOOGLE" }>({
-    satisfaction: "PDF",
-    maturity: "PDF"
+  const [inputMethods, setInputMethods] = useState<{ satisfaction: "DATA_INPUT" | "GOOGLE", maturity: "DATA_INPUT" | "GOOGLE" }>({
+    satisfaction: "DATA_INPUT",
+    maturity: "DATA_INPUT"
   })
-  // 엑셀 입력 포맷 선택: SEQUENTIAL(순차입력) | AGGREGATED(결과입력)
   const [excelFormats, setExcelFormats] = useState<{ satisfaction: "SEQUENTIAL" | "AGGREGATED", maturity: "SEQUENTIAL" | "AGGREGATED" }>({
     satisfaction: "SEQUENTIAL",
     maturity: "SEQUENTIAL"
   })
-  const [activeSurveyTab, setActiveSurveyTab] = useState<"SATISFACTION" | "MATURITY">("SATISFACTION")
+  const [activeSurveyTab, setActiveSurveyTab] = useState<"EVIDENCE" | "SATISFACTION" | "MATURITY">("EVIDENCE")
+  const [sessionDocuments, setSessionDocuments] = useState<any[]>([])
+  const [satisfactionGrid, setSatisfactionGrid] = useState<string[][]>([["", "", "", "", "", ""]])
+  const [maturityGrid, setMaturityGrid] = useState<string[][]>([["", "", "", "", "", ""]])
+  const [satisfactionEssays, setSatisfactionEssays] = useState<Record<string, string>>({})
+  const [maturityEssays, setMaturityEssays] = useState<Record<string, string>>({})
+  const [satisfactionQuestions, setSatisfactionQuestions] = useState<any[]>([])
+  const [maturityQuestions, setMaturityQuestions] = useState<any[]>([])
   
   const [isDragging, setIsDragging] = useState(false)
   const [templates, setTemplates] = useState<any[]>([])
   const [isOcrProcessing, setIsOcrProcessing] = useState(false)
+  const [statusMessage, setStatusMessage] = useState<{ text: string, type: 'info' | 'error' | 'success' } | null>(null)
+
+  const showStatus = (text: string, type: 'info' | 'error' | 'success' = 'info') => {
+    setStatusMessage({ text, type });
+    // Increase to 15 seconds to be absolutely sure, or until clicked
+    setTimeout(() => setStatusMessage(null), 15000);
+  };
 
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [deleteType, setDeleteType] = useState<"program" | "session" | "classday">("program")
   const [isDeleting, setIsDeleting] = useState(false)
+
+  // 세션 상세 탭 상태
+  const [sessionDetailTab, setSessionDetailTab] = useState<Record<string, "DAYS" | "SURVEY">>({})
 
   // ClassDay (교육일) states
   const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set())
@@ -203,6 +389,23 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
     fetchData()
     fetch("/api/templates").then(res => res.json()).then(setTemplates)
   }, [])
+
+  const fetchSessionDocuments = async (sessionId: string) => {
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/documents`)
+      if (res.ok) {
+        setSessionDocuments(await res.json())
+      }
+    } catch (err) {
+      console.error("Failed to fetch documents:", err)
+    }
+  }
+
+  useEffect(() => {
+    if (showSurveyModal && activeSession) {
+      fetchSessionDocuments(activeSession.id)
+    }
+  }, [showSurveyModal, activeSession])
 
   const handleProgramSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -277,237 +480,129 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
     }
   }
 
-  const handleSurveySubmit = async (e: React.FormEvent) => {
+    const getCat = (q: any) => {
+      if (!q.category) return "미지정";
+      return q.category.includes('|') ? q.category.split('|').pop() : q.category;
+    };
+
+    const handleSurveySubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!activeSession) return
+    showStatus("데이터 분석 및 저장 프로세스를 시작합니다.", "info");
+    
+    if (!activeSession) {
+      showStatus("에러: 세션 정보가 없습니다.", "error");
+      return;
+    }
     
     if (!surveyTabsData.satisfaction.templateId && !surveyTabsData.maturity.templateId) {
-      alert("적어도 하나의 평가 템플릿(만족도 또는 성숙도)을 선택해주세요.")
+      showStatus("템플릿을 선택해주세요.", "error");
       return
     }
 
-    setIsOcrProcessing(true)
+    setIsOcrProcessing(true);
 
     try {
       let totalRegistered = 0;
       for (const type of ["satisfaction", "maturity"] as const) {
         const formData = surveyTabsData[type];
         const method = inputMethods[type];
-        
         if (!formData.templateId) continue;
 
-        const qRes = await fetch(`/api/templates/${formData.templateId}`)
-        const templateData = await qRes.json()
-        const questions = templateData.questions || []
-        const selectedTemplate = templates.find(t => t.id === formData.templateId)
-
-        if (questions.length === 0) {
-          alert(`${type === "satisfaction" ? "만족도" : "성숙도"} 템플릿에 문항이 없습니다.`)
-          continue;
-        }
-
-        let mockResponses: any[] = [];
-        const getCat = (q: any) => {
-            if (!q.category) return "미지정";
-            return q.category.includes('|') ? q.category.split('|').pop() : q.category;
-        };
-
         const targetType = type === 'maturity' ? 'MATURITY' : 'SATISFACTION';
+        const qs = type === 'satisfaction' ? satisfactionQuestions : maturityQuestions;
+        const grid = type === 'satisfaction' ? satisfactionGrid : maturityGrid;
+        
+        let responses: any[] = [];
 
-        if (method === "EXCEL" && formData.excelFile) {
-            const XLSX = await import("xlsx");
-            const data = await formData.excelFile.arrayBuffer();
-            const workbook = XLSX.read(data);
-            const sheet = workbook.Sheets[workbook.SheetNames[0]];
-            const json: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-            const currentExcelFmt = excelFormats[type];
+        if (method === "DATA_INPUT") {
+            const format = excelFormats[type];
+            const mcqs = qs.filter((q: any) => q.type === 'MCQ');
+            const dataRows = grid.filter(r => r.some(c => c.trim() !== ""));
 
-            if (currentExcelFmt === "AGGREGATED") {
-              // ── 결과입력 파싱: 각 행=문항, 점수분포에서 개별 응답 복원 ──
-              const SCORE_COLS_SAT  = ["매우그렇다(5)", "그렇다(4)", "보통(3)", "그렇지않다(2)", "전혀그렇지않다(1)"]
-              const SCORE_COLS_PRE  = ["사전_매우그렇다(5)", "사전_그렇다(4)", "사전_보통(3)", "사전_그렇지않다(2)", "사전_전혀그렇지않다(1)"]
-              const SCORE_COLS_POST = ["사후_매우그렇다(5)", "사후_그렇다(4)", "사후_보통(3)", "사후_그렇지않다(2)", "사후_전혀그렇지않다(1)"]
-              const SCORE_VALS = [5, 4, 3, 2, 1]
-              const isMat = type === 'maturity'
+            const parseNum = (v: any) => {
+              if (typeof v === 'number') return v;
+              const s = String(v || "").replace(/[^0-9]/g, '');
+              return s ? parseInt(s) : 0;
+            };
 
-              // 최대 응답자 수 파악
-              let maxP = 0
-              json.forEach((row: any) => {
-                const p = Number(row["참여자"] || 0)
-                if (p > maxP) maxP = p
-              })
-              if (maxP === 0) maxP = 1
-
-              // 각 문항별 점수분포를 개인별 배열로 변환
-              const questionScores: Map<string, { pre: (number|null)[], post: (number|null)[], sat: (number|null)[] }> = new Map()
-              json.forEach((row: any) => {
-                const qContent = String(row["설문문항"] || "").trim()
-                if (!qContent) return
-                const matched = questions.find((q: any) => q.content.trim() === qContent)
-                if (!matched) return
-                const cat = getCat(matched)
-                const key = cat + "||" + qContent
-                const p = Number(row["참여자"] || maxP)
-                if (isMat) {
-                  const preArr: (number|null)[] = []
-                  const postArr: (number|null)[] = []
-                  SCORE_COLS_PRE.forEach((col, i) => {
-                    const cnt = Number(row[col] || 0)
-                    for (let k = 0; k < cnt; k++) preArr.push(SCORE_VALS[i])
-                  })
-                  SCORE_COLS_POST.forEach((col, i) => {
-                    const cnt = Number(row[col] || 0)
-                    for (let k = 0; k < cnt; k++) postArr.push(SCORE_VALS[i])
-                  })
-                  while (preArr.length < p) preArr.push(null)
-                  while (postArr.length < p) postArr.push(null)
-                  questionScores.set(key, { pre: preArr, post: postArr, sat: [] })
-                } else {
-                  const satArr: (number|null)[] = []
-                  SCORE_COLS_SAT.forEach((col, i) => {
-                    const cnt = Number(row[col] || 0)
-                    for (let k = 0; k < cnt; k++) satArr.push(SCORE_VALS[i])
-                  })
-                  while (satArr.length < p) satArr.push(null)
-                  questionScores.set(key, { pre: [], post: [], sat: satArr })
-                }
-              })
-
-              // 개인별 응답으로 재구성
-              mockResponses = Array.from({ length: maxP }).map((_, idx) => ({
+            if (format === "AGGREGATED") {
+              // 집계 데이터 -> 응답자별 데이터 시뮬레이션 (Distribute 로직)
+              const maxCount = Math.max(...dataRows.map(r => parseNum(r[2])), 1);
+              responses = Array.from({ length: maxCount }).map((_, idx) => ({
                 studentName: `응답자_${idx + 1}`,
-                researchTarget: "ELEMENTARY",
-                type: targetType,
-                answers: questions.map((q: any) => {
-                  const cat = getCat(q)
-                  const key = cat + "||" + q.content.trim()
-                  const data = questionScores.get(key)
-                  if (!data) return { questionId: q.id, score: null, preScore: null, postChange: null, textValue: "" }
-                  if (isMat) {
-                    const pre = data.pre[idx] ?? null
-                    const post = data.post[idx] ?? null
-                    return { questionId: q.id, score: post, preScore: pre, postChange: (pre !== null && post !== null) ? post - pre : null, textValue: "" }
+                answers: qs.map(q => {
+                  if (q.type === 'MCQ') {
+                    const row = dataRows.find(r => r[1].trim() === q.content.trim());
+                    if (!row) return { questionId: q.id, score: null };
+                    
+                    const counts = targetType === 'MATURITY' 
+                      ? { pre: [7,6,5,4,3].map(i => parseNum(row[i])), post: [12,11,10,9,8].map(i => parseNum(row[i])) }
+                      : { sat: [7,6,5,4,3].map(i => parseNum(row[i])) };
+
+                    const distribute = (cList: number[], cIdx: number) => {
+                      let cumulative = 0;
+                      for (let s = 5; s >= 1; s--) {
+                        cumulative += cList[5-s];
+                        if (cIdx < cumulative) return s;
+                      }
+                      return null;
+                    };
+
+                    if (targetType === 'MATURITY') {
+                      return { questionId: q.id, preScore: distribute(counts.pre, idx), score: distribute(counts.post, idx) };
+                    }
+                    return { questionId: q.id, score: distribute(counts.sat, idx) };
                   } else {
-                    return { questionId: q.id, score: data.sat[idx] ?? null, preScore: null, postChange: null, textValue: "" }
+                    const essaysMap = type === 'satisfaction' ? satisfactionEssays : maturityEssays;
+                    const texts = (essaysMap[q.id] || "").split('\n').filter(t => t.trim());
+                    return { questionId: q.id, textValue: texts[idx] || "" };
                   }
                 })
-              }))
-
+              }));
             } else {
-              // ── 순차입력 파싱: 기존 방식 (행=학생) ──
-              mockResponses = json.map((row: any) => ({
-                  studentName: row["성명"] || "알수없음",
-                  researchTarget: "ELEMENTARY",
-                  type: targetType,
-                  answers: questions.map((q: any) => {
-                      const cat = getCat(q);
-                      const isS = q.growthType === 'NONE';
-                      let score = null, preScore = null, postChange = null, textValue = "";
-
-                      if (!isS && (q.growthType === 'CHANGE' || q.growthType === 'PRE_POST')) {
-                          const pre = row[`사전_${cat}`];
-                          const post = row[`사후_${cat}`];
-                          preScore = (pre !== undefined && pre !== '') ? Number(pre) : null;
-                          score = (post !== undefined && post !== '') ? Number(post) : null;
-                          postChange = (preScore !== null && score !== null) ? score - preScore : null;
-                      } else {
-                          const val = row[`결과값_${cat}`] ?? row[`주관식_${cat}`] ?? row[cat];
-                          if (q.type === 'ESSAY') textValue = val || "";
-                          else score = (val !== undefined && val !== '') ? Number(val) : null;
-                      }
-                      return { questionId: q.id, score, preScore, postChange, textValue };
-                  })
+              // 순차 데이터 (그리드 1행 = 1응답자)
+              responses = dataRows.map((row, idx) => ({
+                studentName: row[1] || `응답자_${idx + 1}`,
+                answers: mcqs.map((q, qIdx) => {
+                   if (targetType === 'MATURITY') {
+                     return { questionId: q.id, preScore: parseNum(row[2 + qIdx]), score: parseNum(row[2 + mcqs.length + qIdx]) };
+                   }
+                   return { questionId: q.id, score: parseNum(row[2 + qIdx]) };
+                }).concat(qs.filter(q => q.type === 'ESSAY').map(q => {
+                   const essaysMap = type === 'satisfaction' ? satisfactionEssays : maturityEssays;
+                   const texts = (essaysMap[q.id] || "").split('\n').filter(t => t.trim());
+                   return { questionId: q.id, textValue: texts[idx] || "" };
+                }))
               }));
             }
-        } else {
-            // Simulation
-            const mockCount = method === "PDF" ? 5 : method === "EXCEL" ? 10 : 25
-            mockResponses = Array.from({ length: mockCount }).map((_, idx) => ({
-              studentName: `학생_${idx + 1}`,
-              researchTarget: "ELEMENTARY",
-              type: targetType,
-              answers: questions.map((q: any, qIdx: number) => {
-                  let score: number | null = null, preScore: number | null = null, postChange: number | null = null, textValue = "";
-                  
-                  if (q.growthType === 'CHANGE' || q.growthType === 'PRE_POST') {
-                      const preMark = Math.floor(Math.random() * 3) + 2;
-                      const improvement = Math.random() > 0.3 ? (Math.random() > 0.8 ? 2 : 1) : 0;
-                      const postMark = Math.min(5, preMark + improvement);
-                      
-                      if (q.growthType === 'CHANGE') {
-                          preScore = preMark;
-                          postChange = postMark - preMark;
-                          score = postMark;
-                      } else {
-                          preScore = preMark;
-                          score = postMark;
-                      }
-                  } else if (q.type === 'MCQ') {
-                      score = Math.floor(Math.random() * 2) + 4;
-                  } else if (q.type === 'ESSAY') {
-                      const essaySentences = ["친구들과 조를 짜서 문제 해결을 한 과정이 가장 기억에 남습니다.", "선생님이 알려주신 나의 장점 키워드들이 힘이 되었습니다.", "어렵게 느껴졌던 기술들을 직접 체험해보니 자신감이 생겼습니다.", "다음에는 코딩뿐만 아니라 디자인 수업도 들어보고 싶습니다.", "오늘 배운 내용을 친구들에게도 알려주고 싶어요."];
-                      textValue = essaySentences[Math.floor(Math.random() * essaySentences.length)];
-                  }
-                  
-                  if (Math.random() < 0.01) {
-                      score = null; preScore = null; postChange = null;
-                  }
-                  return { questionId: q.id, score, preScore, postChange, textValue };
-              })
-            }))
         }
 
-        if (mockResponses.length > 0) {
-          totalRegistered += mockResponses.length;
-          await fetch("/api/responses/bulk", {
+        if (responses.length > 0) {
+          const res = await fetch(`/api/sessions/${activeSession.id}/surveys`, {
             method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              sessionId: activeSession.id,
               templateId: formData.templateId,
-              responses: mockResponses
-            }),
-            headers: { "Content-Type": "application/json" }
+              type: targetType,
+              responses
+            })
           });
-          
-          const docType = targetType === 'SATISFACTION' ? 'SATISFACTION' : 'COMPETENCY';
-
-          if (method === "PDF" && formData.pdfPath) {
-            await fetch(`/api/sessions/${activeSession.id}/documents`, {
-              method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ type: docType, category: "PDF_EVIDENCE", fileName: formData.pdfPath, description: `PDF 증빙 문서` })
-            });
+          if (!res.ok) {
+            const errData = await res.json();
+            throw new Error(`[${type}] ${errData.error || "데이터 저장 실패"}`);
           }
-
-          if (method === "EXCEL" && formData.excelFile) {
-            const uploadData = new FormData();
-            uploadData.append("file", formData.excelFile);
-            const uploadRes = await fetch("/api/upload", { method: "POST", body: uploadData });
-            if (uploadRes.ok) {
-              const { fileName, sha256 } = await uploadRes.json();
-              await fetch(`/api/sessions/${activeSession.id}/documents`, {
-                method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ type: "DATA_SOURCE", category: "EXCEL_DATA", fileName: fileName, description: `엑셀 원본` })
-              });
-            }
-          }
-
-          if (method === "GOOGLE" && formData.googleUrl) {
-            await fetch(`/api/sessions/${activeSession.id}/documents`, {
-              method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ type: docType, category: "GOOGLE_FORM", googleFormUrl: formData.googleUrl, description: "구글폼 원본" })
-            });
-          }
+          totalRegistered += responses.length;
         }
       }
 
-      alert(`총 ${totalRegistered}건의 데이터가 등록/업데이트 되었습니다.`);
-      setShowSurveyModal(false);
-      fetchData();
-    } catch (err) {
-      console.error(err)
-      alert("데이터 처리 중 오류가 발생했습니다.")
+      showStatus(`성공적으로 데이터를 저장했습니다. (총 ${totalRegistered}명 응답 등록)`, "success");
+      await fetchData(true);
+      setTimeout(() => setShowSurveyModal(false), 2000);
+    } catch (err: any) {
+      console.error(err);
+      showStatus(`오류 발생: ${err.message}`, "error");
     } finally {
-      setIsOcrProcessing(false)
+      setIsOcrProcessing(false);
     }
   }
 
@@ -544,54 +639,55 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
 
       if (format === "SEQUENTIAL") {
         // ── 순차입력: 학생별 1행씩 ──
-        const headers = ["성명"]
+        const headers = ["응답순번", "성명"]
         if (isMat) {
           questions.forEach((q: any) => headers.push(`사전_${getCat(q)}`))
           questions.forEach((q: any) => headers.push(`사후_${getCat(q)}`))
         } else {
-          questions.forEach((q: any) => headers.push(`결과값_${getCat(q)}`))
+          questions.forEach((q: any) => headers.push(`점수_${getCat(q)}`))
         }
         essayQs.forEach((q: any) => headers.push(`주관식_${getCat(q)}`))
 
-        const dataRows = [headers]
-        for (let i = 1; i <= 5; i++) dataRows.push([`학생_${i}`])
+        const dataRows = [
+          ["순차입력 양식: 응답자별 데이터를 한 행씩 입력해 주세요. (점수: 1~5점)"],
+          headers
+        ]
+        for (let i = 1; i <= 30; i++) {
+          const row = [i, `응답자_${i}`]
+          dataRows.push(row)
+        }
 
         const ws = XLSX.utils.aoa_to_sheet(dataRows)
-        // Column widths
-        ws['!cols'] = headers.map((_, i) => ({ wch: i === 0 ? 10 : 18 }))
+        ws['!cols'] = headers.map((_, i) => ({ wch: i <= 1 ? 10 : 15 }))
         XLSX.utils.book_append_sheet(wb, ws, "순차입력")
 
       } else {
         // ── 결과입력: 구분별 응답 집계 표 ──
-        // 헤더 행
         const scoreLabels = isMat
-          ? ["구분", "설문문항", "참여자", "사전_매우그렇다(5)", "사전_그렇다(4)", "사전_보통(3)", "사전_그렇지않다(2)", "사전_전혀그렇지않다(1)", "사전_평균", "사후_매우그렇다(5)", "사후_그렇다(4)", "사후_보통(3)", "사후_그렇지않다(2)", "사후_전혀그렇지않다(1)", "사후_평균"]
-          : ["구분", "설문문항", "참여자", "매우그렇다(5)", "그렇다(4)", "보통(3)", "그렇지않다(2)", "전혀그렇지않다(1)", "평균"]
+          ? ["구분", "설문문항", "응답인원(계)", "사전_5점", "사전_4점", "사전_3점", "사전_2점", "사전_1점", "사후_5점", "사후_4점", "사후_3점", "사후_2점", "사후_1점"]
+          : ["구분", "설문문항", "응답인원(계)", "5점(매우만족)", "4점(만족)", "3점(보통)", "2점(불만족)", "1점(매우불만족)"]
 
-        const dataRows: any[][] = [scoreLabels]
-        // 구분별 그룹화
-        const catMap = new Map<string, any[]>()
-        questions.forEach((q: any) => {
-          const cat = getCat(q)
-          if (!catMap.has(cat)) catMap.set(cat, [])
-          catMap.get(cat)!.push(q)
+        const dataRows: any[][] = [
+          [`결과입력 양식: 문항별로 각 점수에 해당하는 응답자 수를 입력해 주세요.`],
+          scoreLabels
+        ]
+        
+        const qList = questions.length > 0 ? questions : []
+        qList.forEach((q: any) => {
+          const row = isMat
+            ? [getCat(q), q.content, "", "", "", "", "", "", "", "", "", "", ""]
+            : [getCat(q), q.content, "", "", "", "", "", ""]
+          dataRows.push(row)
         })
-        catMap.forEach((qs, catName) => {
-          qs.forEach((q, idx) => {
-            const row = isMat
-              ? [idx === 0 ? catName : "", q.content, 0, "", "", "", "", "", "=IFERROR(SUMPRODUCT((D{r}:H{r})*{5,4,3,2,1})/I{r},\"\")",  "", "", "", "", "", ""]
-              : [idx === 0 ? catName : "", q.content, 0, "", "", "", "", "", ""]
-            dataRows.push(row)
-          })
-        })
-        // 주관식 항목 추가
+
         if (essayQs.length > 0) {
-          dataRows.push([""])  // 빈 행
-          dataRows.push(["[주관식 응답]"])
-          dataRows.push(isMat ? ["구분", "설문문항", "응답내용"] : ["구분", "설문문항", "응답내용"])
+          dataRows.push([])
+          dataRows.push(["[주관식/서술형 응답 입력]"])
+          dataRows.push(["구분", "설문문항", "내용(콤마(,)로 구분하여 입력하거나 여러 행에 입력)"])
           essayQs.forEach((q: any) => {
             dataRows.push([getCat(q), q.content, ""])
-            for (let i = 0; i < 4; i++) dataRows.push(["", "", ""]) // 5줄 입력 공간
+            dataRows.push(["", "", ""])
+            dataRows.push(["", "", ""])
           })
         }
 
@@ -894,6 +990,28 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
 
   return (
     <div className="space-y-12 animate-in fade-in duration-300 pb-20">
+      {/* Status Message Overlay */}
+      {statusMessage && (
+        <div 
+          onClick={() => setStatusMessage(null)}
+          className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-top-10 duration-500 cursor-pointer group"
+        >
+          <div className={cn(
+            "px-10 py-6 rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] flex items-center gap-6 border-4 min-w-[450px] backdrop-blur-xl transition-all hover:scale-105",
+            statusMessage.type === 'error' ? "bg-red-600 border-red-400 text-white" : 
+            statusMessage.type === 'success' ? "bg-emerald-600 border-emerald-400 text-white" : 
+            "bg-slate-900/95 border-slate-700 text-white"
+          )}>
+            {statusMessage.type === 'error' ? <AlertCircle className="w-10 h-10 animate-bounce" /> : 
+             statusMessage.type === 'success' ? <Plus className="w-10 h-10 rotate-45" /> : 
+             <Clock className="w-10 h-10 animate-spin text-blue-400" />}
+            <div className="flex flex-col">
+              <span className="text-lg font-black tracking-tight leading-tight">{statusMessage.text}</span>
+              <span className="text-[10px] font-bold text-white/50 uppercase mt-1">클릭하여 이 메시지 닫기 (또는 15초 후 자동 종료)</span>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between border-b border-slate-200 pb-6">
         <div>
           <h2 className="text-2xl md:text-3xl font-black tracking-tight text-slate-900">사업 관리</h2>
@@ -1019,12 +1137,7 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
                                     size="sm" 
                                     onClick={() => { 
                                       setActiveSession(session); 
-                                      setSurveyTabsData({
-                                        satisfaction: { templateId: "", pdfPath: "", googleUrl: "", excelFile: null },
-                                        maturity: { templateId: "", pdfPath: "", googleUrl: "", excelFile: null }
-                                      });
-                                      setInputMethods({ satisfaction: "PDF", maturity: "PDF" });
-                                      setActiveSurveyTab("SATISFACTION");
+                                      setActiveSurveyTab("EVIDENCE");
                                       setShowSurveyModal(true); 
                                     }}
                                     className="h-8 md:h-9 px-2 md:px-3 text-blue-600 font-black hover:bg-blue-50 rounded-xl flex gap-1 items-center transition-all active:scale-95 border border-blue-100 whitespace-nowrap text-[10px] md:text-sm"
@@ -1056,103 +1169,113 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
                             </td>
                           </tr>
                           
-                          {/* Tree Connector Styling for ClassDays */}
+                          {/* ── 세션 상세 영역 (탭 시스템 적용) ── */}
                           {isExpanded && (
-                            <tr className="bg-slate-50/20">
-                              <td colSpan={8} className="p-0">
-                                <div className="relative ml-12 pl-8 pb-4 border-l-2 border-blue-200">
-                                  {hasClassDays ? (
-                                    <table className="w-full text-xs border-collapse">
-                                      <thead>
-                                        <tr className="text-[10px] font-black text-slate-400 uppercase border-b border-slate-100">
-                                          <th className="px-4 py-2 text-left">수업일</th>
-                                          <th className="px-4 py-2 text-left">시간</th>
-                                          <th className="px-4 py-2 text-left">수업명</th>
-                                          <th className="px-4 py-2 text-center">정원</th>
-                                          <th className="px-4 py-2 text-center">참여</th>
-                                          <th className="px-4 py-2 text-center">관리</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody className="divide-y divide-slate-50">
-                                        {session.classDays.map((cd, idx) => (
-                                          <tr key={cd.id} className="group/cd-row hover:bg-white transition-colors relative">
-                                            {/* Connector Horizontal Line */}
-                                            <div className="absolute -left-[34px] top-1/2 w-8 border-t-2 border-blue-200"></div>
-                                            
-                                            <td className="px-4 py-3 font-bold text-slate-600 whitespace-nowrap">
-                                              <div className="flex items-center gap-2">
-                                                <CalendarDays className="w-3.5 h-3.5 text-blue-400" />
-                                                {formatClassDayDate(cd.date)}
-                                              </div>
-                                            </td>
-                                            <td className="px-4 py-3 font-bold text-slate-500 whitespace-nowrap">
-                                              {idx + 1}일차
-                                            </td>
-                                            <td className="px-4 py-3 font-bold text-slate-800">{cd.title || "-"}</td>
-                                            <td className="px-4 py-3 text-center font-bold text-slate-500">{cd.capacity}</td>
-                                            <td className="px-4 py-3 text-center font-black text-blue-600">{cd.participantCount}</td>
-                                            <td className="px-4 py-3">
-                                              <div className="flex items-center justify-center gap-1">
-                                                {!isMember && (
-                                                  <Button 
-                                                    variant="ghost" 
-                                                    size="sm" 
-                                                    onClick={(e) => { 
-                                                      e.stopPropagation();
-                                                      setActiveSession(session); 
-                                                      setSurveyTabsData({
-                                                        satisfaction: { templateId: "", pdfPath: "", googleUrl: "", excelFile: null },
-                                                        maturity: { templateId: "", pdfPath: "", googleUrl: "", excelFile: null }
-                                                      });
-                                                      setInputMethods({ satisfaction: "PDF", maturity: "PDF" });
-                                                      setActiveSurveyTab("SATISFACTION");
-                                                      setShowSurveyModal(true); 
-                                                    }}
-                                                    className="h-7 px-2 text-blue-600 font-black hover:bg-blue-50 rounded-lg border border-blue-100 flex gap-1 items-center transform transition-all active:scale-95 text-[9px] mr-1"
-                                                  >
-                                                    <FilePlus2 className="w-2.5 h-2.5" /> 입력
-                                                  </Button>
-                                                )}
-                                                {canEdit && (
-                                                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); openClassDayModal(session.id, cd); }} className="h-7 w-7 p-0 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg">
-                                                    <Pencil className="h-3 w-3" />
-                                                  </Button>
-                                                )}
-                                                {canDelete && (
-                                                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setDeleteId(cd.id); setDeleteType("classday"); setIsDeleteConfirmOpen(true); }} className="h-7 w-7 p-0 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg">
-                                                    <Trash2 className="h-3 w-3" />
-                                                  </Button>
-                                                )}
-                                              </div>
-                                            </td>
-                                          </tr>
-                                        ))}
-                                      </tbody>
-                                    </table>
-                                  ) : (
-                                    <div className="py-6 px-4 text-center">
-                                      <div className="absolute -left-[34px] top-1/2 w-8 border-t-2 border-blue-200"></div>
-                                      <CalendarDays className="w-8 h-8 text-slate-200 mx-auto mb-2" />
-                                      <p className="text-xs font-bold text-slate-400 italic">등록된 수업일이 없습니다.</p>
-                                      <p className="text-[10px] text-slate-300 mt-1">아래 버튼으로 수업일을 추가해 주세요.</p>
+                            <tr>
+                              <td colSpan={8} className="p-0 border-b border-slate-100 bg-slate-50/10">
+                                <div className="p-8 animate-in slide-in-from-top-2 duration-500">
+                                  <div className="bg-white rounded-[3rem] border border-slate-100 shadow-2xl shadow-slate-200/20 overflow-hidden">
+                                    {/* 탭 헤더 */}
+                                    <div className="flex bg-slate-50/50 border-b border-slate-100 px-8">
+                                      <button 
+                                        onClick={(e) => { e.stopPropagation(); setSessionDetailTab(prev => ({ ...prev, [session.id]: "DAYS" })); }}
+                                        className={cn(
+                                          "px-8 py-5 text-xs font-black transition-all border-b-2 tracking-widest uppercase",
+                                          (sessionDetailTab[session.id] || "DAYS") === "DAYS" 
+                                            ? "border-blue-600 text-blue-600 bg-white" 
+                                            : "border-transparent text-slate-400 hover:text-slate-600"
+                                        )}
+                                      >
+                                        Class Days Info
+                                      </button>
+                                      <button 
+                                        onClick={(e) => { e.stopPropagation(); setSessionDetailTab(prev => ({ ...prev, [session.id]: "SURVEY" })); }}
+                                        className={cn(
+                                          "px-8 py-5 text-xs font-black transition-all border-b-2 tracking-widest uppercase",
+                                          sessionDetailTab[session.id] === "SURVEY" 
+                                            ? "border-indigo-600 text-indigo-600 bg-white" 
+                                            : "border-transparent text-slate-400 hover:text-slate-600"
+                                        )}
+                                      >
+                                        Survey Management
+                                      </button>
                                     </div>
-                                  )}
+
+                                    {/* 탭 컨텐츠 */}
+                                    <div className="p-8">
+                                      {(sessionDetailTab[session.id] || "DAYS") === "DAYS" ? (
+                                        <div className="space-y-6">
+                                          <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl">
+                                            <div className="flex items-center gap-3">
+                                              <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                                                <CalendarDays className="w-5 h-5 text-blue-600" />
+                                              </div>
+                                              <div>
+                                                <h4 className="text-sm font-black text-slate-900">상세 교육 일정 리스트</h4>
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Class Schedule Tracking</p>
+                                              </div>
+                                            </div>
+                                            {canEdit && (
+                                              <Button 
+                                                size="sm" 
+                                                onClick={(e) => { e.stopPropagation(); openClassDayModal(session.id); }}
+                                                className="h-10 px-6 bg-slate-900 text-white font-black rounded-xl text-[10px] shadow-lg shadow-slate-900/10 transition-all active:scale-95"
+                                              >
+                                                <Plus className="w-3.5 h-3.5 mr-1" />
+                                                교육일 추가
+                                              </Button>
+                                            )}
+                                          </div>
+                                          
+                                          {hasClassDays ? (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                              {session.classDays.sort((a,b) => (a.order || 0) - (b.order || 0)).map((cd, idx) => (
+                                                <div key={cd.id} className="group p-6 bg-white border border-slate-100 hover:border-blue-200 hover:shadow-2xl hover:shadow-blue-500/5 rounded-[2rem] transition-all relative overflow-hidden">
+                                                  <div className="flex justify-between items-start mb-4">
+                                                    <div className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[9px] font-black tracking-widest uppercase">
+                                                      {idx + 1} DAY LESSON
+                                                    </div>
+                                                    {canEdit && (
+                                                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button onClick={(e) => { e.stopPropagation(); openClassDayModal(session.id, cd); }} className="p-2 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"><Pencil className="w-4 h-4" /></button>
+                                                        <button onClick={(e) => { e.stopPropagation(); setDeleteId(cd.id); setDeleteType("classday"); setIsDeleteConfirmOpen(true); }} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"><Trash2 className="w-4 h-4" /></button>
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                  <h5 className="text-sm font-black text-slate-900 mb-3 truncate">{cd.title || `${cd.order}일차 수업`}</h5>
+                                                  <div className="flex flex-col gap-2">
+                                                     <div className="flex items-center gap-2 text-[11px] font-bold text-slate-500">
+                                                        <CalendarDays className="w-3.5 h-3.5 opacity-40" /> 
+                                                        {formatClassDayDate(cd.date)}
+                                                     </div>
+                                                     <div className="flex items-center gap-4">
+                                                        <div className="flex items-center gap-2 text-[11px] font-bold text-slate-500">
+                                                          <Clock className="w-3.5 h-3.5 opacity-40" /> 
+                                                          {formatClassDayTime(cd.startTime)} ~ {formatClassDayTime(cd.endTime)}
+                                                        </div>
+                                                        <div className="flex items-center gap-2 text-[11px] font-black text-blue-600">
+                                                          <Users className="w-3.5 h-3.5 opacity-40" /> 
+                                                          {cd.participantCount}명 출석
+                                                        </div>
+                                                     </div>
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <div className="py-20 text-center bg-slate-50/50 rounded-[2.5rem] border-2 border-dashed border-slate-200">
+                                              <p className="text-sm font-black text-slate-300 italic">등록된 상세 교육 일정이 없습니다.</p>
+                                            </div>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+                                          <SurveyAdminTab sessionId={session.id} />
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
                                 </div>
-                              </td>
-                            </tr>
-                          )}
-  
-                          {/* Add ClassDay button - show when expanded */}
-                          {isExpanded && canEdit && (
-                            <tr className="bg-slate-50/30">
-                              <td colSpan={8} className="pl-14 py-2">
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); openClassDayModal(session.id); }}
-                                  className="flex items-center gap-2 px-4 py-2 text-[11px] font-bold text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-xl transition-all"
-                                >
-                                  <Plus className="w-3.5 h-3.5" />
-                                  수업일 추가
-                                </button>
                               </td>
                             </tr>
                           )}
@@ -1573,7 +1696,7 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
       {/* Survey Entry Modal */}
       {showSurveyModal && activeSession && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <Card className="w-full max-w-lg border-none shadow-2xl rounded-[2.5rem] bg-white overflow-hidden p-0 flex flex-col max-h-[90vh]">
+          <Card className="w-full max-w-[1200px] w-[95vw] border-none shadow-2xl rounded-[2.5rem] bg-white overflow-hidden p-0 flex flex-col h-[90vh]">
             <div className="bg-slate-900 px-8 py-6 text-white flex justify-between items-center shrink-0">
               <div>
                 <h3 className="text-xl font-black">설문 결과 입력</h3>
@@ -1583,6 +1706,16 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
             </div>
             
             <div className="flex bg-slate-100 p-2 mx-8 mt-6 rounded-2xl shrink-0">
+              <button
+                type="button"
+                onClick={() => setActiveSurveyTab("EVIDENCE")}
+                className={cn(
+                  "flex-1 py-3 text-sm font-black rounded-xl transition-all",
+                  activeSurveyTab === "EVIDENCE" ? "bg-white text-blue-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                )}
+              >
+                증빙서류
+              </button>
               <button
                 type="button"
                 onClick={() => setActiveSurveyTab("SATISFACTION")}
@@ -1601,11 +1734,107 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
                   activeSurveyTab === "MATURITY" ? "bg-white text-blue-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
                 )}
               >
-                성숙도 조사
+                성품/성숙도
               </button>
             </div>
 
             <form onSubmit={handleSurveySubmit} className="flex flex-col flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+              {/* Evidence Tab Content */}
+              {activeSurveyTab === "EVIDENCE" && (
+                <div className="p-8 space-y-6 animate-in fade-in">
+                  <div className="space-y-4">
+                    <label className="text-xs font-black text-slate-400 ml-1 uppercase">증빙서류(PDF/이미지) 업로드</label>
+                    <label 
+                      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                      onDragLeave={() => setIsDragging(false)}
+                      onDrop={async (e) => {
+                        e.preventDefault();
+                        setIsDragging(false);
+                        const file = e.dataTransfer.files[0];
+                        if (file) {
+                          const formData = new FormData();
+                          formData.append("file", file);
+                          const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
+                          if (uploadRes.ok) {
+                            const { fileName } = await uploadRes.json();
+                            await fetch(`/api/sessions/${activeSession.id}/documents`, {
+                              method: "POST", headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ type: "EVIDENCE", category: "PDF_EVIDENCE", fileName: fileName, description: `증빙 서류: ${file.name}` })
+                            });
+                            fetchSessionDocuments(activeSession.id);
+                            showStatus("증빙서류가 업로드되었습니다.", "success");
+                          }
+                        }
+                      }}
+                      className={cn(
+                          "relative h-40 border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center transition-all cursor-pointer overflow-hidden",
+                          isDragging ? "border-blue-500 bg-blue-50/50 scale-[1.02]" : "border-slate-200 bg-slate-50 hover:bg-slate-100"
+                      )}
+                    >
+                      <input type="file" accept=".pdf,image/*" className="hidden" onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const formData = new FormData();
+                          formData.append("file", file);
+                          const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
+                          if (uploadRes.ok) {
+                            const { fileName } = await uploadRes.json();
+                            await fetch(`/api/sessions/${activeSession.id}/documents`, {
+                              method: "POST", headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ type: "EVIDENCE", category: "PDF_EVIDENCE", fileName: fileName, description: `증빙 서류: ${file.name}` })
+                            });
+                            fetchSessionDocuments(activeSession.id);
+                            showStatus("증빙서류가 업로드되었습니다.", "success");
+                          }
+                        }
+                      }} />
+                      <div className="flex flex-col items-center gap-2">
+                        <UploadCloud className={cn("w-10 h-10 text-slate-400", isDragging && "animate-bounce text-blue-500")} />
+                        <p className="text-xs font-bold text-slate-700">증빙 문서(PDF, 이미지)를 업로드하세요</p>
+                        <p className="text-[10px] text-slate-400">드래그하거나 클릭하여 파일 선택</p>
+                      </div>
+                    </label>
+
+                    {sessionDocuments.filter(d => d.type === 'EVIDENCE' || d.category === 'PDF_EVIDENCE').length > 0 && (
+                      <div className="space-y-2 mt-4">
+                        <label className="text-xs font-black text-slate-400 ml-1 uppercase">등록된 증빙서류 목록</label>
+                        <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                          {sessionDocuments.filter(d => d.type === 'EVIDENCE' || d.category === 'PDF_EVIDENCE').map((doc, idx) => (
+                            <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100 group">
+                              <div className="flex items-center gap-3 overflow-hidden">
+                                <FileText className="w-4 h-4 text-blue-400 shrink-0" />
+                                <span className="text-[11px] font-bold text-slate-600 truncate">{doc.fileName}</span>
+                              </div>
+                              <div className="flex gap-1 shrink-0">
+                                <button 
+                                  type="button" 
+                                  onClick={() => window.open(`/api/download?file=${encodeURIComponent(doc.fileName)}`, '_blank')}
+                                  className="p-1.5 hover:bg-white rounded-lg text-slate-400 hover:text-blue-600 transition-colors"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                </button>
+                                <button 
+                                  type="button" 
+                                  onClick={async () => {
+                                    if(confirm("이 증빙서류를 삭제하시겠습니까?")) {
+                                      await fetch(`/api/sessions/documents/${doc.id}`, { method: "DELETE" });
+                                      fetchSessionDocuments(activeSession.id);
+                                    }
+                                  }}
+                                  className="p-1.5 hover:bg-white rounded-lg text-slate-400 hover:text-red-500 transition-colors"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {["satisfaction", "maturity"].map((type) => {
                 const isSat = type === "satisfaction";
                 const isActive = (isSat && activeSurveyTab === "SATISFACTION") || (!isSat && activeSurveyTab === "MATURITY");
@@ -1620,7 +1849,46 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
                         <label className="text-xs font-black text-slate-400 ml-1 uppercase">{isSat ? '만족도' : '성숙도'} 평가 템플릿 선택</label>
                         <select 
                           value={currentData.templateId} 
-                          onChange={e => setSurveyTabsData(prev => ({...prev, [tName]: {...prev[tName], templateId: e.target.value}}))} 
+                          onChange={async (e) => {
+                            const tid = e.target.value;
+                            setSurveyTabsData(prev => ({...prev, [tName]: {...prev[tName], templateId: tid}}));
+                            if (tid) {
+                              const res = await fetch(`/api/templates/${tid}`);
+                              const data = await res.json();
+                              const qs = data.questions || [];
+                              const getMCQs = (list: any[]) => list.filter((q: any) => q.type === 'MCQ');
+                              const getCat = (q: any) => {
+                                const cat = q.category || "미지정";
+                                return cat.includes('|') ? cat.split('|').pop() : cat;
+                              };
+
+                              if (tName === 'satisfaction') {
+                                setSatisfactionQuestions(qs);
+                                const isAgg = excelFormats.satisfaction === 'AGGREGATED';
+                                if (isAgg) {
+                                  setSatisfactionGrid(getMCQs(qs).map(q => [getCat(q), q.content, "", "", "", "", "", ""]));
+                                } else {
+                                  setSatisfactionGrid([new Array(getMCQs(qs).length + 2).fill("")]);
+                                }
+                                
+                                const essayInit: Record<string, string> = {};
+                                qs.filter((q: any) => q.type === 'ESSAY').forEach((q: any) => { essayInit[q.id] = ""; });
+                                setSatisfactionEssays(essayInit);
+                              } else {
+                                setMaturityQuestions(qs);
+                                const isAgg = excelFormats.maturity === 'AGGREGATED';
+                                if (isAgg) {
+                                  setMaturityGrid(getMCQs(qs).map(q => [getCat(q), q.content, "", "", "", "", "", "", "", "", "", "", ""]));
+                                } else {
+                                  setMaturityGrid([new Array(getMCQs(qs).length + 2).fill("")]);
+                                }
+                                
+                                const essayInit: Record<string, string> = {};
+                                qs.filter((q: any) => q.type === 'ESSAY').forEach((q: any) => { essayInit[q.id] = ""; });
+                                setMaturityEssays(essayInit);
+                              }
+                            }
+                          }} 
                           className="w-full h-12 px-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"
                         >
                           <option value="">적용할 템플릿을 선택하세요 (선택안함 시 무시)</option>
@@ -1634,79 +1902,208 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
                         <div className="space-y-3 animate-in fade-in slide-in-from-top-2 p-1 pt-4 border-t border-slate-100">
                           <label className="text-xs font-black text-slate-400 ml-1 uppercase">입력 방법 선택</label>
                           <div className="flex p-1 bg-slate-100 rounded-2xl gap-1">
-                              {[
-                                { id: 'PDF', label: 'PDF 입력', icon: UploadCloud },
-                                { id: 'EXCEL', label: '엑셀 입력', icon: FilePlus2 },
-                                { id: 'GOOGLE', label: '구글폼 연동', icon: Link }
-                              ].map(method => (
-                                <button
-                                  key={method.id}
-                                  type="button"
-                                  onClick={() => setInputMethods(prev => ({...prev, [tName]: method.id as any}))}
-                                  className={cn(
-                                    "flex-1 h-10 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all",
-                                    currentMethod === method.id ? "bg-white text-blue-600 shadow-sm shadow-slate-200" : "text-slate-400 hover:text-slate-600"
-                                  )}
-                                >
-                                  <method.icon className="w-3.5 h-3.5" />
-                                  {method.label}
-                                </button>
-                              ))}
+                                {[
+                                  { id: 'DATA_INPUT', label: '데이터 직접 입력', icon: LayoutGrid },
+                                  { id: 'EXCEL_UPLOAD', label: '엑셀 파일 일괄 업로드', icon: FileSpreadsheet },
+                                  { id: 'GOOGLE', label: '구글폼 시트 연동', icon: Link }
+                                ].map(method => (
+                                  <button
+                                    key={method.id}
+                                    type="button"
+                                    onClick={() => setInputMethods(prev => ({...prev, [tName]: method.id as any}))}
+                                    className={cn(
+                                      "flex-1 h-10 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all",
+                                      currentMethod === method.id ? "bg-white text-blue-600 shadow-sm shadow-slate-200" : "text-slate-400 hover:text-slate-600"
+                                    )}
+                                  >
+                                    <method.icon className="w-3.5 h-3.5" />
+                                    {method.label}
+                                  </button>
+                                ))}
                           </div>
                         </div>
                       )}
 
-                      {currentData.templateId && currentMethod === 'PDF' && (
-                        <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                          <label className="text-xs font-black text-slate-400 ml-1 uppercase leading-none mb-1 block">결과 PDF/이미지 파일 (Drag & Drop)</label>
-                          <label 
-                            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                            onDragLeave={() => setIsDragging(false)}
-                            onDrop={(e) => handleFileDrop(e, tName)}
-                            className={cn(
-                                "relative h-40 border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center transition-all cursor-pointer overflow-hidden",
-                                isDragging ? "border-blue-500 bg-blue-50/50 scale-[1.02]" : "border-slate-200 bg-slate-50 hover:bg-slate-100",
-                                currentData.pdfPath ? "border-emerald-500 bg-emerald-50/20" : ""
-                            )}
-                          >
-                            <input type="file" accept=".pdf,image/*" className="hidden" onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) setSurveyTabsData(prev => ({...prev, [tName]: {...prev[tName], pdfPath: file.name}}));
-                            }} />
-                            {currentData.pdfPath ? (
-                                <div className="flex flex-col items-center gap-2 animate-in zoom-in-95">
-                                    <div className="w-10 h-10 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-lg">
-                                        <FilePlus2 className="w-5 h-5" />
+                      {currentData.templateId && currentMethod === 'EXCEL_UPLOAD' && (
+                        <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                          {/* Step 1: File Selection */}
+                          <div className="relative h-48 border-2 border-dashed border-slate-200 rounded-[2.5rem] flex flex-col items-center justify-center transition-all bg-slate-50 hover:bg-white hover:border-blue-400 group">
+                            <input 
+                              type="file" 
+                              accept=".xlsx, .xls"
+                              className="absolute inset-0 opacity-0 cursor-pointer"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                setIsImporting(true);
+                                try {
+                                  const template = templates.find(t => t.id === currentData.templateId);
+                                  const result = await parseSurveyExcel(
+                                    file, 
+                                    template, 
+                                    isSat ? "SATISFACTION" : "MATURITY", 
+                                    excelFormats[tName]
+                                  );
+                                  if (result.isValid) {
+                                    setSurveyPreviewData({ ...result.previewData, fileName: file.name });
+                                    showStatus(`${file.name} 파싱 완료. 매칭 결과를 확인하세요.`, "success");
+                                  } else {
+                                    showStatus(result.errors.join(", "), "error");
+                                  }
+                                } finally {
+                                  setIsImporting(false);
+                                }
+                              }}
+                            />
+                            <div className="flex flex-col items-center gap-3">
+                              <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                                {isImporting ? <Loader2 className="w-7 h-7 animate-spin" /> : <FileSpreadsheet className="w-7 h-7" />}
+                              </div>
+                              <div className="text-center">
+                                <p className="text-sm font-black text-slate-800">엑셀 파일을 선택하거나 드래그하세요</p>
+                                <p className="text-[11px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Supports .xlsx, .xls (Max 10MB)</p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Step 2: Preview Results */}
+                          {surveyPreviewData && (
+                            <div className="p-6 bg-slate-900 rounded-[2.5rem] text-white space-y-4 animate-in zoom-in-95">
+                              <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">
+                                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                                  </div>
+                                  <div>
+                                    <h4 className="text-sm font-black">데이터 매칭 미리보기</h4>
+                                    <p className="text-[10px] font-bold text-slate-400">{surveyPreviewData.fileName}</p>
+                                  </div>
+                                </div>
+                                <div className="flex gap-2">
+                                  <Badge variant="outline" className="bg-emerald-500/10 border-emerald-500/20 text-emerald-400 font-black">
+                                    {Array.isArray(surveyPreviewData) ? surveyPreviewData.length : 0}명 응답자 감지
+                                  </Badge>
+                                </div>
+                              </div>
+                              
+                              <div className="max-h-60 overflow-y-auto pr-2 custom-scrollbar space-y-2">
+                                {(Array.isArray(surveyPreviewData) ? surveyPreviewData.slice(0, 5) : []).map((row: any, idx: number) => (
+                                  <div key={idx} className="p-3 bg-white/5 rounded-xl border border-white/10 flex justify-between items-center">
+                                    <span className="text-[11px] font-black opacity-60">#{idx+1} {row.respondentId}</span>
+                                    <div className="flex gap-1">
+                                      {row.answers.slice(0, 4).map((ans: any, aidx: number) => (
+                                        <div key={aidx} className="w-6 h-6 bg-white/10 rounded flex items-center justify-center text-[10px] font-black">
+                                          {ans.score || '-'}
+                                        </div>
+                                      ))}
+                                      {row.answers.length > 4 && <div className="text-[10px] font-black opacity-40 self-center ml-1">...</div>}
                                     </div>
-                                    <span className="text-xs font-black text-emerald-700">{currentData.pdfPath}</span>
-                                    <button type="button" onClick={(e) => { e.preventDefault(); setSurveyTabsData(prev => ({...prev, [tName]: {...prev[tName], pdfPath: ""}}));}} className="text-[10px] font-bold text-slate-400 hover:text-red-500 hover:underline transition-colors mt-1">파일 제거</button>
-                                </div>
-                            ) : (
-                                <div className="flex flex-col items-center gap-2">
-                                    <UploadCloud className={cn("w-10 h-10 text-slate-400", isDragging && "animate-bounce text-blue-500")} />
-                                    <p className="text-xs font-bold text-slate-700">스캔된 파일(PDF, 이미지)을 업로드</p>
-                                    <p className="text-[10px] font-medium text-slate-400 text-center px-8 leading-relaxed">AI가 스캔된 페이지에서 O, V 마커를 분석하여<br/>문항별 점수를 추출 (시뮬레이션)</p>
-                                </div>
-                            )}
-                          </label>
+                                  </div>
+                                ))}
+                                {Array.isArray(surveyPreviewData) && surveyPreviewData.length > 5 && (
+                                  <div className="text-center py-2 text-[10px] font-bold text-white/40">외 {surveyPreviewData.length - 5}명 추가 데이터 대기 중</div>
+                                )}
+                              </div>
+
+                              <Button 
+                                type="button"
+                                onClick={() => {
+                                  // 프리뷰 데이터를 실제 그리드 형식으로 변환하여 반영
+                                  const qs = isSat ? satisfactionQuestions : maturityQuestions;
+                                  const mcqs = qs.filter((q: any) => q.type === 'MCQ');
+                                  const getCat = (q: any) => {
+                                    const cat = q.category || "미지정";
+                                    return cat.includes('|') ? cat.split('|').pop() : cat;
+                                  };
+
+                                  if (isSat) {
+                                    const newGrid = surveyPreviewData.map((row: any, rIdx: number) => {
+                                      const rowData = [String(rIdx + 1), row.respondentId];
+                                      mcqs.forEach(q => {
+                                        const ans = row.answers.find((a: any) => a.questionId === q.id);
+                                        rowData.push(ans?.score ? String(ans.score) : "");
+                                      });
+                                      return rowData;
+                                    });
+                                    setSatisfactionGrid(newGrid);
+
+                                    // 서술형 추출
+                                    const newEssays = { ...satisfactionEssays };
+                                    qs.filter((q: any) => q.type === 'ESSAY').forEach(q => {
+                                      const texts = surveyPreviewData
+                                        .map((r: any) => r.answers.find((a: any) => a.questionId === q.id)?.text)
+                                        .filter((t: any) => t);
+                                      newEssays[q.id] = texts.join("\n");
+                                    });
+                                    setSatisfactionEssays(newEssays);
+                                  } else {
+                                    // 성숙도 그리드 변환 (사전/사후 지원)
+                                    const newGrid = surveyPreviewData.map((row: any, rIdx: number) => {
+                                      const rowData = [String(rIdx + 1), row.respondentId];
+                                      // 사전 점수들
+                                      mcqs.forEach(q => {
+                                        const ans = row.answers.find((a: any) => a.questionId === q.id);
+                                        rowData.push(ans?.preScore ? String(ans.preScore) : "");
+                                      });
+                                      // 사후 점수들
+                                      mcqs.forEach(q => {
+                                        const ans = row.answers.find((a: any) => a.questionId === q.id);
+                                        rowData.push(ans?.score ? String(ans.score) : "");
+                                      });
+                                      return rowData;
+                                    });
+                                    setMaturityGrid(newGrid);
+                                  }
+                                  
+                                  setInputMethods(prev => ({ ...prev, [tName]: 'DATA_INPUT' }));
+                                  setSurveyPreviewData(null);
+                                  showStatus("엑셀 데이터가 입력 그리드에 반영되었습니다. 최종 검토 후 저장하세요.", "success");
+                                }}
+                                className="w-full h-12 bg-white text-slate-900 hover:bg-slate-100 font-black rounded-2xl"
+                              >
+                                분석된 데이터 그리드에 적용하기
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       )}
 
-                      {currentData.templateId && currentMethod === 'EXCEL' && (
+                      {currentData.templateId && currentMethod === 'DATA_INPUT' && (
                         <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-
-                          {/* 엑셀 포맷 선택 */}
+                          {/* 입력 방식 선택 (순차/결과) */}
                           <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase ml-1">입력 방식 선택</label>
+                            <label className="text-[10px] font-black text-slate-400 uppercase ml-1">입력 패턴 선택</label>
                             <div className="grid grid-cols-2 gap-2">
                               {([
                                 { id: 'SEQUENTIAL', label: '순차입력', desc: '학생별 1행씩 입력', icon: '📋' },
-                                { id: 'AGGREGATED', label: '결과입력', desc: '구분별 응답 집계표', icon: '📊' },
+                                { id: 'AGGREGATED', label: '결과입력', desc: '문항별 응답 집계표', icon: '📊' },
                               ] as const).map(fmt => (
                                 <button
                                   key={fmt.id}
                                   type="button"
-                                  onClick={() => setExcelFormats(prev => ({ ...prev, [tName]: fmt.id }))}
+                                  onClick={() => {
+                                    setExcelFormats(prev => ({ ...prev, [tName]: fmt.id }));
+                                    const qs = isSat ? satisfactionQuestions : maturityQuestions;
+                                    const mcqs = qs.filter((q: any) => q.type === 'MCQ');
+                                    const getCat = (q: any) => {
+                                      const cat = q.category || "미지정";
+                                      return cat.includes('|') ? cat.split('|').pop() : cat;
+                                    };
+
+                                    if (tName === 'satisfaction') {
+                                      if (fmt.id === 'AGGREGATED') {
+                                        setSatisfactionGrid(mcqs.map(q => [getCat(q), q.content, "", "", "", "", "", ""]));
+                                      } else {
+                                        setSatisfactionGrid([new Array(mcqs.length + 2).fill("")]);
+                                      }
+                                    } else {
+                                      if (fmt.id === 'AGGREGATED') {
+                                        setMaturityGrid(mcqs.map(q => [getCat(q), q.content, "", "", "", "", "", "", "", "", "", "", ""]));
+                                      } else {
+                                        setMaturityGrid([new Array(mcqs.length + 2).fill("")]);
+                                      }
+                                    }
+                                  }}
                                   className={cn(
                                     "p-3 rounded-2xl border-2 text-left transition-all",
                                     excelFormats[tName] === fmt.id
@@ -1722,69 +2119,69 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
                             </div>
                           </div>
 
-                          {/* 양식 다운로드 */}
-                          <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg">
-                                  <Download className="w-4 h-4" />
-                                </div>
-                                <div>
-                                  <p className="text-xs font-black text-blue-700">
-                                    {excelFormats[tName] === 'SEQUENTIAL' ? '📋 순차입력 양식' : '📊 결과입력 양식'} 다운로드
-                                  </p>
-                                  <p className="text-[10px] text-blue-500 font-bold">
-                                    {excelFormats[tName] === 'SEQUENTIAL'
-                                      ? '학생 1명 = 1행 | 성명, 결과값_[구분명] 컬럼'
-                                      : '구분 | 문항 | 참여자 | 매우그렇다(5) ... | 평균'}
-                                  </p>
-                                </div>
-                              </div>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-9 px-4 rounded-xl border-blue-200 text-blue-600 font-black hover:bg-white shrink-0"
-                                onClick={() => handleDownloadExcelTemplate(tName, excelFormats[tName])}
-                              >
-                                다운로드
-                              </Button>
-                            </div>
-                          </div>
+                          {/* 그리드 입력 컴포넌트 */}
+                          {(() => {
+                            const qs = isSat ? satisfactionQuestions : maturityQuestions;
+                            const format = excelFormats[tName];
+                            const isMat = tName === 'maturity';
+                            
+                            let headers: string[] = [];
+                            if (format === 'SEQUENTIAL') {
+                              headers = ["순번", "성명"];
+                              if (isMat) {
+                                qs.filter((q: any) => q.type === 'MCQ').forEach((q: any) => headers.push(`사전_${getCat(q)}`));
+                                qs.filter((q: any) => q.type === 'MCQ').forEach((q: any) => headers.push(`사후_${getCat(q)}`));
+                              } else {
+                                qs.filter((q: any) => q.type === 'MCQ').forEach((q: any) => headers.push(`점수_${getCat(q)}`));
+                              }
+                            } else {
+                              headers = isMat 
+                                ? ["구분", "설문문항", "응답인원", "사전5", "사전4", "사전3", "사전2", "사전1", "사후5", "사후4", "사후3", "사후2", "사후1"]
+                                : ["구분", "설문문항", "응답인원", "5점", "4점", "3점", "2점", "1점"];
+                            }
 
-                          {/* 파일 업로드 영역 */}
-                          <label 
-                            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                            onDragLeave={() => setIsDragging(false)}
-                            onDrop={(e) => handleFileDrop(e, tName)}
-                            className={cn(
-                                "relative h-36 border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center transition-all cursor-pointer overflow-hidden",
-                                isDragging ? "border-blue-500 bg-blue-50/50 scale-[1.02]" : "border-slate-200 bg-slate-50 hover:bg-slate-100",
-                                currentData.excelFile ? "border-emerald-500 bg-emerald-50/20" : ""
-                            )}
-                          >
-                            <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) setSurveyTabsData(prev => ({...prev, [tName]: {...prev[tName], excelFile: file}}));
-                            }} />
-                            {currentData.excelFile ? (
-                                <div className="flex flex-col items-center gap-2 animate-in zoom-in-95">
-                                    <div className="w-10 h-10 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-lg">
-                                        <FilePlus2 className="w-5 h-5" />
-                                    </div>
-                                    <span className="text-xs font-black text-emerald-700">{currentData.excelFile.name}</span>
-                                    <button type="button" onClick={(e) => { e.preventDefault(); setSurveyTabsData(prev => ({...prev, [tName]: {...prev[tName], excelFile: null}}));}} className="text-[10px] font-bold text-slate-400 hover:text-red-500 hover:underline transition-colors mt-1">파일 제거</button>
-                                </div>
-                            ) : (
-                                <div className="flex flex-col items-center gap-2">
-                                    <UploadCloud className={cn("w-9 h-9 text-slate-400", isDragging && "animate-bounce text-blue-500")} />
-                                    <p className="text-xs font-bold text-slate-700">엑셀 파일을 드래그하거나 클릭하여 업로드</p>
-                                    <p className="text-[10px] font-medium text-slate-400 text-center px-4 leading-relaxed">
-                                      {excelFormats[tName] === 'SEQUENTIAL' ? '순차입력 양식 업로드 시 학생별 분석' : '결과입력 양식 업로드 시 집계 데이터 분석'}
-                                    </p>
-                                </div>
-                            )}
-                          </label>
+                             return (
+                               <div className="space-y-6">
+                                 <div className="space-y-2">
+                                   <label className="text-xs font-black text-slate-400 ml-1 uppercase">객관식 데이터 (Grid)</label>
+                                   <SurveyDataGrid 
+                                     headers={headers}
+                                     data={isSat ? satisfactionGrid : maturityGrid}
+                                     onChange={(newData) => isSat ? setSatisfactionGrid(newData) : setMaturityGrid(newData)}
+                                     fixedCols={format === 'AGGREGATED' ? 2 : 0}
+                                     isAggregated={format === 'AGGREGATED'}
+                                     placeholder={`엑셀의 객관식 점수 영역을 복사하여 붙여넣으세요.\n(${format === 'SEQUENTIAL' ? '학생별 순차 데이터' : '문항별 집계 데이터'})`}
+                                   />
+                                 </div>
+
+                                 {qs.filter((q: any) => q.type === 'ESSAY').length > 0 && (
+                                   <div className="space-y-4 pt-4 border-t border-slate-100">
+                                      <label className="text-xs font-black text-slate-400 ml-1 uppercase tracking-wider">주관식 상술형 입력 (문항별 별도 입력)</label>
+                                      <div className="grid grid-cols-1 gap-4">
+                                        {qs.filter((q: any) => q.type === 'ESSAY').map((q: any) => (
+                                          <div key={q.id} className="space-y-2 group">
+                                            <div className="flex items-center gap-2 mb-1">
+                                              <div className="w-1 h-3 bg-blue-500 rounded-full"></div>
+                                              <span className="text-[11px] font-black text-slate-600">{q.content}</span>
+                                            </div>
+                                            <textarea 
+                                              value={(isSat ? satisfactionEssays : maturityEssays)[q.id] || ""}
+                                              onChange={(e) => {
+                                                const val = e.target.value;
+                                                const setter = isSat ? setSatisfactionEssays : setMaturityEssays;
+                                                setter(prev => ({...prev, [q.id]: val}));
+                                              }}
+                                              placeholder="주관식 응답 내용을 줄바꿈으로 구분하여 입력하거나, 엑셀의 해당 열을 복사하여 붙여넣으세요."
+                                              className="w-full h-32 p-4 bg-slate-50 border-none rounded-2xl text-[11px] font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 transition-all resize-none placeholder:text-slate-300"
+                                            />
+                                          </div>
+                                        ))}
+                                      </div>
+                                   </div>
+                                 )}
+                               </div>
+                             );
+                          })()}
                         </div>
                       )}
 
