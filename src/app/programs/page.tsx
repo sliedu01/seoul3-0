@@ -8,7 +8,7 @@ import { useForm } from "react-hook-form"
 import { utils, read, write } from "xlsx"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
-import { SurveyAdminTab } from "@/components/survey/SurveyAdminTab";
+import SurveyAdminTab from "@/components/survey/SurveyAdminTab";
 import { parseSurveyExcel, SurveyInputFormat, SurveyType } from "@/lib/survey-parser";
 
 // ── 설문 그리드 입력 컴포넌트 ──
@@ -632,37 +632,66 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
         if (!q.category) return "미지정";
         return q.category.includes('|') ? q.category.split('|').pop() : q.category;
       };
-      const getGroup = (q: any) => {
-        if (!q.category) return "";
-        return q.category.includes('|') ? q.category.split('|')[0] : "";
-      };
 
       if (format === "SEQUENTIAL") {
-        // ── 순차입력: 학생별 1행씩 ──
-        const headers = ["응답순번", "성명"]
-        if (isMat) {
-          questions.forEach((q: any) => headers.push(`사전_${getCat(q)}`))
-          questions.forEach((q: any) => headers.push(`사후_${getCat(q)}`))
-        } else {
-          questions.forEach((q: any) => headers.push(`점수_${getCat(q)}`))
-        }
-        essayQs.forEach((q: any) => headers.push(`주관식_${getCat(q)}`))
-
-        const dataRows = [
-          ["순차입력 양식: 응답자별 데이터를 한 행씩 입력해 주세요. (점수: 1~5점)"],
-          headers
+        // ── 순차입력: 이미지 양식 반영 ──
+        const dataRows: any[][] = [
+          [templateData.name], // A1: 타이틀 (예: 만족도 조사)
+          [],
+          ["1. 기본정보"],
+          ["일시", activeSession?.date ? new Date(activeSession.date).toLocaleDateString() : "2026-04-15", activeSession?.startTime ? new Date(activeSession.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) + "~" + (activeSession?.endTime ? new Date(activeSession.endTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "") : ""],
+          ["장소", partners.find(p => p.id === activeSession?.partnerId)?.name || "정보없음"],
+          [],
+          ["2. 설문 Data"]
         ]
-        for (let i = 1; i <= 30; i++) {
-          const row = [i, `응답자_${i}`]
-          dataRows.push(row)
+
+        // 헤더 구성: 페이지, 문항 1, 문항 2 ...
+        const headers = ["페이지"]
+        if (isMat) {
+          questions.forEach((_, i) => headers.push(`문항 ${i + 1} (사전)`))
+          questions.forEach((_, i) => headers.push(`문항 ${i + 1} (사후)`))
+        } else {
+          questions.forEach((_, i) => headers.push(`문항 ${i + 1}`))
         }
+        essayQs.forEach((_, i) => headers.push(`문항 ${questions.length + i + 1} (주관식)`))
+        
+        dataRows.push(headers)
+
+        // 빈 행 (예: 60개)
+        for (let i = 1; i <= 60; i++) {
+          dataRows.push([i])
+        }
+
+        // 3. 설명정보 (문항별 내용)
+        dataRows.push([])
+        dataRows.push(["3. 문항 설명 (참고용)"])
+        dataRows.push(["문항 No.", "카테고리", "질문내용 (해당 문항에 대한 상세 내용입니다)"])
+        
+        let qNum = 1;
+        questions.forEach((q: any) => {
+          dataRows.push([`문항 ${qNum++}`, getCat(q), q.content])
+        })
+        essayQs.forEach((q: any) => {
+          dataRows.push([`문항 ${qNum++}`, getCat(q), q.content])
+        })
 
         const ws = XLSX.utils.aoa_to_sheet(dataRows)
-        ws['!cols'] = headers.map((_, i) => ({ wch: i <= 1 ? 10 : 15 }))
-        XLSX.utils.book_append_sheet(wb, ws, "순차입력")
+        
+        // 컬럼 너비 설정
+        const colWidths = [{ wch: 10 }] // 페이지/번호
+        if (isMat) {
+          questions.forEach(() => colWidths.push({ wch: 15 }, { wch: 15 }))
+        } else {
+          questions.forEach(() => colWidths.push({ wch: 15 }))
+        }
+        essayQs.forEach(() => colWidths.push({ wch: 40 }))
+        colWidths.push({ wch: 50 }) // 질문내용 등
+        
+        ws['!cols'] = colWidths;
+        XLSX.utils.book_append_sheet(wb, ws, "설문데이터")
 
       } else {
-        // ── 결과입력: 구분별 응답 집계 표 ──
+        // ── 결과입력 (전체 점수 분포 합계 입력 형태) ──
         const scoreLabels = isMat
           ? ["구분", "설문문항", "응답인원(계)", "사전_5점", "사전_4점", "사전_3점", "사전_2점", "사전_1점", "사후_5점", "사후_4점", "사후_3점", "사후_2점", "사후_1점"]
           : ["구분", "설문문항", "응답인원(계)", "5점(매우만족)", "4점(만족)", "3점(보통)", "2점(불만족)", "1점(매우불만족)"]
@@ -672,8 +701,7 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
           scoreLabels
         ]
         
-        const qList = questions.length > 0 ? questions : []
-        qList.forEach((q: any) => {
+        questions.forEach((q: any) => {
           const row = isMat
             ? [getCat(q), q.content, "", "", "", "", "", "", "", "", "", "", ""]
             : [getCat(q), q.content, "", "", "", "", "", ""]
@@ -692,15 +720,11 @@ const { canEdit, canDelete, isMember, loading: authLoading } = useAuth()
         }
 
         const ws = XLSX.utils.aoa_to_sheet(dataRows)
-        ws['!cols'] = [
-          { wch: 14 }, { wch: 40 }, { wch: 8 },
-          ...Array(isMat ? 12 : 6).fill({ wch: 12 })
-        ]
-        // 헤더 스타일 (배경색은 xlsx 기본 미지원, 별도 스타일은 xlsx-style 필요)
+        ws['!cols'] = [{ wch: 14 }, { wch: 40 }, { wch: 8 }, ...Array(isMat ? 12 : 6).fill({ wch: 12 })]
         XLSX.utils.book_append_sheet(wb, ws, "결과입력")
       }
       
-      XLSX.writeFile(wb, `${templateData.name}_${format === 'SEQUENTIAL' ? '순차입력' : '결과입력'}_양식.xlsx`)
+      XLSX.writeFile(wb, `${templateData.name}_${format === 'SEQUENTIAL' ? '작성용' : '결과입력'}_양식.xlsx`)
     } catch (err) {
       console.error(err)
       alert("양식 파일 생성 중 오류가 발생했습니다.")

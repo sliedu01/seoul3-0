@@ -50,60 +50,90 @@ export async function parseSurveyExcel(
  * 순차 입력(학생별 행) 처리
  */
 function processSequential(rows: any[][], template: any, type: SurveyType): ValidationResult {
-  const headerIdx = rows.findIndex(row => row.includes("성명") || row.includes("응답순번"));
-  if (headerIdx === -1) return { isValid: false, errors: ["'성명' 또는 '응답순번' 헤더를 찾을 수 없습니다."] };
+  // 헤더 탐색: '페이지' 또는 '문항 1'이 포함된 행 찾기 (실제 데이터 그리드 헤더)
+  const headerIdx = rows.findIndex(row => row.some(cell => {
+    const s = String(cell || "").trim();
+    return s === "페이지" || s === "번호" || s === "응답순번" || s.startsWith("문항 1");
+  }));
 
-  const headers = rows[headerIdx];
-  const dataRows = rows.slice(headerIdx + 1).filter(row => row.length > 0 && (row[0] || row[1]));
+  if (headerIdx === -1) return { isValid: false, errors: ["설문 데이터의 시작점(페이지, 문항 1 등 헤더)을 찾을 수 없습니다."] };
+
+  const headers = rows[headerIdx].map(h => String(h || "").trim());
+  const pageIdx = headers.findIndex(h => h === "페이지" || h === "번호" || h === "응답순번");
+  const nameIdx = headers.findIndex(h => h === "성명");
+  
+  // 데이터 행 추출 (헤더 이후부터, 첫 번째 컬럼(페이지/번호)에 유효한 값이 있는 경우)
+  const dataRows = rows.slice(headerIdx + 1).filter(row => {
+    const firstCell = String(row[pageIdx] || "").trim();
+    // 숫자가 있거나 내용이 있는 행만 추출
+    return firstCell !== "" && !isNaN(Number(firstCell)) || row.some(cell => cell !== null && cell !== undefined && String(cell).trim() !== "");
+  });
   
   const questions = template.questions || [];
   const previewData: any[] = [];
   const errors: string[] = [];
 
-  // 매핑 로직: 헤더 텍스트와 템플릿 카테고리/내용 매칭
+  // 문항 유형 분리
+  const mcqs = questions.filter((q: any) => q.type === "MCQ");
+  const essays = questions.filter((q: any) => q.type === "ESSAY");
+
   dataRows.forEach((row, rowIndex) => {
-    const respondentName = String(row[headers.indexOf("성명")] || `응답자_${rowIndex + 1}`);
+    const pageVal = pageIdx !== -1 ? row[pageIdx] : null;
+    const nameVal = nameIdx !== -1 ? row[nameIdx] : null;
+    // 성명이 있으면 성명 우선, 없으면 페이지(번호) 사용
+    const respondentName = nameVal ? String(nameVal).trim() : (pageVal ? `응답자_${pageVal}` : `응답자_${rowIndex + 1}`);
+
     const answers: any[] = [];
 
-    questions.forEach((q: any) => {
+    questions.forEach((q: any, qIdx: number) => {
       const cat = q.category?.split('|').pop() || "";
-      // 다양한 헤더 패턴 대응 (사전_X, 사후_X, 점수_X 등)
-      const possibleHeaders = type === "MATURITY" 
-        ? [`사전_${cat}`, `사후_${cat}`, cat] 
-        : [`점수_${cat}`, cat, q.content];
-      
       let score: number | null = null;
       let preScore: number | null = null;
       let text: string | null = null;
 
       if (type === "MATURITY") {
-        const preIdx = headers.findIndex(h => String(h).includes(`사전_${cat}`));
-        const postIdx = headers.findIndex(h => String(h).includes(`사후_${cat}`));
-        preScore = preIdx !== -1 ? Number(row[preIdx]) : null;
-        score = postIdx !== -1 ? Number(row[postIdx]) : null;
+        // 성숙도: 사전/사후 분리 매핑
+        const mcqIdx = mcqs.findIndex((mq: any) => mq.id === q.id);
+        if (mcqIdx !== -1) {
+          const preSearch = `문항 ${mcqIdx + 1} (사전)`;
+          const postSearch = `문항 ${mcqIdx + 1} (사후)`;
+          const preCol = headers.findIndex(h => h.includes(preSearch));
+          const postCol = headers.findIndex(h => h.includes(postSearch));
+          
+          preScore = preCol !== -1 ? (Number(row[preCol]) || null) : null;
+          score = postCol !== -1 ? (Number(row[postCol]) || null) : null;
+        }
       } else {
-        const idx = headers.findIndex(h => possibleHeaders.some(ph => String(h).includes(ph)));
-        if (q.type === "ESSAY") {
-          text = idx !== -1 ? String(row[idx]) : null;
-        } else {
-          score = idx !== -1 ? Number(row[idx]) : null;
+        // 만족도/만족도 이외: 일반 문항 매핑
+        const allQIdx = questions.findIndex((aq: any) => aq.id === q.id);
+        const searchLabel = `문항 ${allQIdx + 1}`;
+        const colIdx = headers.findIndex(h => h.startsWith(searchLabel));
+        
+        if (colIdx !== -1) {
+          if (q.type === "ESSAY") {
+            text = String(row[colIdx] || "").trim() || null;
+          } else {
+            score = row[colIdx] !== undefined && row[colIdx] !== "" ? Number(row[colIdx]) : null;
+          }
         }
       }
+      
+      if (score !== null || preScore !== null || text !== null) {
+        answers.push({ questionId: q.id, content: q.content, score, preScore, text });
+      }
+    });
 
-      answers.push({
-        questionId: q.id,
-        content: q.content,
-        score,
-        preScore,
-        text
+    if (answers.length > 0) {
+      previewData.push({
+        respondentId: respondentName,
+        answers
       });
-    });
-
-    previewData.push({
-      respondentId: respondentName,
-      answers
-    });
+    }
   });
+
+  if (previewData.length === 0) {
+    return { isValid: false, errors: ["유효한 설문 응답 데이터를 찾을 수 없습니다. 양식에 맞춰 데이터를 입력했는지 확인해주세요."] };
+  }
 
   return { isValid: true, errors, previewData };
 }
@@ -112,73 +142,124 @@ function processSequential(rows: any[][], template: any, type: SurveyType): Vali
  * 결과 입력(집계표) 처리
  */
 function processResult(rows: any[][], template: any, type: SurveyType): ValidationResult {
-  // 결과 입력은 각 문항별로 5점~1점 인원수를 역산하여 Sequential 데이터로 변환
-  const headerIdx = rows.findIndex(row => row.includes("설문문항"));
-  if (headerIdx === -1) return { isValid: false, errors: ["'설문문항' 헤더를 찾을 수 없습니다."] };
+  const headerIdx = rows.findIndex(row => row.includes("설문문항") || row.includes("문항"));
+  if (headerIdx === -1) return { isValid: false, errors: ["'설문문항' 또는 '문항' 헤더를 찾을 수 없습니다."] };
 
-  const headers = rows[headerIdx];
-  const dataRows = rows.slice(headerIdx + 1).filter(row => row[headers.indexOf("설문문항")]);
+  const headers = rows[headerIdx].map(h => String(h || "").trim());
   
+  // 데이터 행과 하단 추가 데이터(주관식 등) 분리
+  const rawDataRows = rows.slice(headerIdx + 1);
+  const dataRows: any[][] = [];
+  const bottomRows: any[][] = [];
+  let isTableEnded = false;
+
+  for (const row of rawDataRows) {
+    const qCell = String(row[headers.indexOf("설문문항")] || row[headers.indexOf("문항")] || "").trim();
+    if (!qCell || qCell.includes("합계") || isTableEnded) {
+      if (qCell.includes("합계")) isTableEnded = true;
+      if (row.some(cell => cell)) bottomRows.push(row);
+      continue;
+    }
+    dataRows.push(row);
+  }
+
+  // 하단 데이터에서 주관식 응답 추출 (비어있지 않은 긴 텍스트 위주)
+  const extractedEssays = bottomRows
+    .flatMap(row => row.map(cell => String(cell || "").trim()))
+    .filter(text => text.length > 5 && !text.includes("합계") && !text.includes("계") && !text.includes("비고"));
+
   const questions = template.questions || [];
   const simulatedResponses: any[] = [];
   
   // 가상의 응답자 생성 (최대 응답 인원 기준)
   let maxRespondents = 0;
+  const countIdx = headers.findIndex(h => h.includes("응답인원") || h.includes("합계") || h.includes("계"));
+  
   dataRows.forEach(row => {
-    const count = Number(row[headers.indexOf("응답인원(계)")]) || 0;
+    const count = Number(row[countIdx]) || 0;
     if (count > maxRespondents) maxRespondents = count;
   });
+
+  if (maxRespondents === 0) maxRespondents = 1; // 최소 1명
 
   for (let i = 0; i < maxRespondents; i++) {
     simulatedResponses.push({ respondentId: `익명_${i+1}`, answers: [] });
   }
 
+  // 점수 컬럼 인덱스 찾기 함수
+  const findScoreIdx = (score: number) => {
+    // 1. 숫자 포함 매칭 (예: "5점", "(5)", "1")
+    let idx = headers.findIndex(h => h.includes(String(score)) && !h.includes("사전") && !h.includes("사후"));
+    if (idx !== -1) return idx;
+
+    // 2. 텍스트 매칭 (만족도 등)
+    const labels: Record<number, string[]> = {
+      5: ["매우만족", "매우우수", "보통이상", "우수"],
+      4: ["만족", "우수"],
+      3: ["보통"],
+      2: ["불만족", "미흡"],
+      1: ["매우불만족", "매우미흡", "보통미만"]
+    };
+    return headers.findIndex(h => labels[score]?.some(l => h.includes(l)));
+  };
+
   questions.forEach((q: any) => {
-    const matchingRow = dataRows.find(row => String(row[headers.indexOf("설문문항")]).trim() === q.content.trim());
+    const qColIdx = headers.indexOf("설문문항") !== -1 ? headers.indexOf("설문문항") : headers.indexOf("문항");
+    const matchingRow = dataRows.find(row => String(row[qColIdx] || "").trim() === q.content.trim());
+    
     if (!matchingRow) return;
 
     if (type === "MATURITY") {
-      // 성숙도 집계 처리 (사전/사후 각 점수대별 분배)
-      const scoreMaps = [
-        { key: "사전", startIdx: headers.findIndex(h => String(h).includes("사전_5점")) },
-        { key: "사후", startIdx: headers.findIndex(h => String(h).includes("사후_5점")) }
-      ];
-
-      scoreMaps.forEach(map => {
+      // 성숙도 집계 처리
+      for (const mode of ["사전", "사후"]) {
         let currentResponseIdx = 0;
         for (let score = 5; score >= 1; score--) {
-          const count = Number(matchingRow[map.startIdx + (5 - score)]) || 0;
+          const sIdx = headers.findIndex(h => h.includes(mode) && h.includes(String(score)));
+          if (sIdx === -1) continue;
+          
+          const count = Number(matchingRow[sIdx]) || 0;
           for (let j = 0; j < count; j++) {
             if (currentResponseIdx < simulatedResponses.length) {
-              if (map.key === "사전") simulatedResponses[currentResponseIdx].answers.push({ questionId: q.id, preScore: score });
-              else {
-                const existing = simulatedResponses[currentResponseIdx].answers.find((a:any) => a.questionId === q.id);
-                if (existing) existing.score = score;
-                else simulatedResponses[currentResponseIdx].answers.push({ questionId: q.id, score });
+              const ans = simulatedResponses[currentResponseIdx].answers;
+              let existing = ans.find((a:any) => a.questionId === q.id);
+              if (!existing) {
+                existing = { questionId: q.id, content: q.content, score: null, preScore: null };
+                ans.push(existing);
               }
+              if (mode === "사전") existing.preScore = score;
+              else existing.score = score;
               currentResponseIdx++;
             }
           }
         }
-      });
+      }
     } else {
       // 만족도 집계 처리
       if (q.type === "ESSAY") {
-        const textVal = String(matchingRow[headers.length - 1] || "");
-        const texts = textVal.split(/,|\n/).map(t => t.trim()).filter(t => t);
-        texts.forEach((txt, idx) => {
+        // 이미 추출된 주관식 데이터가 있으면 배분
+        extractedEssays.forEach((txt, idx) => {
           if (idx < simulatedResponses.length) {
-            simulatedResponses[idx].answers.push({ questionId: q.id, text: txt });
+            simulatedResponses[idx].answers.push({ 
+              questionId: q.id, 
+              content: q.content,
+              text: txt 
+            });
           }
         });
       } else {
-        const startIdx = headers.findIndex(h => String(h).includes("5점"));
         let currentResponseIdx = 0;
         for (let score = 5; score >= 1; score--) {
-          const count = Number(matchingRow[startIdx + (5 - score)]) || 0;
+          const sIdx = findScoreIdx(score);
+          if (sIdx === -1) continue;
+
+          const count = Number(matchingRow[sIdx]) || 0;
           for (let j = 0; j < count; j++) {
             if (currentResponseIdx < simulatedResponses.length) {
-              simulatedResponses[currentResponseIdx].answers.push({ questionId: q.id, score });
+              simulatedResponses[currentResponseIdx].answers.push({ 
+                questionId: q.id, 
+                content: q.content,
+                score 
+              });
               currentResponseIdx++;
             }
           }

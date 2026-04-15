@@ -29,6 +29,10 @@ export default function SurveyAdminTab({ sessionId }: SurveyAdminTabProps) {
   const [loading, setLoading] = useState(false)
   const [isDeletingAll, setIsDeletingAll] = useState(false)
   
+  // 정렬 상태
+  const [sortField, setSortField] = useState<"NO" | "NAME">("NO")
+  const [sortDirection, setSortDirection] = useState<"ASC" | "DESC">("ASC")
+
   // 수정 모달 관련
   const [editingResponse, setEditingResponse] = useState<any | null>(null)
   const [isUpdating, setIsUpdating] = useState(false)
@@ -126,6 +130,16 @@ export default function SurveyAdminTab({ sessionId }: SurveyAdminTabProps) {
   }
 
   const headers = getHeaders()
+
+  const sortedResponses = [...responses].sort((a, b) => {
+    if (sortField === "NAME") {
+      const cmp = String(a.respondentId).localeCompare(String(b.respondentId), undefined, { numeric: true })
+      return sortDirection === "ASC" ? cmp : -cmp
+    } else {
+      const cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      return sortDirection === "ASC" ? cmp : -cmp
+    }
+  })
 
   return (
     <div className="space-y-6 animate-in fade-in duration-700">
@@ -231,8 +245,30 @@ export default function SurveyAdminTab({ sessionId }: SurveyAdminTabProps) {
           <table className="w-full text-left border-collapse min-w-[1000px]">
             <thead>
               <tr className="bg-slate-50/50">
-                <th className="p-6 text-[10px] font-black text-slate-400 border-b border-slate-100 w-20 text-center">NO.</th>
-                <th className="p-6 text-[10px] font-black text-slate-900 border-b border-slate-100 min-w-[120px]">응답자명</th>
+                <th 
+                  className="p-6 text-[10px] font-black text-slate-400 border-b border-slate-100 w-24 text-center cursor-pointer hover:bg-blue-50 transition-colors group/th"
+                  onClick={() => {
+                    if (sortField === "NO") setSortDirection(prev => prev === "ASC" ? "DESC" : "ASC")
+                    else { setSortField("NO"); setSortDirection("ASC") }
+                  }}
+                >
+                  <div className="flex items-center justify-center gap-1.5">
+                    NO.
+                    <ArrowUpDown className={cn("w-3 h-3 transition-colors", sortField === "NO" ? "text-blue-500" : "text-transparent group-hover/th:text-slate-300")} />
+                  </div>
+                </th>
+                <th 
+                  className="p-6 text-[10px] font-black text-slate-900 border-b border-slate-100 min-w-[120px] cursor-pointer hover:bg-blue-50 transition-colors group/th"
+                  onClick={() => {
+                    if (sortField === "NAME") setSortDirection(prev => prev === "ASC" ? "DESC" : "ASC")
+                    else { setSortField("NAME"); setSortDirection("ASC") }
+                  }}
+                >
+                  <div className="flex items-center justify-start gap-1.5">
+                    응답자명
+                    <ArrowUpDown className={cn("w-3 h-3 transition-colors", sortField === "NAME" ? "text-blue-500" : "text-transparent group-hover/th:text-slate-300")} />
+                  </div>
+                </th>
                 {headers.map((h: any, i: number) => (
                   <th key={h.id} className="p-6 text-[10px] font-black text-slate-500 border-b border-slate-100 min-w-[150px] max-w-[200px]">
                     <div className="flex flex-col gap-1">
@@ -254,7 +290,7 @@ export default function SurveyAdminTab({ sessionId }: SurveyAdminTabProps) {
                     </div>
                   </td>
                 </tr>
-              ) : responses.length === 0 ? (
+              ) : sortedResponses.length === 0 ? (
                 <tr>
                   <td colSpan={headers.length + 3} className="p-20 text-center">
                     <div className="flex flex-col items-center gap-6 opacity-30">
@@ -269,9 +305,9 @@ export default function SurveyAdminTab({ sessionId }: SurveyAdminTabProps) {
                   </td>
                 </tr>
               ) : (
-                responses.map((res, rIdx) => (
+                sortedResponses.map((res, index) => (
                   <tr key={res.id} className="group hover:bg-slate-50/50 transition-colors border-b border-slate-50 last:border-none">
-                    <td className="p-6 text-[11px] font-black text-slate-300 text-center">{String(rIdx + 1).padStart(2, '0')}</td>
+                    <td className="p-6 text-[11px] font-black text-slate-300 text-center">{String(index + 1).padStart(2, '0')}</td>
                     <td className="p-6">
                       <div className="flex flex-col">
                         <span className="text-sm font-black text-slate-900">{res.respondentId}</span>
